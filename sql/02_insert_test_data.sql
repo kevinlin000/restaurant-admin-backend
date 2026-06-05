@@ -1,6 +1,8 @@
 -- ============================================================
--- 測試資料
--- 包含：1 品牌、3 門市、桌位、營業時間、4 角色、菜單
+-- 測試資料（對齊新 schema）
+-- 包含：1 品牌、3 門市、營業時間、特殊休息日、桌位、4 角色、
+--       帳號（user）+ 會員（members）+ 員工（staff）、菜單、
+--       時段（time_slot）+ 時段桌型庫存（reservation_capacity）示範
 -- ============================================================
 
 USE restaurant_db;
@@ -9,22 +11,21 @@ USE restaurant_db;
 -- 品牌
 -- ============================================================
 INSERT INTO brand (brand_name, brand_logo_url) VALUES
-('旭集和食集錦', '/images/brand/asahi-logo.png');
+('敘日和食集錦', '/images/brand/xuri-logo.png');
 
 -- ============================================================
--- 門市（3 家）
+-- 門市（3 家）—— status 用字串列舉
 -- ============================================================
 INSERT INTO store (brand_id, store_code, store_name, city, district, address, phone, latitude, longitude, mrt_info, parking_info, description, status) VALUES
-(1, 'TPE001', '旭集信義 A11 店', '台北市', '信義區', '台北市信義區松壽路11號4樓', '02-2345-6789', 25.0360390, 121.5674080, '捷運市政府站 3 號出口步行 5 分鐘', '統一時代百貨附設停車場，消費滿額可折抵', '信義區旗艦店，270度環景落地窗，享受都市天際線', 1),
-(1, 'TPE002', '旭集南港 CITYLINK 店', '台北市', '南港區', '台北市南港區忠孝東路七段369號3樓', '02-2789-1234', 25.0527340, 121.6065700, '捷運南港站直結 CITYLINK', 'CITYLINK 地下停車場，消費折抵 2 小時', '南港新據點，開放式廚房可觀賞料理過程', 1),
-(1, 'KHH001', '旭集高雄夢時代店', '高雄市', '前鎮區', '高雄市前鎮區中華五路789號5樓', '07-536-7890', 22.5955130, 120.3079830, '輕軌夢時代站步行 3 分鐘', '夢時代購物中心免費停車 3 小時', '南台灣首店，海港景觀座位區', 1);
+(1, 'TPE001', '敘日信義 A11 店', '台北市', '信義區', '台北市信義區松壽路11號4樓', '02-2345-6789', 25.0360390, 121.5674080, '捷運市政府站 3 號出口步行 5 分鐘', '統一時代百貨附設停車場，消費滿額可折抵', '信義區旗艦店，270度環景落地窗，享受都市天際線', 'OPEN'),
+(1, 'TPE002', '敘日南港 CITYLINK 店', '台北市', '南港區', '台北市南港區忠孝東路七段369號3樓', '02-2789-1234', 25.0527340, 121.6065700, '捷運南港站直結 CITYLINK', 'CITYLINK 地下停車場，消費折抵 2 小時', '南港新據點，開放式廚房可觀賞料理過程', 'OPEN'),
+(1, 'KHH001', '敘日高雄夢時代店', '高雄市', '前鎮區', '高雄市前鎮區中華五路789號5樓', '07-536-7890', 22.5955130, 120.3079830, '輕軌夢時代站步行 3 分鐘', '夢時代購物中心免費停車 3 小時', '南台灣首店，海港景觀座位區', 'OPEN');
 
 -- ============================================================
 -- 營業時間（每家店 x 每天 x 午晚餐時段）
 -- ============================================================
 -- TPE001 信義店
 INSERT INTO store_hour (store_id, day_of_week, open_time, close_time, meal_period, is_closed) VALUES
--- 週一到週五
 (1, 1, '11:30:00', '14:30:00', 'LUNCH', false),
 (1, 1, '17:30:00', '22:00:00', 'DINNER', false),
 (1, 2, '11:30:00', '14:30:00', 'LUNCH', false),
@@ -35,7 +36,6 @@ INSERT INTO store_hour (store_id, day_of_week, open_time, close_time, meal_perio
 (1, 4, '17:30:00', '22:00:00', 'DINNER', false),
 (1, 5, '11:30:00', '14:30:00', 'LUNCH', false),
 (1, 5, '17:30:00', '22:30:00', 'DINNER', false),
--- 週六日（提早開、延後收）
 (1, 6, '11:00:00', '15:00:00', 'LUNCH', false),
 (1, 6, '17:00:00', '22:30:00', 'DINNER', false),
 (1, 7, '11:00:00', '15:00:00', 'LUNCH', false),
@@ -87,59 +87,59 @@ INSERT INTO store_holiday (store_id, holiday_date, reason) VALUES
 (3, '2026-02-19', '農曆初二公休');
 
 -- ============================================================
--- 桌位
+-- 桌位 —— capacity 改 table_size，status 用字串
 -- ============================================================
--- TPE001 信義店（20 桌）
-INSERT INTO table_info (store_id, table_number, capacity, table_type, zone, status, is_combinable) VALUES
-(1, 'A01', 2, 'REGULAR', '1F', 1, false),
-(1, 'A02', 2, 'REGULAR', '1F', 1, false),
-(1, 'A03', 4, 'REGULAR', '1F', 1, true),
-(1, 'A04', 4, 'REGULAR', '1F', 1, true),
-(1, 'A05', 4, 'REGULAR', '1F', 1, true),
-(1, 'A06', 6, 'REGULAR', '1F', 1, true),
-(1, 'B01', 2, 'BOOTH', '1F', 1, false),
-(1, 'B02', 4, 'BOOTH', '1F', 1, false),
-(1, 'B03', 4, 'BOOTH', '1F', 1, false),
-(1, 'C01', 2, 'BAR', '1F', 1, false),
-(1, 'C02', 2, 'BAR', '1F', 1, false),
-(1, 'D01', 4, 'REGULAR', '2F', 1, true),
-(1, 'D02', 4, 'REGULAR', '2F', 1, true),
-(1, 'D03', 6, 'REGULAR', '2F', 1, true),
-(1, 'D04', 6, 'REGULAR', '2F', 1, true),
-(1, 'V01', 8, 'VIP_ROOM', '2F', 1, false),
-(1, 'V02', 10, 'VIP_ROOM', '2F', 1, false),
-(1, 'V03', 12, 'VIP_ROOM', '2F', 1, false);
+-- TPE001 信義店（18 桌）
+INSERT INTO table_info (store_id, table_number, table_size, table_type, zone, status, is_combinable) VALUES
+(1, 'A01', 2, 'REGULAR', '1F', 'AVAILABLE', false),
+(1, 'A02', 2, 'REGULAR', '1F', 'AVAILABLE', false),
+(1, 'A03', 4, 'REGULAR', '1F', 'AVAILABLE', true),
+(1, 'A04', 4, 'REGULAR', '1F', 'AVAILABLE', true),
+(1, 'A05', 4, 'REGULAR', '1F', 'AVAILABLE', true),
+(1, 'A06', 6, 'REGULAR', '1F', 'AVAILABLE', true),
+(1, 'B01', 2, 'BOOTH', '1F', 'AVAILABLE', false),
+(1, 'B02', 4, 'BOOTH', '1F', 'AVAILABLE', false),
+(1, 'B03', 4, 'BOOTH', '1F', 'AVAILABLE', false),
+(1, 'C01', 2, 'BAR', '1F', 'AVAILABLE', false),
+(1, 'C02', 2, 'BAR', '1F', 'AVAILABLE', false),
+(1, 'D01', 4, 'REGULAR', '2F', 'AVAILABLE', true),
+(1, 'D02', 4, 'REGULAR', '2F', 'AVAILABLE', true),
+(1, 'D03', 6, 'REGULAR', '2F', 'AVAILABLE', true),
+(1, 'D04', 6, 'REGULAR', '2F', 'AVAILABLE', true),
+(1, 'V01', 8, 'VIP_ROOM', '2F', 'AVAILABLE', false),
+(1, 'V02', 10, 'VIP_ROOM', '2F', 'AVAILABLE', false),
+(1, 'V03', 12, 'VIP_ROOM', '2F', 'AVAILABLE', false);
 
--- TPE002 南港店（15 桌）
-INSERT INTO table_info (store_id, table_number, capacity, table_type, zone, status, is_combinable) VALUES
-(2, 'A01', 2, 'REGULAR', '1F', 1, false),
-(2, 'A02', 2, 'REGULAR', '1F', 1, false),
-(2, 'A03', 4, 'REGULAR', '1F', 1, true),
-(2, 'A04', 4, 'REGULAR', '1F', 1, true),
-(2, 'A05', 4, 'REGULAR', '1F', 1, true),
-(2, 'A06', 6, 'REGULAR', '1F', 1, true),
-(2, 'A07', 6, 'REGULAR', '1F', 1, true),
-(2, 'B01', 2, 'BOOTH', '1F', 1, false),
-(2, 'B02', 4, 'BOOTH', '1F', 1, false),
-(2, 'C01', 2, 'BAR', '1F', 1, false),
-(2, 'C02', 2, 'BAR', '1F', 1, false),
-(2, 'V01', 8, 'VIP_ROOM', '1F', 1, false),
-(2, 'V02', 10, 'VIP_ROOM', '1F', 1, false);
+-- TPE002 南港店（13 桌）
+INSERT INTO table_info (store_id, table_number, table_size, table_type, zone, status, is_combinable) VALUES
+(2, 'A01', 2, 'REGULAR', '1F', 'AVAILABLE', false),
+(2, 'A02', 2, 'REGULAR', '1F', 'AVAILABLE', false),
+(2, 'A03', 4, 'REGULAR', '1F', 'AVAILABLE', true),
+(2, 'A04', 4, 'REGULAR', '1F', 'AVAILABLE', true),
+(2, 'A05', 4, 'REGULAR', '1F', 'AVAILABLE', true),
+(2, 'A06', 6, 'REGULAR', '1F', 'AVAILABLE', true),
+(2, 'A07', 6, 'REGULAR', '1F', 'AVAILABLE', true),
+(2, 'B01', 2, 'BOOTH', '1F', 'AVAILABLE', false),
+(2, 'B02', 4, 'BOOTH', '1F', 'AVAILABLE', false),
+(2, 'C01', 2, 'BAR', '1F', 'AVAILABLE', false),
+(2, 'C02', 2, 'BAR', '1F', 'AVAILABLE', false),
+(2, 'V01', 8, 'VIP_ROOM', '1F', 'AVAILABLE', false),
+(2, 'V02', 10, 'VIP_ROOM', '1F', 'AVAILABLE', false);
 
 -- KHH001 高雄店（12 桌）
-INSERT INTO table_info (store_id, table_number, capacity, table_type, zone, status, is_combinable) VALUES
-(3, 'A01', 2, 'REGULAR', '1F', 1, false),
-(3, 'A02', 4, 'REGULAR', '1F', 1, true),
-(3, 'A03', 4, 'REGULAR', '1F', 1, true),
-(3, 'A04', 4, 'REGULAR', '1F', 1, true),
-(3, 'A05', 6, 'REGULAR', '1F', 1, true),
-(3, 'A06', 6, 'REGULAR', '1F', 1, true),
-(3, 'B01', 2, 'BOOTH', '1F', 1, false),
-(3, 'B02', 4, 'BOOTH', '1F', 1, false),
-(3, 'C01', 2, 'BAR', '1F', 1, false),
-(3, 'V01', 8, 'VIP_ROOM', '1F', 1, false),
-(3, 'V02', 10, 'VIP_ROOM', '1F', 1, false),
-(3, 'V03', 16, 'VIP_ROOM', '1F', 1, false);
+INSERT INTO table_info (store_id, table_number, table_size, table_type, zone, status, is_combinable) VALUES
+(3, 'A01', 2, 'REGULAR', '1F', 'AVAILABLE', false),
+(3, 'A02', 4, 'REGULAR', '1F', 'AVAILABLE', true),
+(3, 'A03', 4, 'REGULAR', '1F', 'AVAILABLE', true),
+(3, 'A04', 4, 'REGULAR', '1F', 'AVAILABLE', true),
+(3, 'A05', 6, 'REGULAR', '1F', 'AVAILABLE', true),
+(3, 'A06', 6, 'REGULAR', '1F', 'AVAILABLE', true),
+(3, 'B01', 2, 'BOOTH', '1F', 'AVAILABLE', false),
+(3, 'B02', 4, 'BOOTH', '1F', 'AVAILABLE', false),
+(3, 'C01', 2, 'BAR', '1F', 'AVAILABLE', false),
+(3, 'V01', 8, 'VIP_ROOM', '1F', 'AVAILABLE', false),
+(3, 'V02', 10, 'VIP_ROOM', '1F', 'AVAILABLE', false),
+(3, 'V03', 16, 'VIP_ROOM', '1F', 'AVAILABLE', false);
 
 -- ============================================================
 -- 角色（4 種）
@@ -151,14 +151,30 @@ INSERT INTO role (role_name, description) VALUES
 ('ADMIN', '系統管理員，可管理全系統');
 
 -- ============================================================
--- 測試會員
--- ============================================================
+-- 登入帳號 user（會員與員工共用）
 -- 密碼皆為 password123（BCrypt 雜湊）
-INSERT INTO member (role_id, email, password_hash, name, phone, birthday, member_level) VALUES
-(4, 'admin@restaurant.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '系統管理員', '0900-000-000', '1990-01-01', 'DIAMOND'),
-(3, 'manager@restaurant.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '王店長', '0911-111-111', '1985-06-15', 'GOLD'),
-(1, 'user1@example.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '陳小明', '0922-222-222', '1995-03-20', 'BRONZE'),
-(1, 'user2@example.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '林小美', '0933-333-333', '1998-11-08', 'SILVER');
+-- user_id 依序：1=admin 2=manager 3=staff 4=陳小明 5=林小美
+-- ============================================================
+INSERT INTO user (role_id, email, password_hash, name, phone, birthday) VALUES
+(4, 'admin@xuri.com',     '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '系統管理員', '0900-000-000', '1990-01-01'),
+(3, 'manager@xuri.com',   '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '王店長',     '0911-111-111', '1985-06-15'),
+(2, 'staff@xuri.com',     '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '李店員',     '0955-555-555', '1997-09-10'),
+(1, 'user1@example.com',  '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '陳小明',     '0922-222-222', '1995-03-20'),
+(1, 'user2@example.com',  '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '林小美',     '0933-333-333', '1998-11-08');
+
+-- ============================================================
+-- 會員資料 members（顧客；對應 user 3、4 → 陳小明 / 林小美）
+-- ============================================================
+INSERT INTO members (user_id, point_balance, member_level) VALUES
+(4, 120, 'BRONZE'),
+(5, 880, 'SILVER');
+
+-- ============================================================
+-- 員工資料 staff（manager + staff；皆屬信義店 store_id=1）
+-- ============================================================
+INSERT INTO staff (user_id, store_id, staff_no, hire_date, status) VALUES
+(2, 1, 'M001', '2023-01-01', 'ACTIVE'),
+(3, 1, 'S001', '2024-07-15', 'ACTIVE');
 
 -- ============================================================
 -- 菜單分類
@@ -208,6 +224,30 @@ SELECT s.store_id, m.menu_item_id, NULL, TRUE
 FROM store s CROSS JOIN menu_item m;
 
 -- ============================================================
--- 方案價格（用 store_menu 的 price 覆蓋來表示各方案）
--- 實際方案建議用獨立的 meal_plan 表，這裡先用簡化方式
+-- 時段 time_slot（示範：信義店 2026-06-10 午/晚兩個時段）
+-- 註：以下假設這是 time_slot 首批資料，slot_id 依序為 1、2
 -- ============================================================
+INSERT INTO time_slot (store_id, reservation_date, start_time, end_time, is_open) VALUES
+(1, '2026-06-10', '11:30:00', '14:30:00', true),  -- slot_id = 1 午餐
+(1, '2026-06-10', '17:30:00', '22:00:00', true);  -- slot_id = 2 晚餐
+
+-- ============================================================
+-- 時段桌型庫存 reservation_capacity
+-- total_count = 信義店各 table_size 的桌數（2人:5 / 4人:7 / 6人:3 / 8人:1 / 10人:1 / 12人:1）
+-- reserved_count 初始皆為 0
+-- ============================================================
+INSERT INTO reservation_capacity (slot_id, table_size, total_count, reserved_count) VALUES
+-- 午餐 slot 1
+(1, 2, 5, 0),
+(1, 4, 7, 0),
+(1, 6, 3, 0),
+(1, 8, 1, 0),
+(1, 10, 1, 0),
+(1, 12, 1, 0),
+-- 晚餐 slot 2
+(2, 2, 5, 0),
+(2, 4, 7, 0),
+(2, 6, 3, 0),
+(2, 8, 1, 0),
+(2, 10, 1, 0),
+(2, 12, 1, 0);
