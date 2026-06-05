@@ -1,4 +1,4 @@
-package com.restaurant.dto.response;
+package com.restaurant.common;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

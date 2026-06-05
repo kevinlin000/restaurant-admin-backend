@@ -1,4 +1,4 @@
-package com.restaurant.exception;
+package com.restaurant.common;
 
 /**
  * 業務邏輯例外

@@ -1,4 +1,4 @@
-package com.restaurant.exception;
+package com.restaurant.common;
 
 /**
  * 資源不存在例外
