@@ -17,6 +17,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 public class Staff {
+
     public enum StaffStatus {
         ACTIVE, RESIGNED
     }
@@ -25,6 +26,7 @@ public class Staff {
     @Column(name = "user_id")
     private Long userId;
 
+    // 共享主鍵：對應 User Entity
     @OneToOne(fetch = FetchType.LAZY)
     @MapsId
     @JoinColumn(name = "user_id")
@@ -42,6 +44,6 @@ public class Staff {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
-    @Builder.Default
+    @Builder.Default // 如果依然報錯，請參考下方的替代方案
     private StaffStatus status = StaffStatus.ACTIVE;
 }
