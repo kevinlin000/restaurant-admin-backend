@@ -18,7 +18,6 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class PointTransaction {
-    // 1. 修正對齊 SQL 註解的列舉
     public enum TransactionType {
         EARN, USE, EXPIRE, ADJUST
     }
@@ -32,7 +31,6 @@ public class PointTransaction {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    // 2. 將 storeId 改為關聯 Store Entity (可為 null)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "store_id")
     private Store store;
