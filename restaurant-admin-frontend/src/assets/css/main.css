@@ -1,0 +1,14 @@
+/* 頁面內容位置 */
+.page-container {
+    width: 80%;
+    max-width: 1200px ;
+    margin: 0 auto;
+    padding-top: 150px;
+}
+
+/* Logo */
+.logo-image {
+  width: 53px;
+  height: 50px;
+  margin-right: 15px;
+}
