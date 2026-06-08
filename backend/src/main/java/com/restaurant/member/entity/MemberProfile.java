@@ -7,6 +7,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * 顧客會員實體，對應 members 資料表。
+ * 掛載於 User 主表之下，負責記錄顧客的可用點數餘額與會員等級。
+ */
 @Entity
 @Table(name = "members")
 @Getter
@@ -28,7 +32,7 @@ public class MemberProfile {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "point_balance", nullable = false)
+    @Column(name = "point_balance")
     @Builder.Default
     private Integer pointBalance = 0;
 

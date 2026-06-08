@@ -1,15 +1,15 @@
 package com.restaurant.member.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import com.restaurant.store.entity.Store;
 import java.time.LocalDateTime;
 
+/**
+ * 會員點數異動歷史紀錄實體，對應 point_transaction 資料表。
+ * 負責記錄所有點數的獲取、扣除、過期或手動調整之流水帳。
+ */
 @Entity
 @Table(name = "point_transaction")
 @Getter
@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class PointTransaction {
+
     public enum TransactionType {
         EARN, USE, EXPIRE, ADJUST
     }
@@ -39,7 +40,7 @@ public class PointTransaction {
     private Integer pointChange;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "transaction_type", nullable = false, length = 20)
+    @Column(name = "transaction_type", length = 20)
     private TransactionType transactionType;
 
     @Column(name = "reference_id")

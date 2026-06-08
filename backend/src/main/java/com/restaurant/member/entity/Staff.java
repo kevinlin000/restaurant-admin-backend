@@ -9,6 +9,10 @@ import lombok.Setter;
 import com.restaurant.store.entity.Store;
 import java.time.LocalDate;
 
+/**
+ * 員工資訊實體，對應 staff 資料表。
+ * 掛載於 User 主表之下，用以記錄員工特有的工號、入職日與在職狀態。
+ */
 @Entity
 @Table(name = "staff")
 @Getter
@@ -17,10 +21,8 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 public class Staff {
-
-    public enum StaffStatus {
-        ACTIVE, RESIGNED
-    }
+    public static final Integer STATUS_ACTIVE = 1; // 在職
+    public static final Integer STATUS_RESIGNED = 0; // 離職
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,8 +43,10 @@ public class Staff {
     @Column(name = "hire_date", nullable = false)
     private LocalDate hireDate;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
-    @Builder.Default // 如果依然報錯，請參考下方的替代方案
-    private StaffStatus status = StaffStatus.ACTIVE;
+    @Column(name = "status")
+    @Builder.Default
+    private Integer status = 1; // 1 = 在職 (ACTIVE), 0 = 離職 (RESIGNED)
+
+    public class StaffStatus {
+    }
 }

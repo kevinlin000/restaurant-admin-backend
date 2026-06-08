@@ -9,10 +9,14 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
-
+import com.restaurant.store.entity.Store;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/**
+ * 使用者核心帳號實體，對應 user 資料表。
+ * 全系統（會員與員工）的唯一基礎帳號表，存儲登入憑證與基本個資。
+ */
 @Entity
 @Table(name = "user")
 @SQLDelete(sql = "UPDATE user SET is_deleted = true WHERE user_id = ?")
@@ -33,6 +37,10 @@ public class User {
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "store_id")
+    private Store store;
+
     @OneToOne(mappedBy = "user", cascade = { CascadeType.PERSIST, CascadeType.MERGE }, fetch = FetchType.LAZY)
     private Staff staff;
 
@@ -45,7 +53,7 @@ public class User {
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
-    @Column(name = "name", length = 100)
+    @Column(name = "name", length = 50)
     private String name;
 
     @Column(name = "phone", length = 20)
