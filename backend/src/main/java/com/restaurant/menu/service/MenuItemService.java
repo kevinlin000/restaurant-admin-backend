@@ -42,7 +42,7 @@ public class MenuItemService {
         MenuItem existingItem = menuItemRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("找不到該品項，無法下架！"));
         
-        existingItem.setIsActive(false); // 你的左手塗改軟刪除大招！
+        existingItem.setStatus("UNAVAILABLE"); // 你的左手塗改軟刪除大招！
         return menuItemRepository.save(existingItem);
     }
 }
