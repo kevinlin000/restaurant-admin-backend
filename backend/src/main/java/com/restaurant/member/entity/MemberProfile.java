@@ -32,7 +32,7 @@ public class MemberProfile {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "point_balance")
+    @Column(name = "point_balance", nullable = false)
     @Builder.Default
     private Integer pointBalance = 0;
 

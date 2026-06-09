@@ -40,7 +40,7 @@ public class PointTransaction {
     private Integer pointChange;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "transaction_type", length = 20)
+    @Column(name = "transaction_type", nullable = false, length = 20)
     private TransactionType transactionType;
 
     @Column(name = "reference_id")

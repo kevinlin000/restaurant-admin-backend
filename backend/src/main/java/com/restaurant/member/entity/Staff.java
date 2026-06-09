@@ -21,8 +21,11 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 public class Staff {
-    public static final Integer STATUS_ACTIVE = 1; // 在職
-    public static final Integer STATUS_RESIGNED = 0; // 離職
+
+    public enum StaffStatus {
+        ACTIVE, // 在職
+        RESIGNED // 離職
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -43,10 +46,8 @@ public class Staff {
     @Column(name = "hire_date", nullable = false)
     private LocalDate hireDate;
 
-    @Column(name = "status")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
-    private Integer status = 1; // 1 = 在職 (ACTIVE), 0 = 離職 (RESIGNED)
-
-    public class StaffStatus {
-    }
+    private StaffStatus status = StaffStatus.ACTIVE;
 }

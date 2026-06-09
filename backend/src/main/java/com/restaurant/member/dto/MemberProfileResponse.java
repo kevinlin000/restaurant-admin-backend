@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 import com.restaurant.member.entity.MemberProfile.MemberLevel;
 
 /**
- * 前台會員修改個人資料時，前端傳入的請求資料
+ * 回傳給前台會員的基本個資與等級資訊
  */
 @Data
 public class MemberProfileResponse {
