@@ -24,6 +24,10 @@ public class CreateOrderRequest {
     private Integer pointsUsed;
 
     // private Integer pointsEarned;
+    private String invoiceType;
+
+    private String carrierNumber;
+
 
     private List<OrderItemRequest> items;
    

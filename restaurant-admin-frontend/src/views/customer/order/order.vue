@@ -62,6 +62,8 @@ const customerForm = ref({
     paymentMethod: "CASH",
     needTableware: false,
     agreePolicy: false,
+    invoiceType: "NONE",
+    carrierNumber: "",
 });
 
 // =========================
@@ -296,13 +298,37 @@ function backToMenu() {
 }
 
 async function submitOrder() {
+    if (
+        customerForm.value.invoiceType === "MOBILE_BARCODE" &&
+        !/^\/[0-9A-Z.+-]{7}$/.test(customerForm.value.carrierNumber)
+    ) {
+        alert("請輸入正確手機條碼載具");
+        return;
+    }
+
     if (!customerForm.value.customerName) {
         alert("請輸入姓名");
         return;
     }
 
+    if (!customerForm.value.customerName?.trim()) {
+        alert("請輸入姓名");
+        return;
+    }
+
     if (!customerForm.value.phone) {
-        alert("請輸入電話");
+        alert("請輸入電話號碼");
+        return;
+    }
+    const namePattern = /^[A-Za-z\u4e00-\u9fa5\s]{2,20}$/;
+
+    if (!namePattern.test(customerForm.value.customerName.trim())) {
+        alert("姓名格式不正確");
+        return;
+    }
+
+    if (!/^09\d{8}$/.test(customerForm.value.phone)) {
+        alert("請輸入正確手機號碼");
         return;
     }
 
@@ -311,6 +337,7 @@ async function submitOrder() {
         return;
     }
 
+
     const request = {
         userId: orderForm.value.userId,
         storeId: orderForm.value.storeId,
@@ -318,6 +345,8 @@ async function submitOrder() {
         reservationId: orderForm.value.reservationId,
         orderType: orderForm.value.orderType,
         pointsUsed: orderForm.value.pointsUsed,
+        invoiceType: customerForm.value.invoiceType,
+        carrierNumber: customerForm.value.carrierNumber,
         items: cartItems.value.map((item) => ({
             menuItemId: item.menuItemId,
             quantity: item.quantity,
@@ -338,132 +367,133 @@ async function submitOrder() {
 <template>
     <!-- 1. 點餐頁 Header -->
     <main class="order-page">
-    <div v-if="step === 'MENU'">
-        <section class="order-header">
-            <div>
-                <h1>點餐</h1>
-                <p>選擇餐點加入購物車，確認後送出訂單。</p>
-            </div>
+        <div v-if="step === 'MENU'">
+            <section class="order-header">
+                <div>
+                    <h1>點餐</h1>
+                    <p>選擇餐點加入購物車，確認後送出訂單。</p>
+                </div>
 
-            <div class="order-type">
-                <button :class="{ active: orderForm.orderType === 'DINE_IN' }" @click="orderForm.orderType = 'DINE_IN'">
-                    內用
+                <div class="order-type">
+                    <button :class="{ active: orderForm.orderType === 'DINE_IN' }"
+                        @click="orderForm.orderType = 'DINE_IN'">
+                        內用
+                    </button>
+
+                    <button :class="{ active: orderForm.orderType === 'TAKE_OUT' }"
+                        @click="orderForm.orderType = 'TAKE_OUT'">
+                        外帶
+                    </button>
+                </div>
+            </section>
+            <!-- 2. 分類按鈕：之後可拆 CategoryTabs.vue -->
+            <section class="category-tabs">
+                <button v-for="category in categories" :key="category.id"
+                    :class="{ active: activeCategory === category.id }" @click="activeCategory = category.id">
+                    {{ category.name }}
                 </button>
+            </section>
 
-                <button :class="{ active: orderForm.orderType === 'TAKE_OUT' }"
-                    @click="orderForm.orderType = 'TAKE_OUT'">
-                    外帶
-                </button>
-            </div>
-        </section>
-        <!-- 2. 分類按鈕：之後可拆 CategoryTabs.vue -->
-        <section class="category-tabs">
-            <button v-for="category in categories" :key="category.id"
-                :class="{ active: activeCategory === category.id }" @click="activeCategory = category.id">
-                {{ category.name }}
-            </button>
-        </section>
+            <!-- 3. 菜單列表：之後可拆 MenuList.vue / MenuCard.vue -->
+            <section class="content-layout">
 
-        <!-- 3. 菜單列表：之後可拆 MenuList.vue / MenuCard.vue -->
-        <section class="content-layout">
+                <div class="menu-section">
+                    <h2>{{ activeCategoryName }}</h2>
 
-            <div class="menu-section">
-                <h2>{{ activeCategoryName }}</h2>
+                    <div class="menu-grid">
 
-                <div class="menu-grid">
+                        <!-- Menu Card -->
+                        <!-- 之後可拆 MenuCard.vue -->
+                        <!-- ========================= -->
+                        <article v-for="item in filteredMenuItems" :key="item.id" class="menu-card">
+                            <div class="menu-info">
+                                <span class="menu-id">#{{ item.id }}</span>
 
-                    <!-- Menu Card -->
-                    <!-- 之後可拆 MenuCard.vue -->
-                    <!-- ========================= -->
-                    <article v-for="item in filteredMenuItems" :key="item.id" class="menu-card">
-                        <div class="menu-info">
-                            <span class="menu-id">#{{ item.id }}</span>
+                                <h3>{{ item.itemName }}</h3>
 
-                            <h3>{{ item.itemName }}</h3>
+                                <p class="description">
+                                    {{ item.description }}
+                                </p>
 
-                            <p class="description">
-                                {{ item.description }}
-                            </p>
+                                <p class="category">
+                                    分類：
+                                    {{
+                                        categories.find((category) => category.id === item.categoryId)
+                                            ?.name
+                                    }}
+                                </p>
 
-                            <p class="category">
-                                分類：
-                                {{
-                                    categories.find((category) => category.id === item.categoryId)
-                                        ?.name
-                                }}
-                            </p>
+                                <p class="status">狀態：{{ item.status }}</p>
 
-                            <p class="status">狀態：{{ item.status }}</p>
+                                <small class="allergen">
+                                    過敏原：{{ item.allergenInfo }}
+                                </small>
 
-                            <small class="allergen">
-                                過敏原：{{ item.allergenInfo }}
-                            </small>
-
-                            <div class="menu-bottom">
-                                <button @click="addItem(item)">＋</button>
-                                <strong>NT${{ item.price }}</strong>
+                                <div class="menu-bottom">
+                                    <button @click="addItem(item)">＋</button>
+                                    <strong>NT${{ item.price }}</strong>
+                                </div>
                             </div>
-                        </div>
 
-                        <div class="image-wrapper">
-                            <img :src="item.imageUrl" :alt="item.itemName" />
-                        </div>
-                    </article>
-                </div>
-            </div>
-            <!-- 4. 購物車：之後可拆 CartPanel.vue -->
-            <aside class="cart-section">
-                <h2>您的訂單</h2>
-
-                <div v-if="cartItems.length === 0" class="empty-cart">
-                    尚未加入餐點
-                </div>
-
-                <div v-else class="cart-list">
-                    <div v-for="item in cartItems" :key="item.menuItemId" class="cart-item">
-                        <img :src="item.imageUrl" :alt="item.itemName" />
-
-                        <div class="cart-info">
-                            <small>#{{ item.menuItemId }}</small>
-
-                            <h4>{{ item.itemName }}</h4>
-
-                            <p>NT${{ item.price }}</p>
-
-                            <small>過敏原：{{ item.allergenInfo }}</small>
-
-                            <textarea v-model="item.note" placeholder="餐點備註，例如：不要蔥、少辣"></textarea>
-                        </div>
-
-                        <div class="quantity-control">
-                            <button @click="decreaseQuantity(item)">－</button>
-                            <span>{{ item.quantity }}</span>
-                            <button @click="increaseQuantity(item)">＋</button>
-                        </div>
-
-                        <div class="cart-price">
-                            NT${{ item.price * item.quantity }}
-                            <button @click="removeItem(item.menuItemId)">移除</button>
-                        </div>
+                            <div class="image-wrapper">
+                                <img :src="item.imageUrl" :alt="item.itemName" />
+                            </div>
+                        </article>
                     </div>
                 </div>
+                <!-- 4. 購物車：之後可拆 CartPanel.vue -->
+                <aside class="cart-section">
+                    <h2>您的訂單</h2>
 
-                <div class="points-box">
-                    <label>使用點數</label>
-                    <input v-model.number="orderForm.pointsUsed" type="number" min="0" />
-                </div>
+                    <div v-if="cartItems.length === 0" class="empty-cart">
+                        尚未加入餐點
+                    </div>
 
-                <div class="total-box">
-                    <span>預估總金額</span>
-                    <strong>NT${{ totalAmount }}</strong>
-                </div>
+                    <div v-else class="cart-list">
+                        <div v-for="item in cartItems" :key="item.menuItemId" class="cart-item">
+                            <img :src="item.imageUrl" :alt="item.itemName" />
 
-                <button class="submit-btn" :disabled="cartItems.length === 0" @click="goCheckout">
-                    前往結帳
-                </button>
-            </aside>
-        </section>
-    </div>
+                            <div class="cart-info">
+                                <small>#{{ item.menuItemId }}</small>
+
+                                <h4>{{ item.itemName }}</h4>
+
+                                <p>NT${{ item.price }}</p>
+
+                                <small>過敏原：{{ item.allergenInfo }}</small>
+
+                                <textarea v-model="item.note" placeholder="餐點備註，例如：不要蔥、少辣"></textarea>
+                            </div>
+
+                            <div class="quantity-control">
+                                <button @click="decreaseQuantity(item)">－</button>
+                                <span>{{ item.quantity }}</span>
+                                <button @click="increaseQuantity(item)">＋</button>
+                            </div>
+
+                            <div class="cart-price">
+                                NT${{ item.price * item.quantity }}
+                                <button @click="removeItem(item.menuItemId)">移除</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="points-box">
+                        <label>使用點數</label>
+                        <input v-model.number="orderForm.pointsUsed" type="number" min="0" />
+                    </div>
+
+                    <div class="total-box">
+                        <span>預估總金額</span>
+                        <strong>NT${{ totalAmount }}</strong>
+                    </div>
+
+                    <button class="submit-btn" :disabled="cartItems.length === 0" @click="goCheckout">
+                        前往結帳
+                    </button>
+                </aside>
+            </section>
+        </div>
         <section v-if="step === 'CHECKOUT'" class="checkout-page">
             <div class="checkout-summary">
                 <h2>確認訂單</h2>
@@ -484,14 +514,8 @@ async function submitOrder() {
                 <h2>確認訂單與填寫聯絡資訊</h2>
 
                 <div class="form-card">
-                    <label>
-                        <input type="checkbox" v-model="customerForm.needTableware" />
-                        需要免洗餐具或吸管
-                    </label>
-                </div>
-
-                <div class="form-card">
                     <h3>付款方式</h3>
+
                     <label>
                         <input type="radio" value="CASH" v-model="customerForm.paymentMethod" />
                         現場付款
@@ -501,6 +525,23 @@ async function submitOrder() {
                         付款金額
                         <strong>NT${{ totalAmount }}</strong>
                     </div>
+                </div>
+
+                <div class="form-card">
+                    <h3>發票 / 載具</h3>
+
+                    <label>
+                        <input type="radio" value="NONE" v-model="customerForm.invoiceType" />
+                        不使用載具
+                    </label>
+
+                    <label>
+                        <input type="radio" value="MOBILE_BARCODE" v-model="customerForm.invoiceType" />
+                        手機條碼載具
+                    </label>
+
+                    <input v-if="customerForm.invoiceType === 'MOBILE_BARCODE'" v-model="customerForm.carrierNumber"
+                        type="text" placeholder="/ABC1234" />
                 </div>
 
                 <div class="form-card">
@@ -525,7 +566,15 @@ async function submitOrder() {
                     </div>
 
                     <label>電話 *</label>
-                    <input v-model="customerForm.phone" type="tel" />
+                    <input class="phone-input" v-model="customerForm.phone" type="tel" placeholder="0912345678"
+                        maxlength="10" />
+                </div>
+
+                <div class="form-card">
+                    <label>
+                        <input type="checkbox" v-model="customerForm.needTableware" />
+                        需要免洗餐具或吸管
+                    </label>
                 </div>
 
                 <div class="policy-box">
@@ -548,6 +597,10 @@ async function submitOrder() {
 </template>
 
 <style scoped>
+.phone-input::placeholder {
+    color: #bdbdbd;
+}
+
 .order-page {
     max-width: 1280px;
     margin: 40px auto;
