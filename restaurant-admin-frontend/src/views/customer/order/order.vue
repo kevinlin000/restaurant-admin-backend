@@ -1,27 +1,30 @@
 <script setup>
+// =========================
+// Vue
 import { computed, ref } from "vue";
 import axios from "axios";
+
+
+// =========================
+// Images
+
 import tofuImg from "@/assets/images/tofu.jpg";
 import seafoodSaladImg from "@/assets/images/seafood-salad.jpg";
-
 import sashimiImg from "@/assets/images/sashimi.jpg";
 import salmonSashimiImg from "@/assets/images/salmon-sashimi.jpg";
-
 import sushiImg from "@/assets/images/sushi.jpg";
 import aburiSalmonSushiImg from "@/assets/images/aburi-salmon-sushi.jpg";
-
 import sukiyakiImg from "@/assets/images/sukiyaki.jpg";
 import tempuraImg from "@/assets/images/tempura.jpg";
-
 import matchaDessertImg from "@/assets/images/matcha-dessert.jpg";
 import caramelPuddingImg from "@/assets/images/caramel-pudding.jpg";
-
 import calpisImg from "@/assets/images/calpis.jpg";
 import japaneseTeaImg from "@/assets/images/japanese-tea.jpg";
-
 import asahiBeerImg from "@/assets/images/asahi-beer.jpg";
 import japaneseSakeImg from "@/assets/images/japanese-sake.jpg";
 
+// =========================
+// Category Data
 const categories = ref([
     { id: 1, name: "前菜" },
     { id: 2, name: "刺身" },
@@ -32,7 +35,12 @@ const categories = ref([
     { id: 8, name: "酒類" },
 ]);
 
+// 之後改成 API
+// =========================
 const activeCategory = ref(1);
+
+// =========================
+// Order Form
 
 const orderForm = ref({
     userId: 1,
@@ -43,6 +51,22 @@ const orderForm = ref({
     pointsUsed: 0,
 });
 
+const step = ref("MENU");
+// MENU = 點餐畫面
+// CHECKOUT = 結帳確認畫面
+
+const customerForm = ref({
+    customerName: "",
+    phone: "",
+    title: "小姐",
+    paymentMethod: "CASH",
+    needTableware: false,
+    agreePolicy: false,
+});
+
+// =========================
+// Menu Data
+// 之後改成 Menu API
 const menuItems = ref([
     {
         id: 1,
@@ -185,8 +209,15 @@ const menuItems = ref([
         allergenInfo: "無",
     },
 ]);
+// =========================
+// Cart
+// 之後可搬到 Pinia
+
 const cartItems = ref([]);
 
+// =========================
+// Computed
+// =========================
 const filteredMenuItems = computed(() => {
     return menuItems.value.filter(
         (item) =>
@@ -208,6 +239,9 @@ const totalAmount = computed(() => {
         return sum + item.price * item.quantity;
     }, 0);
 });
+
+// =========================
+// Cart Functions
 
 function addItem(menuItem) {
     const existItem = cartItems.value.find(
@@ -248,7 +282,35 @@ function removeItem(menuItemId) {
     );
 }
 
+function goCheckout() {
+    if (cartItems.value.length === 0) {
+        alert("請先加入餐點");
+        return;
+    }
+
+    step.value = "CHECKOUT";
+}
+
+function backToMenu() {
+    step.value = "MENU";
+}
+
 async function submitOrder() {
+    if (!customerForm.value.customerName) {
+        alert("請輸入姓名");
+        return;
+    }
+
+    if (!customerForm.value.phone) {
+        alert("請輸入電話");
+        return;
+    }
+
+    if (!customerForm.value.agreePolicy) {
+        alert("請先勾選同意條款");
+        return;
+    }
+
     const request = {
         userId: orderForm.value.userId,
         storeId: orderForm.value.storeId,
@@ -262,15 +324,21 @@ async function submitOrder() {
         })),
     };
 
+    console.log("顧客資料：", customerForm.value);
     console.log("送出的訂單資料：", request);
 
     const response = await axios.post("/api/orders", request);
     console.log("後端回傳：", response.data);
+
+    alert("訂單送出成功");
 }
+// =========================
 </script>
 
 <template>
+    <!-- 1. 點餐頁 Header -->
     <main class="order-page">
+    <div v-if="step === 'MENU'">
         <section class="order-header">
             <div>
                 <h1>點餐</h1>
@@ -288,7 +356,7 @@ async function submitOrder() {
                 </button>
             </div>
         </section>
-
+        <!-- 2. 分類按鈕：之後可拆 CategoryTabs.vue -->
         <section class="category-tabs">
             <button v-for="category in categories" :key="category.id"
                 :class="{ active: activeCategory === category.id }" @click="activeCategory = category.id">
@@ -296,11 +364,17 @@ async function submitOrder() {
             </button>
         </section>
 
+        <!-- 3. 菜單列表：之後可拆 MenuList.vue / MenuCard.vue -->
         <section class="content-layout">
+
             <div class="menu-section">
                 <h2>{{ activeCategoryName }}</h2>
 
                 <div class="menu-grid">
+
+                    <!-- Menu Card -->
+                    <!-- 之後可拆 MenuCard.vue -->
+                    <!-- ========================= -->
                     <article v-for="item in filteredMenuItems" :key="item.id" class="menu-card">
                         <div class="menu-info">
                             <span class="menu-id">#{{ item.id }}</span>
@@ -337,7 +411,7 @@ async function submitOrder() {
                     </article>
                 </div>
             </div>
-
+            <!-- 4. 購物車：之後可拆 CartPanel.vue -->
             <aside class="cart-section">
                 <h2>您的訂單</h2>
 
@@ -384,10 +458,91 @@ async function submitOrder() {
                     <strong>NT${{ totalAmount }}</strong>
                 </div>
 
-                <button class="submit-btn" :disabled="cartItems.length === 0" @click="submitOrder">
-                    送出訂單
+                <button class="submit-btn" :disabled="cartItems.length === 0" @click="goCheckout">
+                    前往結帳
                 </button>
             </aside>
+        </section>
+    </div>
+        <section v-if="step === 'CHECKOUT'" class="checkout-page">
+            <div class="checkout-summary">
+                <h2>確認訂單</h2>
+
+                <div v-for="item in cartItems" :key="item.menuItemId" class="checkout-item">
+                    <span>x{{ item.quantity }}</span>
+                    <strong>{{ item.itemName }}</strong>
+                    <span>NT${{ item.price * item.quantity }}</span>
+                </div>
+
+                <div class="checkout-total">
+                    <span>總付款金額</span>
+                    <strong>NT${{ totalAmount }}</strong>
+                </div>
+            </div>
+
+            <div class="checkout-form">
+                <h2>確認訂單與填寫聯絡資訊</h2>
+
+                <div class="form-card">
+                    <label>
+                        <input type="checkbox" v-model="customerForm.needTableware" />
+                        需要免洗餐具或吸管
+                    </label>
+                </div>
+
+                <div class="form-card">
+                    <h3>付款方式</h3>
+                    <label>
+                        <input type="radio" value="CASH" v-model="customerForm.paymentMethod" />
+                        現場付款
+                    </label>
+
+                    <div class="payment-total">
+                        付款金額
+                        <strong>NT${{ totalAmount }}</strong>
+                    </div>
+                </div>
+
+                <div class="form-card">
+                    <h3>聯絡資訊</h3>
+
+                    <label>姓名 *</label>
+                    <input v-model="customerForm.customerName" type="text" />
+
+                    <div class="radio-group">
+                        <label>
+                            <input type="radio" value="小姐" v-model="customerForm.title" />
+                            小姐
+                        </label>
+                        <label>
+                            <input type="radio" value="先生" v-model="customerForm.title" />
+                            先生
+                        </label>
+                        <label>
+                            <input type="radio" value="其他" v-model="customerForm.title" />
+                            其他
+                        </label>
+                    </div>
+
+                    <label>電話 *</label>
+                    <input v-model="customerForm.phone" type="tel" />
+                </div>
+
+                <div class="policy-box">
+                    <label>
+                        <input type="checkbox" v-model="customerForm.agreePolicy" />
+                        我已同意訂單成立後無法任意取消
+                    </label>
+                </div>
+
+                <button class="submit-btn" @click="submitOrder">
+                    送訂單
+                </button>
+
+                <button class="back-btn" @click="backToMenu">
+                    回上一步
+                </button>
+            </div>
         </section>
     </main>
 </template>
@@ -636,5 +791,86 @@ async function submitOrder() {
 .submit-btn:disabled {
     background: #ccc;
     cursor: not-allowed;
+}
+
+.checkout-page {
+    max-width: 1280px;
+    margin: 40px auto;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 32px;
+    color: #40566f;
+}
+
+.checkout-summary,
+.checkout-form .form-card,
+.policy-box {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+}
+
+.checkout-summary h2,
+.checkout-form h2 {
+    margin-bottom: 24px;
+}
+
+.checkout-item {
+    display: grid;
+    grid-template-columns: 50px 1fr auto;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.checkout-total {
+    margin-top: 24px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 22px;
+}
+
+.checkout-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-card h3 {
+    margin-bottom: 16px;
+}
+
+.form-card input[type="text"],
+.form-card input[type="tel"] {
+    width: 100%;
+    padding: 12px;
+    margin: 8px 0 16px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+.radio-group {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 16px;
+}
+
+.payment-total {
+    margin-top: 20px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.back-btn {
+    width: 100%;
+    border: 1px solid #ddd;
+    background: white;
+    color: #40566f;
+    padding: 14px;
+    border-radius: 12px;
+    font-size: 18px;
+    cursor: pointer;
 }
 </style>
