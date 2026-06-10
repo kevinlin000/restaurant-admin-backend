@@ -10,8 +10,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.annotations.UpdateTimestamp;
-
-import com.restaurant.store.entity.Store;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -20,7 +18,7 @@ import java.time.LocalDateTime;
  * 全系統（會員與員工）的唯一基礎帳號表，存儲登入憑證與基本個資。
  */
 @Entity
-@Table(name = "user")
+@Table(name = "`user`")
 @SQLDelete(sql = "UPDATE user SET is_deleted = true WHERE user_id = ?")
 @SQLRestriction("is_deleted = false")
 @Getter

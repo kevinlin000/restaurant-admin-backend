@@ -11,7 +11,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface MemberProfileRepository extends JpaRepository<MemberProfile, Long> {
 
     @EntityGraph(attributePaths = { "user" })
-    Optional<MemberProfile> findByUser_UserId(Long userId);
+    Optional<MemberProfile> findByUserUserId(Long userId);
 
     List<MemberProfile> findByMemberLevel(MemberProfile.MemberLevel level);
 }

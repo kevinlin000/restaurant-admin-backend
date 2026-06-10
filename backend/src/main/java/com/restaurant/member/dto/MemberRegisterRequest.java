@@ -1,10 +1,6 @@
 package com.restaurant.member.dto;
 
 import jakarta.validation.constraints.*;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
 import lombok.Data;
 import java.time.LocalDate;
 

@@ -22,7 +22,4 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Page<User> findAll(Pageable pageable);
 
-    boolean existsByEmailAndIsDeletedFalse(String email);
-
-    boolean existsByPhoneAndIsDeletedFalse(String phone);
 }
