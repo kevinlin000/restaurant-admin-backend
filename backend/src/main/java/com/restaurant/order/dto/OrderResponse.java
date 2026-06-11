@@ -9,7 +9,7 @@ import lombok.Data;
 @Data
 @Builder
 public class OrderResponse {
-     private Long orderId;
+    private Long orderId;
 
     private Long userId;
 
@@ -32,5 +32,11 @@ public class OrderResponse {
     private String status;
 
     private LocalDateTime createdAt;
+
+    private String paymentMethod;
+
+    private String invoiceType;
     
+    private String carrierNumber;
+
 }

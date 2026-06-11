@@ -64,9 +64,9 @@ public class Store {
     @Column(name = "main_image_url", length = 500)
     private String mainImageUrl;
 
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
-    private Integer status = 1;
+    private String status = "OPEN";
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

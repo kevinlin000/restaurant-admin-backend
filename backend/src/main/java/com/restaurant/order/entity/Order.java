@@ -66,6 +66,12 @@ public class Order {
     @Column(name = "status", length = 20)
     private String status;
 
+    @Column(name = "invoice_type", length = 30)
+    private String invoiceType;
+
+    @Column(name = "carrier_number", length = 20)
+    private String carrierNumber;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
