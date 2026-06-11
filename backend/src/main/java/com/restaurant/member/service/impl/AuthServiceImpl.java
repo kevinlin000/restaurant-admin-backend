@@ -8,7 +8,7 @@ import com.restaurant.member.dto.StaffResponse;
 import com.restaurant.member.entity.*;
 import com.restaurant.member.repository.*;
 import com.restaurant.member.service.AuthService;
-import com.restaurant.member.service.util.JwtUtil;
+import com.restaurant.member.util.JwtUtil;
 import com.restaurant.store.entity.Store;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;

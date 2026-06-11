@@ -9,18 +9,33 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class ApiResponse<T> {
 
-    private boolean success;// 標記請求是否成功 (true: 成功, false: 失敗)
-    private String message;// 給前端的提示訊息 (例如："登入成功" 或 "密碼錯誤")
-    private T data;// // 泛型可以是任何物件類別，這裡存放真正的資料 (DTO)
+    private boolean success;
+    private String message;
+    private T data;
+    private String errorCode;
 
-    // 回傳的 ApiResponse 物件能自動對應傳入的資料型別
+    // 成功，有資料
     public static <T> ApiResponse<T> success(T data) {
-        return new ApiResponse<>(true, "請求成功", data);
+        return new ApiResponse<>(true, "操作成功", data, null);
     }
 
-    // 參數只需要傳入錯誤訊息字串即可
+    // 成功，有自訂訊息和資料
+    public static <T> ApiResponse<T> success(String message, T data) {
+        return new ApiResponse<>(true, message, data, null);
+    }
+
+    // 成功，只有訊息沒有資料
+    public static <T> ApiResponse<T> success(String message) {
+        return new ApiResponse<>(true, message, null, null);
+    }
+
+    // 失敗，有錯誤訊息和錯誤代碼
+    public static <T> ApiResponse<T> error(String message, String errorCode) {
+        return new ApiResponse<>(false, message, null, errorCode);
+    }
+
+    // 失敗，只有錯誤訊息（不知道 errorCode 時用這個）
     public static <T> ApiResponse<T> error(String message) {
-        // 回傳一個 success 為 false 的物件，資料欄位 (data) 為 null
-        return new ApiResponse<>(false, message, null);
+        return new ApiResponse<>(false, message, null, null);
     }
 }

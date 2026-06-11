@@ -1,4 +1,4 @@
-package com.restaurant.member.service.util;
+package com.restaurant.member.util;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -8,6 +8,8 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Date;
 
 /**
@@ -19,11 +21,18 @@ public class JwtUtil {
     @Value("${jwt.secret}")
     private String secret;
 
-    @Value("${jwt.expiration-ms:86400000}")
+    @Value("${jwt.expiration:86400000}")
     private long expirationMs;
 
     private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        try {
+            // 使用 SHA-256 將任意長度的 secret 轉換為固定的 256 bits (32 bytes)
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(secret.getBytes(StandardCharsets.UTF_8));
+            return Keys.hmacShaKeyFor(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("初始化 JWT 簽章失敗", e);
+        }
     }
 
     /**
@@ -54,5 +63,25 @@ public class JwtUtil {
 
     public String getRole(String token) {
         return parseToken(token).get("role", String.class);
+    }
+
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(token);
+            return true;
+        } catch (io.jsonwebtoken.security.SignatureException e) {
+            // 簽名不匹配（Token 被篡改）
+            System.err.println("無效的 JWT 簽名: " + e.getMessage());
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            // Token 超過當初設定的 86400000 毫秒
+            System.err.println("JWT Token 已過期: " + e.getMessage());
+        } catch (io.jsonwebtoken.MalformedJwtException e) {
+            // 格式不對
+            System.err.println("不合法的 JWT Token: " + e.getMessage());
+        } catch (IllegalArgumentException e) {
+            // 空字串等
+            System.err.println("JWT 參數錯誤: " + e.getMessage());
+        }
+        return false;
     }
 }
