@@ -9,6 +9,9 @@ import CustomerReservation from '@/views/customer/reservation/Reservation.vue'
 import AdminReservationList from '@/views/admin/reservation/ReservationList.vue'
 import AdminReservationTable from '@/views/admin/reservation/ReservationTable.vue'
 import AdminReservationSetting from '@/views/admin/reservation/ReservationSetting.vue'
+import AdminMenuCreate from '@/views/admin/menu/menu-create.vue'
+import AdminMenuEdit from '@/views/admin/menu/menu-edit.vue'
+import AdminMenuSetting from '@/views/admin/menu/menu-setting.vue'
 import CustomerMenu from '@/views/customer/menu/menu.vue'
 import CustomerOrder from '@/views/customer/order/order.vue'
 import CustomerStore from '@/views/customer/store/store.vue'
@@ -86,6 +89,22 @@ const routers = [
         path: 'reservation-setting',
         name: 'AdminReservationSetting',
         component: AdminReservationSetting
+      }
+      ,
+      {
+        path: 'menu-setting',
+        name: 'AdminMenuSetting',
+        component: AdminMenuSetting
+      },
+      {
+        path: 'menu-create',
+        name: 'AdminMenuCreate',
+        component: AdminMenuCreate
+      },
+      {
+        path: 'menu-edit/:id', // 💡 提示：edit 通常需要帶 id 參數才能知道要改哪一道菜喔！
+        name: 'AdminMenuEdit',
+        component: AdminMenuEdit
       }
     ],
   }
