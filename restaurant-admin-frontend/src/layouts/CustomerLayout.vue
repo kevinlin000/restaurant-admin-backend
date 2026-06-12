@@ -1,21 +1,18 @@
-<script setup>
-</script>
+<script setup></script>
 
 <template>
   <div class="layout-wrapper">
-
     <!-- Navbar (視窗縮小 navbar-expand-lg)-->
-    <nav class="landing-navbar ">
+    <nav class="landing-navbar">
       <div class="container">
-
         <div class="navbar navbar-expand-lg">
-
           <!-- Logo -->
           <RouterLink to="/home" class="navbar-brand app-logo">
             <img
-            src="../assets/images/logo.png"
-            alt="旭日 Logo"
-            class="logo-image"/>
+              src="../assets/images/logo.png"
+              alt="旭日 Logo"
+              class="logo-image"
+            />
             <span class="logo-text new-tegomin-regular">敘日</span>
           </RouterLink>
 
@@ -24,17 +21,17 @@
             class="navbar-toggler border-0"
             type="button"
             data-bs-toggle="collapse"
-            data-bs-target="#navbarNav">
+            data-bs-target="#navbarNav"
+          >
             <i class="navbar-toggler-icon"></i>
           </button>
 
           <!-- Menu -->
           <div class="collapse navbar-collapse" id="navbarNav">
-
             <!-- right -->
             <ul class="navbar-nav ms-auto">
               <li class="nav-item">
-                <RouterLink class="nav-link " to="/home">首頁</RouterLink>
+                <RouterLink class="nav-link" to="/home">首頁</RouterLink>
               </li>
 
               <li class="nav-item">
@@ -55,11 +52,10 @@
 
               <li class="nav-item ms-lg-5">
                 <RouterLink to="/login" class="login-btn">
-                 <i class="bi bi-person"></i>會員登入
+                  <i class="bi bi-person"></i>會員登入
                 </RouterLink>
               </li>
             </ul>
-
           </div>
         </div>
       </div>
@@ -67,9 +63,9 @@
 
     <!-- Main -->
     <main class="main-content">
-        <div>
-            <RouterView />
-        </div>
+      <div>
+        <RouterView />
+      </div>
     </main>
 
     <!-- Footer -->
@@ -81,20 +77,18 @@
     </footer>
 
     <!-- Overlay -->
-      <div class="layout-overlay layout-menu-toggle"></div>
+    <div class="layout-overlay layout-menu-toggle"></div>
 
-      <!-- Drag Target Area To SlideIn Menu On Small Screens -->
-      <div class="drag-target"></div>
+    <!-- Drag Target Area To SlideIn Menu On Small Screens -->
+    <div class="drag-target"></div>
     <!-- / Layout wrapper -->
-
   </div>
 </template>
 
 <style scoped>
-
 /* 字型 */
-@import url('https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=New+Tegomin&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=New+Tegomin&display=swap");
 
 .yuji-boku-regular {
   font-family: "Yuji Boku", serif;
@@ -143,7 +137,7 @@
   background: white;
   border-radius: 10px;
   padding: 10px 20px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 /* nav */
@@ -165,7 +159,7 @@
 }
 
 /* 點到目前所在頁面 */
-.navbar-nav .router-link-exact-active {
+.navbar-nav .nav-link.router-link-exact-active:not(.login-btn) {
   color: #e3ac7f;
   font-weight: bold;
   font-size: 22px;
@@ -199,7 +193,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 4px 12px rgba(105,108,255,0.3);
+  box-shadow: 0 4px 12px rgba(105, 108, 255, 0.3);
 }
 
 .login-btn:hover {
@@ -213,7 +207,7 @@
   flex: 1;
   min-height: calc(100vh - 160px);
   background-attachment: scroll;
-  background-color:#f8f3ed;
+  background-color: #f8f3ed;
 }
 
 /* footer */
@@ -226,7 +220,6 @@
 /* mobile */
 
 @media (max-width: 991px) {
-
   .landing-navbar .navbar {
     border-radius: 16px;
   }
@@ -242,7 +235,5 @@
   .navbar-nav .nav-link {
     margin: 10px 0;
   }
-
 }
-
 </style>
