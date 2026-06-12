@@ -16,6 +16,6 @@ public class LoginRequest {
     private String email;
 
     @NotBlank(message = "密碼不可為空")
-    @Size(min = 8, max = 20)
+    @Size(min = 8, max = 100)
     private String password;
 }

@@ -1,6 +1,6 @@
 package com.restaurant.member.controller;
 
-import com.restaurant.member.dto.ApiResponse;
+import com.restaurant.common.ApiResponse;
 import com.restaurant.member.dto.LoginRequest;
 import com.restaurant.member.dto.LoginResponse;
 import com.restaurant.member.dto.MemberRegisterRequest;

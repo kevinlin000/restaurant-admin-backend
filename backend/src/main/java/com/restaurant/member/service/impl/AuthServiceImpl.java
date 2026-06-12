@@ -1,5 +1,6 @@
 package com.restaurant.member.service.impl;
 
+import com.restaurant.common.BusinessException;
 import com.restaurant.member.dto.LoginRequest;
 import com.restaurant.member.dto.LoginResponse;
 import com.restaurant.member.dto.MemberRegisterRequest;
@@ -32,16 +33,16 @@ public class AuthServiceImpl implements AuthService {
     public LoginResponse registerMember(MemberRegisterRequest request) {
         // 檢查Email是否重複
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("此 Email 已被註冊");
+            throw new BusinessException("此 Email 已被註冊");
         }
         // 檢查手機號碼是否重複
         if (userRepository.existsByPhone(request.getPhone())) {
-            throw new IllegalArgumentException("此手機號碼已被使用");
+            throw new BusinessException("此手機號碼已被使用");
         }
 
         // 撈取資料庫中的預設角色
         Role memberRole = roleRepository.findByRoleName("CUSTOMER")
-                .orElseThrow(() -> new IllegalStateException("系統角色 CUSTOMER 不存在"));
+                .orElseThrow(() -> new BusinessException("系統角色 CUSTOMER 不存在"));
 
         // 建立User帳號
         User user = User.builder()
@@ -77,11 +78,11 @@ public class AuthServiceImpl implements AuthService {
     public StaffResponse createStaff(StaffCreateRequest request, String roleName) {
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("此 Email 已被使用");
+            throw new BusinessException("此 Email 已被使用");
         }
 
         Role role = roleRepository.findByRoleName(roleName)
-                .orElseThrow(() -> new IllegalArgumentException("指定的系統角色不存在：" + roleName));
+                .orElseThrow(() -> new BusinessException("指定的系統角色不存在：" + roleName));
 
         Store store = Store.builder().storeId(request.getStoreId()).build();
 
@@ -112,10 +113,10 @@ public class AuthServiceImpl implements AuthService {
     public LoginResponse login(LoginRequest request) {
 
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("帳號或密碼錯誤"));
+                .orElseThrow(() -> new BusinessException("帳號或密碼錯誤"));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new IllegalArgumentException("帳號或密碼錯誤");
+            throw new BusinessException("帳號或密碼錯誤");
         }
 
         String token = jwtUtil.generateToken(user.getUserId(), user.getRole().getRoleName());

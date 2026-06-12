@@ -1,6 +1,6 @@
 package com.restaurant.member.controller;
 
-import com.restaurant.member.dto.ApiResponse;
+import com.restaurant.common.ApiResponse;
 import com.restaurant.member.dto.StaffResponse;
 import com.restaurant.member.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -31,10 +31,9 @@ public class StaffController {
      * 查詢特定員工
      * GET /api/members/staff/{staffId}
      */
-    @GetMapping("/{staffId}")
-    public ResponseEntity<ApiResponse<StaffResponse>> getStaff(
-            @PathVariable Long staffId) {
 
+    @GetMapping("/{staffId}")
+    public ResponseEntity<ApiResponse<StaffResponse>> getStaff(@PathVariable Long staffId) {
         StaffResponse data = userService.getStaff(staffId);
         return ResponseEntity.ok(ApiResponse.success(data));
     }

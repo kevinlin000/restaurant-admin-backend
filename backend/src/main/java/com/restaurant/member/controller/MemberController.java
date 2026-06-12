@@ -1,6 +1,6 @@
 package com.restaurant.member.controller;
 
-import com.restaurant.member.dto.ApiResponse;
+import com.restaurant.common.ApiResponse;
 import com.restaurant.member.dto.MemberProfileResponse;
 import com.restaurant.member.dto.MemberUpdateRequest;
 import com.restaurant.member.dto.PasswordUpdateRequest;
@@ -65,18 +65,13 @@ public class MemberController {
      * DELETE /api/members/me
      */
     @DeleteMapping("/me")
-    public ResponseEntity<ApiResponse<Void>> deleteAccount(
-            @RequestHeader("Authorization") String authHeader) {
+    public ResponseEntity<ApiResponse<Void>> deleteAccount(@RequestHeader("Authorization") String authHeader) {
 
-        Long userId = getUserIdFromHeader(authHeader);
-        userService.deleteAccount(userId);
+        userService.deleteAccount(getUserIdFromHeader(authHeader));
+
         return ResponseEntity.ok(ApiResponse.success("帳號已註銷"));
     }
 
-    /**
-     * 從 Authorization Header 解析 userId
-     * Header 格式：Bearer eyJhbGci...
-     */
     private Long getUserIdFromHeader(String authHeader) {
         String token = authHeader.replace("Bearer ", "");
         return jwtUtil.getUserId(token);

@@ -1,5 +1,7 @@
 package com.restaurant.member.service.impl;
 
+import com.restaurant.common.BusinessException;
+import com.restaurant.common.ResourceNotFoundException;
 import com.restaurant.member.dto.*;
 import com.restaurant.member.entity.*;
 import com.restaurant.member.entity.Staff.StaffStatus;
@@ -30,9 +32,9 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public MemberProfileResponse getProfile(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("使用者不存在"));
+                .orElseThrow(() -> new ResourceNotFoundException("使用者不存在"));
         MemberProfile profile = memberProfileRepository.findByUserUserId(userId)
-                .orElseThrow(() -> new IllegalArgumentException("找不到會員資料"));
+                .orElseThrow(() -> new ResourceNotFoundException("找不到會員資料"));
 
         return toMemberProfileResponse(user, profile);
     }
@@ -44,9 +46,9 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public MemberProfileResponse updateProfile(Long userId, MemberUpdateRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("使用者不存在"));
+                .orElseThrow(() -> new ResourceNotFoundException("使用者不存在"));
         MemberProfile profile = memberProfileRepository.findByUserUserId(userId)
-                .orElseThrow(() -> new IllegalArgumentException("找不到會員資料"));
+                .orElseThrow(() -> new ResourceNotFoundException("找不到會員資料"));
 
         if (request.getName() != null && !request.getName().isBlank()) {
             user.setName(request.getName());
@@ -69,10 +71,10 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public void updatePassword(Long userId, PasswordUpdateRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("使用者不存在"));
+                .orElseThrow(() -> new ResourceNotFoundException("使用者不存在"));
 
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPasswordHash())) {
-            throw new IllegalArgumentException("舊密碼錯誤");
+            throw new BusinessException("舊密碼錯誤");
         }
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
@@ -100,7 +102,7 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public StaffResponse getStaff(Long staffId) {
         Staff staff = staffRepository.findById(staffId)
-                .orElseThrow(() -> new IllegalArgumentException("找不到員工資料"));
+                .orElseThrow(() -> new ResourceNotFoundException("找不到員工資料"));
         return toStaffResponse(staff.getUser(), staff);
     }
 
@@ -122,7 +124,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public void resignStaff(Long staffId) {
         Staff staff = staffRepository.findById(staffId)
-                .orElseThrow(() -> new IllegalArgumentException("找不到員工資料"));
+                .orElseThrow(() -> new ResourceNotFoundException("找不到員工資料"));
 
         staff.setStatus(StaffStatus.RESIGNED);
         staffRepository.save(staff);
