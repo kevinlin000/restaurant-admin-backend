@@ -47,7 +47,7 @@ public class Staff {
     private LocalDate hireDate;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
+    @Column(name = "status", nullable = false, columnDefinition = "varchar(20)")
     @Builder.Default
     private StaffStatus status = StaffStatus.ACTIVE;
 }

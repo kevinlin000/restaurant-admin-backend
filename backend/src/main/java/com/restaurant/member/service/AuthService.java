@@ -16,7 +16,7 @@ public interface AuthService {
     /**
      * 員工註冊：由管理員建立核心 User + 初始化 Staff
      */
-    StaffResponse createStaff(StaffCreateRequest request, String roleName);
+    StaffResponse createStaff(StaffCreateRequest request);
 
     /**
      * 統一登入入口：驗證帳密後，依角色回傳 JWT Access Token

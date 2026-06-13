@@ -75,14 +75,14 @@ public class AuthServiceImpl implements AuthService {
     // -----Staff帳號建立（後台管理者幫員工建立核心 User + 1:1 Staff）-----
     @Override
     @Transactional
-    public StaffResponse createStaff(StaffCreateRequest request, String roleName) {
+    public StaffResponse createStaff(StaffCreateRequest request) {
 
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new BusinessException("此 Email 已被使用");
         }
 
-        Role role = roleRepository.findByRoleName(roleName)
-                .orElseThrow(() -> new BusinessException("指定的系統角色不存在：" + roleName));
+        Role role = roleRepository.findByRoleName(request.getRoleName())
+                .orElseThrow(() -> new BusinessException("指定的系統角色不存在：" + request.getRoleName()));
 
         Store store = Store.builder().storeId(request.getStoreId()).build();
 
@@ -113,13 +113,18 @@ public class AuthServiceImpl implements AuthService {
     public LoginResponse login(LoginRequest request) {
 
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new BusinessException("帳號或密碼錯誤"));
+                .orElseThrow(() -> new BusinessException("找不到帳號"));
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new BusinessException("帳號或密碼錯誤");
+        boolean passwordMatched = passwordEncoder.matches(request.getPassword(), user.getPasswordHash());
+        // 測試 : 正式上線要將這段拿掉
+        boolean devPasswordMatched = "password123".equals(request.getPassword());
+
+        if (!passwordMatched && !devPasswordMatched) {
+            throw new BusinessException("密碼錯誤");
         }
 
         String token = jwtUtil.generateToken(user.getUserId(), user.getRole().getRoleName());
+
         return LoginResponse.builder()
                 .accessToken(token)
                 .tokenType("Bearer")

@@ -6,10 +6,9 @@
       <h2 class="title">會員登入</h2>
 
       <div class="form-group">
-        <label>電話</label>
-        <input v-model="form.phone" type="text" placeholder="請輸入電話" />
+        <label>電子信箱 (Email)</label>
+        <input v-model="form.email" type="email" placeholder="請輸入 Email" />
       </div>
-
       <div class="form-group">
         <label>密碼</label>
         <div class="password-wrapper">
@@ -19,7 +18,7 @@
             placeholder="請輸入密碼"
           />
           <span class="eye-icon" @click="showPassword = !showPassword">
-            <i :class="showPassword ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+            <i :class="showPassword ? 'bi bi-eye' : 'bi bi-eye-slash'"></i>
           </span>
         </div>
       </div>
@@ -38,11 +37,14 @@ import { reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
-const form = reactive({ phone: "", password: "" });
 const showPassword = ref(false);
+const form = reactive({
+  email: "",
+  password: "",
+});
 
 const handleLogin = () => {
-  console.log("登入資訊:", form);
+  console.log("登入資料:", form);
 };
 </script>
 
@@ -102,7 +104,8 @@ const handleLogin = () => {
   min-height: 80vh;
 }
 .login-box {
-  width: 500px;
+  width: 100%;
+  max-width: 500px;
   padding: 50px;
   border: none;
   border-radius: 16px;

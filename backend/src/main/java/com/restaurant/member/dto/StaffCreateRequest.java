@@ -10,7 +10,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
- * 後台管理員建立新員工帳號時傳入的請求資料
+ * 後台管理員建立新員工帳號時傳入的請求資料。
  */
 @Data
 public class StaffCreateRequest {
@@ -37,4 +37,7 @@ public class StaffCreateRequest {
     private String staffNo;
 
     private LocalDate hireDate;
+
+    @NotBlank(message = "角色名稱不可為空")
+    private String roleName;
 }

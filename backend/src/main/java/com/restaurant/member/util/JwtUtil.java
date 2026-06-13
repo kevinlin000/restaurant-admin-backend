@@ -3,6 +3,8 @@ package com.restaurant.member.util;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +19,8 @@ import java.util.Date;
  */
 @Component
 public class JwtUtil {
+    //
+    private static final Logger log = LoggerFactory.getLogger(JwtUtil.class);
 
     @Value("${jwt.secret}")
     private String secret;
@@ -70,17 +74,13 @@ public class JwtUtil {
             Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(token);
             return true;
         } catch (io.jsonwebtoken.security.SignatureException e) {
-            // 簽名不匹配（Token 被篡改）
-            System.err.println("無效的 JWT 簽名: " + e.getMessage());
+            log.warn("無效的 JWT 簽名: {}", e.getMessage());
         } catch (io.jsonwebtoken.ExpiredJwtException e) {
-            // Token 超過當初設定的 86400000 毫秒
-            System.err.println("JWT Token 已過期: " + e.getMessage());
+            log.warn("JWT Token 已過期: {}", e.getMessage());
         } catch (io.jsonwebtoken.MalformedJwtException e) {
-            // 格式不對
-            System.err.println("不合法的 JWT Token: " + e.getMessage());
+            log.warn("不合法的 JWT Token: {}", e.getMessage());
         } catch (IllegalArgumentException e) {
-            // 空字串等
-            System.err.println("JWT 參數錯誤: " + e.getMessage());
+            log.warn("JWT 參數錯誤: {}", e.getMessage());
         }
         return false;
     }

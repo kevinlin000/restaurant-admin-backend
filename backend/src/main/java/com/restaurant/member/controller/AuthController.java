@@ -51,10 +51,9 @@ public class AuthController {
      */
     @PostMapping("/staff")
     public ResponseEntity<ApiResponse<StaffResponse>> createStaff(
-            @Valid @RequestBody StaffCreateRequest request,
-            @RequestHeader(value = "X-Role-Name", defaultValue = "STAFF") String roleName) {
+            @Valid @RequestBody StaffCreateRequest request) {
 
-        StaffResponse data = authService.createStaff(request, roleName);
+        StaffResponse data = authService.createStaff(request);
         return ResponseEntity.ok(ApiResponse.success("員工帳號建立成功", data));
     }
 }

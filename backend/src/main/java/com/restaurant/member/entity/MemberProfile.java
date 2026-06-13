@@ -37,7 +37,7 @@ public class MemberProfile {
     private Integer pointBalance = 0;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "member_level", nullable = false, length = 20)
+    @Column(name = "member_level", nullable = false, columnDefinition = "varchar(20)")
     @Builder.Default
     private MemberLevel memberLevel = MemberLevel.BRONZE;
 }

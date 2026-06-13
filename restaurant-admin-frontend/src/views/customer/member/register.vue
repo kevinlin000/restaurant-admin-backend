@@ -1,7 +1,7 @@
 <template>
   <div class="register-container">
     <div class="register-box">
-      <button class="close-btn" @click="goHome">&times;</button>
+      <button class="back-btn" @click="$router.push('/')">返回首頁</button>
 
       <h2 class="title">會員註冊</h2>
 
@@ -21,13 +21,8 @@
             />
           </div>
           <div class="form-group">
-            <label>生日 (YYYYMMDD)</label>
-            <input
-              v-model="form.birthday"
-              type="text"
-              placeholder="例如：20020101"
-              maxlength="8"
-            />
+            <label>生日</label>
+            <input v-model="form.birthday" type="date" />
           </div>
         </div>
 
@@ -113,7 +108,7 @@ const isFormValid = computed(() => {
     form.name &&
     /^\d{10}$/.test(form.phone) &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) &&
-    /^\d{8}$/.test(form.birthday) &&
+    form.birthday !== "" &&
     form.password.length >= 8 &&
     form.password === form.confirmPassword
   );
@@ -132,15 +127,13 @@ const handleRegister = () => {
 .register-container {
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  padding-top: 130px;
-  padding-bottom: 30px;
-  width: 100%;
-  min-height: auto;
+  align-items: center;
+  padding-top: 50px;
+  min-height: 80vh;
 }
 
 .register-box {
-  position: relative; /* 為了讓關閉按鈕定位 */
+  position: relative;
   width: 100%;
   max-width: 800px;
   padding: 30px;
@@ -149,7 +142,6 @@ const handleRegister = () => {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
-/* 關閉按鈕樣式 */
 .close-btn {
   position: absolute;
   top: 15px;
@@ -165,7 +157,16 @@ const handleRegister = () => {
   color: #333;
 }
 
-/* 標題置中 */
+.back-btn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 14px;
+}
 .title {
   text-align: center;
   margin-bottom: 25px;

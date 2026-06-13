@@ -5,10 +5,10 @@ import com.restaurant.member.dto.MemberProfileResponse;
 import com.restaurant.member.dto.MemberUpdateRequest;
 import com.restaurant.member.dto.PasswordUpdateRequest;
 import com.restaurant.member.service.UserService;
-import com.restaurant.member.util.JwtUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -17,17 +17,14 @@ import org.springframework.web.bind.annotation.*;
 public class MemberController {
 
     private final UserService userService;
-    private final JwtUtil jwtUtil;
 
     /**
      * 查詢自己的個人資料
      * GET /api/members/me
      */
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<MemberProfileResponse>> getProfile(
-            @RequestHeader("Authorization") String authHeader) {
-
-        Long userId = getUserIdFromHeader(authHeader);
+    public ResponseEntity<ApiResponse<MemberProfileResponse>> getProfile() {
+        Long userId = getCurrentUserId();
         MemberProfileResponse data = userService.getProfile(userId);
         return ResponseEntity.ok(ApiResponse.success(data));
     }
@@ -38,10 +35,8 @@ public class MemberController {
      */
     @PutMapping("/me")
     public ResponseEntity<ApiResponse<MemberProfileResponse>> updateProfile(
-            @RequestHeader("Authorization") String authHeader,
             @Valid @RequestBody MemberUpdateRequest request) {
-
-        Long userId = getUserIdFromHeader(authHeader);
+        Long userId = getCurrentUserId();
         MemberProfileResponse data = userService.updateProfile(userId, request);
         return ResponseEntity.ok(ApiResponse.success("個人資料更新成功", data));
     }
@@ -52,10 +47,8 @@ public class MemberController {
      */
     @PutMapping("/me/password")
     public ResponseEntity<ApiResponse<Void>> updatePassword(
-            @RequestHeader("Authorization") String authHeader,
             @Valid @RequestBody PasswordUpdateRequest request) {
-
-        Long userId = getUserIdFromHeader(authHeader);
+        Long userId = getCurrentUserId();
         userService.updatePassword(userId, request);
         return ResponseEntity.ok(ApiResponse.success("密碼修改成功"));
     }
@@ -65,15 +58,17 @@ public class MemberController {
      * DELETE /api/members/me
      */
     @DeleteMapping("/me")
-    public ResponseEntity<ApiResponse<Void>> deleteAccount(@RequestHeader("Authorization") String authHeader) {
-
-        userService.deleteAccount(getUserIdFromHeader(authHeader));
-
+    public ResponseEntity<ApiResponse<Void>> deleteAccount() {
+        userService.deleteAccount(getCurrentUserId());
         return ResponseEntity.ok(ApiResponse.success("帳號已註銷"));
     }
 
-    private Long getUserIdFromHeader(String authHeader) {
-        String token = authHeader.replace("Bearer ", "");
-        return jwtUtil.getUserId(token);
+    /**
+     * 從 SecurityContextHolder 取得當前登入者的 userId。
+     * JwtAuthenticationFilter 在驗證 Token 後會將 userId 存入 principal，
+     * 所以這裡直接取用，不需要再手動解析 Token。
+     */
+    private Long getCurrentUserId() {
+        return (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
     }
 }
