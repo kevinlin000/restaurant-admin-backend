@@ -3,37 +3,42 @@ package com.restaurant.menu.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Data
 @Entity
-@Table(name = "menu_item") // 🚀 1. 檢查：ER圖上是小寫底線的 menu_item
+@Table(name = "menu_item") // 🎯 100% 對齊組長最新的單數表名
 public class MenuItem {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "menu_item_id") // 🚀 2. 對齊 ER 圖的主鍵名字
+    @Column(name = "menu_item_id") // 🎯 對齊主鍵名稱
     private Long id;
 
-    // 🚀 3. 補上最核心的死角：分類 ID 外鍵（對齊 ER 圖的 category_id bigint）
     @Column(name = "category_id", nullable = false)
     private Long categoryId;
 
-    @Column(name = "item_name", nullable = false)
+    @Column(name = "item_name", nullable = false, length = 100)
     private String itemName;
 
-    @Column(name = "description")
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "base_price", nullable = false) // 🚀 4. 對齊 ER 圖的 base_price
-    private BigDecimal price;
+    @Column(name = "base_price", nullable = false) // 🎯 100% 對齊 SQL 欄位
+    private BigDecimal price; // 變數保留為 price，完美契合我們下午改好的前端 axios 接口
 
-    @Column(name = "image_url")
+    @Column(name = "image_url", length = 500)
     private String imageUrl;
 
-    @Column(name = "is_active", nullable = false)
-    private String status = "AVAILABLE";
-
-    // 🚀 終極神救援：對齊 ER 圖最底層的 allergen_info (varchar)
-    @Column(name = "allergen_info")
+    @Column(name = "allergen_info", length = 200)
     private String allergenInfo;
+
+    @Column(name = "is_active", nullable = false) // 🎯 史詩級修正：對齊最新 SQL 的布林型態
+    private Boolean isActive = true;
+
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 }

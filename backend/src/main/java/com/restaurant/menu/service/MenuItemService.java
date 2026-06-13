@@ -1,61 +1,106 @@
-package com.restaurant.menu.service; // 1. 專業門牌完全對齊！
+package com.restaurant.menu.service;
 
-import com.restaurant.menu.entity.MenuItem;
-import com.restaurant.menu.repository.MenuItemRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Autowired;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
-@Service // 2. 貼上動態標籤
+import com.restaurant.menu.dto.MenuCreateDTO; // 🎯 完美引進大寫 DTO
+import com.restaurant.menu.dto.MenuEditDTO;   // 🎯 完美引進大寫 DTO
+import com.restaurant.menu.entity.MenuItem;
+import com.restaurant.menu.entity.StoreMenu;
+import com.restaurant.menu.repository.MenuItemRepository;
+
+import com.restaurant.menu.dto.StoreMenuDisplayResponse; // 🎯 引入剛建好的動態回傳規格
+import com.restaurant.menu.repository.StoreMenuRepository; // 🎯 引入新分店數據庫鑰匙
+import java.util.ArrayList; // 🎯 順便引入 Java 萬能大籃子 ArrayList
+
+@Service
 public class MenuItemService {
 
     @Autowired
-    private MenuItemRepository menuItemRepository; // 3. 劃齊你左邊黑色的斬舟刀！
+    private MenuItemRepository menuItemRepository;
 
-    // 絕招一：查看所有餐點
+    // 💡 1. 補上全新電話線，讓 Service 能同時讀取總部與分店兩張表！
+    @Autowired
+    private StoreMenuRepository storeMenuRepository;
+
+    // 獲取所有餐點
     public List<MenuItem> getAllMenuItems() {
         return menuItemRepository.findAll();
     }
 
-    // 絕招二：新增餐點
-    public MenuItem createMenuItem(MenuItem menuItem) {
-        // 🚀 核心概念：因為你現在是直接傳入 Entity (menuItem)，
-        // 只要前端有傳 allergenInfo 和新格式的 status，這裡呼叫 .save 就會直接完美寫入！
+    // 根據餐點 ID 查詢單一品項
+    public MenuItem getMenuItemById(Long id) {
+        return menuItemRepository.findById(id).orElse(null);
+    }
+
+    // 🚀 絕招一：學會接收 MenuCreateDTO 包裹，並存入資料庫
+    public MenuItem createMenuItem(MenuCreateDTO dto) {
+        MenuItem menuItem = new MenuItem();
+        menuItem.setCategoryId(dto.getCategoryId());
+        menuItem.setItemName(dto.getItemName());
+        menuItem.setDescription(dto.getDescription());
+        menuItem.setPrice(dto.getPrice());
+        menuItem.setImageUrl(dto.getImageUrl());
+        menuItem.setAllergenInfo(dto.getAllergenInfo());
+        menuItem.setIsActive(dto.getIsActive()); 
+        
         return menuItemRepository.save(menuItem);
     }
 
-    // 💡 絕招三：回歸你最踏實的「修改餐點功能」核心靈魂！
-    public MenuItem updateMenuItem(Long id, MenuItem updatedItem) {
-        // 使用 Java 內建宇宙通用的 IllegalArgumentException，再也不用怕同學沒給檔案！
+    // 🚀 絕招二：學會接收 MenuEditDTO 包裹，並更新資料庫
+    public MenuItem updateMenuItem(Long id, MenuEditDTO dto) {
         MenuItem existingItem = menuItemRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("找不到該品項，無法修改！"));
+            .orElseThrow(() -> new IllegalArgumentException("找不到該品項，無法修改！"));
 
-        // 你的擦掉並改寫邏輯
-        existingItem.setItemName(updatedItem.getItemName());
-        existingItem.setDescription(updatedItem.getDescription());
-        
-        // 🚀 核心修正一：因為你的 Entity 欄位昨天改成了 basePrice，請確認你的 Entity getter/setter 名字
-        // 如果你的 Entity 叫 setBasePrice，這裡就用 setBasePrice；如果叫 setPrice，就維持下行：
-        existingItem.setPrice(updatedItem.getPrice());
-        existingItem.setImageUrl(updatedItem.getImageUrl());
-
-        // 🚀 核心修正二：搬運最新字串型態的 Status ("AVAILABLE" / "UNAVAILABLE")
-        existingItem.setStatus(updatedItem.getStatus());
-
-        // 🚀 核心新增三：搬運昨天最新擴充的過敏原欄位
-        existingItem.setAllergenInfo(updatedItem.getAllergenInfo());
+        existingItem.setCategoryId(dto.getCategoryId());
+        existingItem.setItemName(dto.getItemName());
+        existingItem.setDescription(dto.getDescription());
+        existingItem.setPrice(dto.getPrice());
+        existingItem.setImageUrl(dto.getImageUrl());
+        existingItem.setAllergenInfo(dto.getAllergenInfo());
+        existingItem.setIsActive(dto.getIsActive()); 
 
         return menuItemRepository.save(existingItem);
     }
 
-    // 💡 絕招四：回歸你最踏實的「軟刪除（下架）」功能！
+    // 軟刪除（下架）
     public MenuItem deleteMenuItem(Long id) {
         MenuItem existingItem = menuItemRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("找不到該品項，無法下架！"));
-
-        // 🚀 核心修正四：昨天狀態已經全面「字串化」，下架不再是 true/false，而是直接灌入英文字串！
-        existingItem.setStatus("UNAVAILABLE"); // 💡 均勻塗上強效下架大絕！
-        
+            .orElseThrow(() -> new IllegalArgumentException("找不到該品項，無法下架！"));
+            
+        existingItem.setIsActive(false); // 🎯 完美對齊最新的布林值下架！
         return menuItemRepository.save(existingItem);
+    }
+    // 🚀 高階商務邏輯：動態計算各店專屬菜單
+    public List<StoreMenuDisplayResponse> getStoreMenu(Long storeId) {
+        List<StoreMenuDisplayResponse> displayList = new ArrayList<>();
+
+        // 步驟 A：去 store_menu 撈出該分店「有供應 (is_available = true)」的所有設定
+        List<StoreMenu> storeMenuItems = storeMenuRepository.findByStoreIdAndIsAvailableTrue(storeId);
+
+        for (StoreMenu storeMenu : storeMenuItems) {
+            // 步驟 B：拿著關聯的 menu_item_id，去總部菜單表把餐點細節（品名、描述、圖片、過敏原）撈出來
+            MenuItem item = menuItemRepository.findById(storeMenu.getMenuItemId()).orElse(null);
+            
+            // 步驟 C：確保總部沒有把這道菜大下架 (is_active = true)
+            if (item != null && item.getIsActive()) { 
+                StoreMenuDisplayResponse response = new StoreMenuDisplayResponse();
+                response.setId(item.getId());
+                response.setItemName(item.getItemName());
+                response.setDescription(item.getDescription());
+                response.setImageUrl(item.getImageUrl());
+                response.setAllergenInfo(item.getAllergenInfo());
+
+                // 🔥 核心商業邏輯精髓：如果分店有客製化售價，就用分店價；如果為 null，自動退回總部建議售價！
+                if (storeMenu.getPrice() != null) {
+                    response.setFinalPrice(storeMenu.getPrice()); 
+                } else {
+                    response.setFinalPrice(item.getPrice()); 
+                }
+
+                displayList.add(response);
+            }
+        }     return displayList;
     }
 }
