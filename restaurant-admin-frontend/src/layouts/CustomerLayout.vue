@@ -1,4 +1,43 @@
-<script setup></script>
+<script setup>
+import { ref, onMounted, onBeforeUnmount } from "vue";
+import { useRouter } from "vue-router";
+import Swal from "sweetalert2";
+
+const router = useRouter();
+const userInfo = ref(null);
+
+const loadUserInfo = () => {
+  const data = localStorage.getItem("userInfo");
+  userInfo.value = data ? JSON.parse(data) : null;
+};
+
+onMounted(() => {
+  loadUserInfo();
+  window.addEventListener("login-state-changed", loadUserInfo);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("login-state-changed", loadUserInfo);
+});
+
+const logout = async () => {
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("userInfo");
+
+  userInfo.value = null;
+  window.dispatchEvent(new Event("login-state-changed"));
+
+  await Swal.fire({
+    icon: "success",
+    title: "已登出",
+    text: "期待再次與您見面",
+    timer: 1500,
+    showConfirmButton: false,
+  });
+
+  router.push("/home");
+};
+</script>
 
 <template>
   <div class="layout-wrapper">
@@ -49,11 +88,42 @@
               <li class="nav-item">
                 <RouterLink class="nav-link" to="/store">分店資訊</RouterLink>
               </li>
-
-              <li class="nav-item ms-lg-5">
+              <li v-if="!userInfo" class="nav-item ms-lg-5">
                 <RouterLink to="/login" class="login-btn">
-                  <i class="bi bi-person"></i>會員登入
+                  <i class="bi bi-person"></i>
+                  會員登入
                 </RouterLink>
+              </li>
+
+              <li v-else class="nav-item dropdown ms-lg-5">
+                <a
+                  class="login-btn dropdown-toggle"
+                  href="#"
+                  role="button"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                >
+                  <i class="bi bi-person"></i>
+                  Hi，{{ userInfo.name }}
+                </a>
+
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li>
+                    <RouterLink class="dropdown-item" to="/profile">
+                      個人資料
+                    </RouterLink>
+                  </li>
+
+                  <li>
+                    <button
+                      class="dropdown-item text-danger"
+                      type="button"
+                      @click="logout"
+                    >
+                      登出
+                    </button>
+                  </li>
+                </ul>
               </li>
             </ul>
           </div>

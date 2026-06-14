@@ -1,9 +1,11 @@
 package com.restaurant.member.controller;
 
 import com.restaurant.common.ApiResponse;
+import com.restaurant.member.dto.ForgotPasswordRequest;
 import com.restaurant.member.dto.LoginRequest;
 import com.restaurant.member.dto.LoginResponse;
 import com.restaurant.member.dto.MemberRegisterRequest;
+import com.restaurant.member.dto.ResetPasswordRequest;
 import com.restaurant.member.dto.StaffCreateRequest;
 import com.restaurant.member.dto.StaffResponse;
 import com.restaurant.member.service.AuthService;
@@ -55,5 +57,29 @@ public class AuthController {
 
         StaffResponse data = authService.createStaff(request);
         return ResponseEntity.ok(ApiResponse.success("員工帳號建立成功", data));
+    }
+
+    @PostMapping("/password/forgot")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(
+            @RequestBody ForgotPasswordRequest request) {
+
+        authService.forgotPassword(
+                request.getEmail());
+
+        return ResponseEntity.ok(
+                ApiResponse.success("驗證碼已寄出"));
+    }
+
+    @PostMapping("/password/reset")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(
+            @RequestBody ResetPasswordRequest request) {
+
+        authService.resetPassword(
+                request.getEmail(),
+                request.getCode(),
+                request.getNewPassword());
+
+        return ResponseEntity.ok(
+                ApiResponse.success("密碼重設成功"));
     }
 }

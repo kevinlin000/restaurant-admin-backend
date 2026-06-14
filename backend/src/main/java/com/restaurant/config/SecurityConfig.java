@@ -46,6 +46,9 @@ public class SecurityConfig {
                         // ===== 公開路由（不需要登入）=====
                         .requestMatchers(HttpMethod.POST, "/api/members/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/members/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/members/password/forgot").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/members/password/reset").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/members/test-mail").permitAll()
 
                         // ===== 會員路由（需要登入，CUSTOMER 角色）=====
                         .requestMatchers(HttpMethod.GET, "/api/members/me").hasAuthority("ROLE_CUSTOMER")

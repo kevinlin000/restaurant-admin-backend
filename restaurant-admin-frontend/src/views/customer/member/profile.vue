@@ -1,58 +1,283 @@
 <template>
-  <div class="profile-container">
-    <div class="profile-box">
-      <h2 class="title">會員資料</h2>
+  <div class="member-page">
+    <div class="member-shell">
+      <!-- 載入中 -->
+      <div v-if="isLoading" class="state-box">載入中...</div>
 
-      <div class="profile-card">
-        <p><strong>姓名：</strong> {{ userInfo.name }}</p>
-        <p><strong>Email：</strong> {{ userInfo.email }}</p>
-        <p><strong>電話：</strong> {{ userInfo.phone }}</p>
-        <p><strong>生日：</strong> {{ userInfo.birthday }}</p>
-
-        <div class="birthday-gift-hint" v-if="birthdayCountdown !== null">
-          <p v-if="birthdayCountdown === 0" class="gift-active">
-            🎉 生日快樂！快來店領取您的生日專屬禮！
-          </p>
-          <p v-else class="gift-pending">
-            距離您的生日還有 {{ birthdayCountdown }} 天，期待與您一同慶祝！
-          </p>
-        </div>
+      <!-- 錯誤訊息 -->
+      <div v-else-if="errorMsg" class="state-box error-msg">
+        {{ errorMsg }}
       </div>
 
-      <div class="benefits-card">
-        <div class="level-info">
-          <p><strong>目前等級：</strong> {{ memberLevelText }}</p>
-          <p class="upgrade-hint">{{ upgradeHint }}</p>
-        </div>
-        <hr />
-        <div class="points-info">
-          <p>
-            <strong>目前點數：</strong>
-            <span class="points-val">{{ userInfo.points }} 點</span>
-          </p>
-        </div>
-      </div>
+      <template v-else>
+        <!-- 左側會員摘要 -->
+        <aside class="member-sidebar">
+          <div class="member-name">{{ userInfo.name }}</div>
+          <div class="member-meta">
+            <span class="level-badge">{{ memberLevelText }}</span>
+          </div>
 
-      <div class="action-buttons">
-        <button class="pwd-btn" @click="handleEditPassword">修改密碼</button>
-      </div>
+          <div class="side-divider"></div>
+
+          <div class="side-info">
+            <p class="side-label">目前點數</p>
+            <p class="side-value">{{ userInfo.pointBalance }} 點</p>
+          </div>
+
+          <div class="side-info">
+            <p class="side-label">升級提醒</p>
+            <p class="side-note">{{ upgradeHint }}</p>
+          </div>
+
+          <div v-if="birthdayCountdown !== null" class="birthday-box">
+            <p v-if="birthdayCountdown === 0" class="birthday-active">
+              🎉 生日快樂！快來店領取您的生日專屬禮！
+            </p>
+            <p v-else>
+              距離您的生日還有
+              <strong>{{ birthdayCountdown }}</strong
+              >天
+            </p>
+          </div>
+
+          <button class="logout-link" type="button" @click="logout">
+            登出
+          </button>
+        </aside>
+
+        <!-- 右側內容 -->
+        <section class="member-content">
+          <!-- 基本資料 -->
+          <template v-if="currentView === 'profile'">
+            <div class="section-header">
+              <h2>會員基本資料</h2>
+            </div>
+
+            <div class="info-card">
+              <div class="info-row">
+                <div class="info-label">會員姓名</div>
+                <div class="info-value">{{ userInfo.name }}</div>
+              </div>
+
+              <div class="info-row">
+                <div class="info-label">電話</div>
+                <div class="info-value">{{ userInfo.phone }}</div>
+              </div>
+
+              <div class="info-row">
+                <div class="info-label">Email</div>
+                <div class="info-value">{{ userInfo.email }}</div>
+              </div>
+
+              <div class="info-row">
+                <div class="info-label">生日</div>
+                <div class="info-value">
+                  {{ formatBirthday(userInfo.birthday) }}
+                </div>
+              </div>
+
+              <div class="info-row password-row">
+                <div class="info-label">密碼</div>
+                <div class="info-value password-dots">••••••••</div>
+                <button
+                  class="text-action"
+                  type="button"
+                  @click="openPasswordView"
+                >
+                  修改密碼
+                </button>
+              </div>
+            </div>
+          </template>
+
+          <!-- 修改密碼 -->
+          <template v-else>
+            <div class="section-header password-header">
+              <button class="back-btn" type="button" @click="backToProfile">
+                ← 返回基本資料
+              </button>
+            </div>
+
+            <div class="password-panel">
+              <h2 class="password-title">
+                <i class="bi bi-lock-fill"></i>
+                修改密碼
+              </h2>
+
+              <form
+                class="password-form"
+                @submit.prevent="handleUpdatePassword"
+              >
+                <div class="form-group">
+                  <label>目前密碼</label>
+                  <div class="password-input-wrap">
+                    <input
+                      v-model="passwordForm.oldPassword"
+                      :type="showOldPassword ? 'text' : 'password'"
+                      placeholder="請輸入目前密碼"
+                    />
+                    <span
+                      class="eye-icon"
+                      @click="showOldPassword = !showOldPassword"
+                    >
+                      <i
+                        :class="
+                          showOldPassword ? 'bi bi-eye' : 'bi bi-eye-slash'
+                        "
+                      ></i>
+                    </span>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>新密碼</label>
+                  <div class="password-input-wrap">
+                    <input
+                      v-model="passwordForm.newPassword"
+                      :type="showNewPassword ? 'text' : 'password'"
+                      placeholder="請輸入新密碼"
+                    />
+                    <span
+                      class="eye-icon"
+                      @click="showNewPassword = !showNewPassword"
+                    >
+                      <i
+                        :class="
+                          showNewPassword ? 'bi bi-eye' : 'bi bi-eye-slash'
+                        "
+                      ></i>
+                    </span>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>確認新密碼</label>
+                  <div class="password-input-wrap">
+                    <input
+                      v-model="passwordForm.confirmPassword"
+                      :type="showConfirmPassword ? 'text' : 'password'"
+                      placeholder="再次輸入新密碼"
+                    />
+                    <span
+                      class="eye-icon"
+                      @click="showConfirmPassword = !showConfirmPassword"
+                    >
+                      <i
+                        :class="
+                          showConfirmPassword ? 'bi bi-eye' : 'bi bi-eye-slash'
+                        "
+                      ></i>
+                    </span>
+                  </div>
+                </div>
+
+                <p v-if="passwordError" class="password-error">
+                  <i class="bi bi-exclamation-circle-fill"></i>
+                  {{ passwordError }}
+                </p>
+
+                <ul class="password-rules">
+                  <li :class="{ passed: isLengthValid }">
+                    <i class="bi bi-check-circle-fill"></i>
+                    密碼長度需為 8 到 20 個字元
+                  </li>
+                  <li :class="{ passed: isConfirmMatched }">
+                    <i class="bi bi-check-circle-fill"></i>
+                    兩次輸入的新密碼需一致
+                  </li>
+                  <li :class="{ passed: isDifferentFromOld }">
+                    <i class="bi bi-check-circle-fill"></i>
+                    新密碼不可與目前密碼相同
+                  </li>
+                </ul>
+
+                <div class="password-actions">
+                  <button
+                    class="clear-btn"
+                    type="button"
+                    @click="resetPasswordForm"
+                    :disabled="isChangingPassword"
+                  >
+                    清空
+                  </button>
+                  <button
+                    class="submit-btn"
+                    type="submit"
+                    :disabled="isChangingPassword"
+                  >
+                    {{ isChangingPassword ? "修改中..." : "確認修改" }}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </template>
+        </section>
+      </template>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import Swal from "sweetalert2";
+import { getProfile, updatePassword } from "@/api/member";
+
+const router = useRouter();
+
+const isLoading = ref(true);
+const errorMsg = ref("");
+const currentView = ref("profile");
 
 const userInfo = ref({
-  name: "黃小裕",
-  email: "xeriof0000@example.com",
-  phone: "0912-345-678",
-  birthday: "20020101",
-  level: "BRONZE",
-  points: 500,
+  name: "",
+  email: "",
+  phone: "",
+  birthday: "",
+  memberLevel: "BRONZE",
+  pointBalance: 0,
 });
 
-// 會員等級轉換
+const passwordForm = ref({
+  oldPassword: "",
+  newPassword: "",
+  confirmPassword: "",
+});
+
+const passwordError = ref("");
+const isChangingPassword = ref(false);
+
+const showOldPassword = ref(false);
+const showNewPassword = ref(false);
+const showConfirmPassword = ref(false);
+
+onMounted(async () => {
+  const token = localStorage.getItem("accessToken");
+
+  if (!token) {
+    router.push("/login");
+    return;
+  }
+
+  try {
+    const res = await getProfile();
+    const data = res.data.data;
+
+    userInfo.value = {
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      birthday: data.birthday,
+      memberLevel: data.memberLevel,
+      pointBalance: data.pointBalance,
+    };
+  } catch (err) {
+    errorMsg.value = "無法取得會員資料，請重新登入";
+  } finally {
+    isLoading.value = false;
+  }
+});
+
 const memberLevelText = computed(() => {
   const levels = {
     BRONZE: "銅卡會員",
@@ -60,120 +285,549 @@ const memberLevelText = computed(() => {
     GOLD: "金卡會員",
     DIAMOND: "鑽石卡會員",
   };
-  return levels[userInfo.value.level] || "一般會員";
+
+  return levels[userInfo.value.memberLevel] || "一般會員";
 });
 
-// 升級提示
 const upgradeHint = computed(() => {
-  if (userInfo.value.level === "BRONZE")
-    return "再消費 $1,500 即可升級為銀卡會員！";
-  if (userInfo.value.level === "SILVER")
-    return "再消費 $5,000 即可升級為金卡會員！";
-  return "您已達最高等級，繼續保持！";
+  if (userInfo.value.memberLevel === "BRONZE") {
+    return "再消費 $1,500 即可升級為銀卡會員";
+  }
+
+  if (userInfo.value.memberLevel === "SILVER") {
+    return "再消費 $5,000 即可升級為金卡會員";
+  }
+
+  return "您已達最高等級，繼續保持";
 });
 
-// 生日倒數計算
 const birthdayCountdown = computed(() => {
-  const today = new Date();
-  const birthStr = userInfo.value.birthday;
-  const month = parseInt(birthStr.substring(4, 6)) - 1;
-  const day = parseInt(birthStr.substring(6, 8));
+  if (!userInfo.value.birthday) return null;
 
-  const birthdayThisYear = new Date(today.getFullYear(), month, day);
+  const today = new Date();
+  const birthday = new Date(userInfo.value.birthday);
+  const birthdayThisYear = new Date(
+    today.getFullYear(),
+    birthday.getMonth(),
+    birthday.getDate(),
+  );
+
   let nextBirthday = birthdayThisYear;
+
   if (today > birthdayThisYear) {
-    nextBirthday = new Date(today.getFullYear() + 1, month, day);
+    nextBirthday = new Date(
+      today.getFullYear() + 1,
+      birthday.getMonth(),
+      birthday.getDate(),
+    );
   }
 
   return Math.ceil((nextBirthday - today) / (1000 * 60 * 60 * 24));
 });
+
+const isLengthValid = computed(() => {
+  const length = passwordForm.value.newPassword.length;
+  return length >= 8 && length <= 20;
+});
+
+const isConfirmMatched = computed(() => {
+  if (!passwordForm.value.confirmPassword) return false;
+  return passwordForm.value.newPassword === passwordForm.value.confirmPassword;
+});
+
+const isDifferentFromOld = computed(() => {
+  if (!passwordForm.value.oldPassword || !passwordForm.value.newPassword) {
+    return false;
+  }
+
+  return passwordForm.value.oldPassword !== passwordForm.value.newPassword;
+});
+
+const formatBirthday = (birthday) => {
+  if (!birthday) return "未提供";
+  return birthday.replaceAll("-", "/");
+};
+
+const openPasswordView = () => {
+  resetPasswordForm();
+  currentView.value = "password";
+};
+
+const backToProfile = () => {
+  resetPasswordForm();
+  currentView.value = "profile";
+};
+
+const resetPasswordForm = () => {
+  passwordForm.value = {
+    oldPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  };
+
+  passwordError.value = "";
+  showOldPassword.value = false;
+  showNewPassword.value = false;
+  showConfirmPassword.value = false;
+};
+
+const validatePasswordForm = () => {
+  if (
+    !passwordForm.value.oldPassword ||
+    !passwordForm.value.newPassword ||
+    !passwordForm.value.confirmPassword
+  ) {
+    passwordError.value = "請完整填寫所有欄位";
+    return false;
+  }
+
+  if (!isLengthValid.value) {
+    passwordError.value = "新密碼長度需為 8 到 20 個字元";
+    return false;
+  }
+
+  if (!isConfirmMatched.value) {
+    passwordError.value = "兩次輸入的新密碼不一致";
+    return false;
+  }
+
+  if (!isDifferentFromOld.value) {
+    passwordError.value = "新密碼不可與目前密碼相同";
+    return false;
+  }
+
+  passwordError.value = "";
+  return true;
+};
+
+const handleUpdatePassword = async () => {
+  if (!validatePasswordForm()) return;
+
+  isChangingPassword.value = true;
+
+  try {
+    await updatePassword({
+      oldPassword: passwordForm.value.oldPassword,
+      newPassword: passwordForm.value.newPassword,
+    });
+
+    await Swal.fire({
+      icon: "success",
+      title: "密碼修改成功",
+      text: "請使用新密碼登入您的帳號",
+      confirmButtonColor: "#d9a372",
+    });
+
+    resetPasswordForm();
+    currentView.value = "profile";
+  } catch (err) {
+    passwordError.value =
+      err.response?.data?.message || "密碼修改失敗，請稍後再試";
+  } finally {
+    isChangingPassword.value = false;
+  }
+};
+
+const logout = async () => {
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("userInfo");
+  window.dispatchEvent(new Event("login-state-changed"));
+
+  await Swal.fire({
+    icon: "success",
+    title: "已登出",
+    text: "期待再次與您見面",
+    timer: 1500,
+    showConfirmButton: false,
+  });
+
+  router.push("/home");
+};
 </script>
 
 <style scoped>
-.profile-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+.member-page {
   min-height: 100vh;
-  padding: 60px 20px;
-  background-color: #f8f9fa;
+  padding: 150px 32px 80px;
+  background: #f8f3ed;
+  color: #566a7f;
 }
 
-.profile-box {
-  width: 90%;
-  max-width: 500px;
-  padding: 50px;
+.member-shell {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+
+.state-box {
+  width: min(520px, 100%);
+  margin: 80px auto;
+  padding: 40px;
   border-radius: 16px;
-  background: white;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  margin-top: 20px;
-  margin-bottom: 20px;
-}
-
-.title {
+  background: #fff;
   text-align: center;
-  color: #55606e;
-  margin-bottom: 25px;
+  box-shadow: 0 8px 24px rgba(86, 106, 127, 0.12);
 }
 
-.profile-card,
-.benefits-card {
-  border: 1px solid #eee;
-  padding: 20px;
-  margin-bottom: 15px;
-  border-radius: 10px;
-  background-color: #ffffff;
-}
-
-.benefits-card {
-  background-color: #fffaf7;
-  border-color: #f7e0ce;
-}
-.upgrade-hint {
-  font-size: 0.85em;
-  color: #d97706;
-  margin-top: 5px;
-}
-.points-val {
-  font-size: 1.2em;
-  color: #e3ac7f;
-  font-weight: bold;
-}
-
-hr {
-  border: 0;
-  border-top: 1px solid #eee;
-  margin: 15px 0;
-}
-
-.birthday-gift-hint {
-  margin-top: 15px;
-  padding: 10px;
-  background-color: #fff1f2;
-  border-left: 4px solid #e11d48;
-  border-radius: 4px;
-  font-size: 0.9em;
-  color: #9f1239;
-}
-.gift-active {
-  font-weight: bold;
+.error-msg {
   color: #e11d48;
 }
 
-.action-buttons {
-  margin-top: 20px;
+.member-shell > template,
+.member-shell {
+  position: relative;
 }
-.pwd-btn {
-  width: 100%;
-  padding: 12px;
-  background: #55606e;
-  color: white;
-  border: none;
+
+.member-sidebar,
+.member-content {
+  background: transparent;
+}
+
+.member-sidebar {
+  float: left;
+  width: 220px;
+  padding-right: 28px;
+}
+
+.member-content {
+  margin-left: 250px;
+}
+
+.member-name {
+  font-size: 28px;
+  font-weight: 800;
+  color: #3d4651;
+  margin-bottom: 8px;
+}
+
+.member-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+
+.level-badge {
+  padding: 4px 10px;
+  border: 1px solid #ead5c3;
   border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.3s;
+  background: #fffaf7;
+  color: #e3ac7f;
+  font-size: 13px;
 }
-.pwd-btn:hover {
-  background: #3d4651;
+
+.side-divider {
+  height: 1px;
+  background: #e6ded5;
+  margin: 24px 0;
+}
+
+.side-info {
+  margin-bottom: 20px;
+}
+
+.side-label {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: #7b8794;
+}
+
+.side-value {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #e3ac7f;
+}
+
+.side-note {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #8a6f5a;
+}
+
+.birthday-box {
+  margin: 20px 0;
+  padding: 14px;
+  border-left: 4px solid #e3ac7f;
+  border-radius: 8px;
+  background: #fff7f0;
+  color: #8a6f5a;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.birthday-box p {
+  margin: 0;
+}
+
+.birthday-active {
+  color: #d97706;
+  font-weight: 700;
+}
+
+.logout-link {
+  margin-top: 10px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #566a7f;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.logout-link:hover {
+  color: #e3ac7f;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.section-header h2 {
+  margin: 0;
+  color: #3d4651;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.save-text {
+  color: #8a6f5a;
+  font-size: 15px;
+}
+
+.info-card,
+.password-panel {
+  min-height: 560px;
+  padding: 38px 42px;
+  border: 1px solid #e6ded5;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 10px 24px rgba(86, 106, 127, 0.08);
+}
+
+.info-row {
+  display: grid;
+  grid-template-columns: 90px 1fr auto;
+  gap: 18px;
+  align-items: center;
+  min-height: 74px;
+  border-bottom: 1px solid #e6ded5;
+}
+
+.info-label {
+  color: #566a7f;
+  font-size: 14px;
+}
+
+.info-value {
+  color: #2f3a45;
+  font-size: 16px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.password-dots {
+  letter-spacing: 8px;
+  color: #566a7f;
+}
+
+.text-action {
+  border: none;
+  background: transparent;
+  color: #8a6f5a;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.text-action:hover {
+  color: #e3ac7f;
+}
+
+.password-header {
+  justify-content: flex-start;
+}
+
+.back-btn {
+  border: none;
+  background: transparent;
+  color: #8a6f5a;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.back-btn:hover {
+  color: #e3ac7f;
+}
+
+.password-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.password-title {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 20px 0 34px;
+  color: #3d4651;
+  font-size: 30px;
+  font-weight: 800;
+}
+
+.password-title i {
+  color: #e3ac7f;
+}
+
+.password-form {
+  width: min(440px, 100%);
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #566a7f;
+  font-weight: 700;
+}
+
+.password-input-wrap {
+  position: relative;
+}
+
+.password-input-wrap input {
+  width: 100%;
+  height: 48px;
+  padding: 0 46px 0 14px;
+  border: 1px solid #d7ccc0;
+  border-radius: 8px;
+  outline: none;
+  background: #fff;
+  color: #3d4651;
+  font-size: 15px;
+  transition: 0.2s;
+}
+
+.password-input-wrap input:focus {
+  border-color: #e3ac7f;
+  box-shadow: 0 0 0 3px rgba(227, 172, 127, 0.16);
+}
+
+.eye-icon {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  color: #7b8794;
+  cursor: pointer;
+}
+
+.eye-icon:hover {
+  color: #e3ac7f;
+}
+
+.password-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 16px;
+  color: #e11d48;
+  font-size: 14px;
+}
+
+.password-rules {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 28px;
+}
+
+.password-rules li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #9aa3ad;
+  font-size: 14px;
+}
+
+.password-rules li.passed {
+  color: #2f9e44;
+}
+
+.password-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.clear-btn,
+.submit-btn {
+  height: 48px;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.clear-btn {
+  background: #7b8794;
+}
+
+.submit-btn {
+  background: #e3ac7f;
+}
+
+.clear-btn:hover {
+  background: #657180;
+}
+
+.submit-btn:hover {
+  background: #d49a68;
+}
+
+.clear-btn:disabled,
+.submit-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+  .member-page {
+    padding: 130px 18px 60px;
+  }
+
+  .member-sidebar {
+    float: none;
+    width: 100%;
+    padding-right: 0;
+    margin-bottom: 24px;
+  }
+
+  .member-content {
+    margin-left: 0;
+  }
+
+  .info-card,
+  .password-panel {
+    min-height: auto;
+    padding: 28px 22px;
+  }
+
+  .info-row {
+    grid-template-columns: 82px 1fr;
+  }
+
+  .text-action {
+    grid-column: 2 / 3;
+    justify-self: flex-start;
+  }
 }
 </style>
