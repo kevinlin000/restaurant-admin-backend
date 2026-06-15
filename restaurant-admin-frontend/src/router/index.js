@@ -12,6 +12,7 @@ import AdminReservationSetting from "@/views/admin/reservation/ReservationSettin
 import AdminMenuCreate from "@/views/admin/menu/menu-create.vue";
 import AdminMenuEdit from "@/views/admin/menu/menu-edit.vue";
 import AdminMenuSetting from "@/views/admin/menu/menu-setting.vue";
+import AdminStore from "@/views/admin/store/store.vue";
 import CustomerMenu from "@/views/customer/menu/menu.vue";
 import CustomerOrder from "@/views/customer/order/order.vue";
 import CustomerStore from "@/views/customer/store/store.vue";
@@ -118,6 +119,11 @@ const routers = [
         path: "menu-setting",
         name: "AdminMenuSetting",
         component: AdminMenuSetting,
+      },
+      {
+        path: "store",
+        name: "AdminStore",
+        component: AdminStore,
       },
     ],
   },

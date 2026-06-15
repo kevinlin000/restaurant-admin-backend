@@ -3,6 +3,7 @@ package com.restaurant.store.controller;
 import com.restaurant.common.ApiResponse;
 import com.restaurant.store.dto.request.*;
 import com.restaurant.store.dto.response.StoreDetailResponse;
+import com.restaurant.store.dto.response.StoreListResponse;
 import com.restaurant.store.dto.response.TableInfoResponse;
 import com.restaurant.store.service.StoreService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +23,12 @@ public class StoreAdminController {
     private final StoreService storeService;
 
     // =================== 門市 ===================
+
+    @GetMapping("/api/admin/stores")
+    @Operation(summary = "取得後台門市清單")
+    public ApiResponse<List<StoreListResponse>> getStores() {
+        return ApiResponse.success(storeService.getAllStoresForAdmin());
+    }
 
     @PostMapping("/api/admin/stores")
     @ResponseStatus(HttpStatus.CREATED)

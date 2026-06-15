@@ -18,6 +18,7 @@ public interface StoreService {
     List<String> getDistrictsByCity(String city);
 
     // 後台
+    List<StoreListResponse> getAllStoresForAdmin();
     StoreDetailResponse createStore(StoreCreateRequest request);
     StoreDetailResponse updateStore(Long storeId, StoreUpdateRequest request);
     void deleteStore(Long storeId);

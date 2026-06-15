@@ -132,6 +132,15 @@ public class StoreServiceImpl implements StoreService {
     // =================== 後台 ===================
 
     @Override
+    @Transactional(readOnly = true)
+    public List<StoreListResponse> getAllStoresForAdmin() {
+        return storeRepository.findByIsDeletedFalse()
+                .stream()
+                .map(s -> toListResponse(s, null))
+                .collect(Collectors.toList());
+    }
+
+    @Override
     @Transactional
     public StoreDetailResponse createStore(StoreCreateRequest request) {
         Store store = Store.builder()
