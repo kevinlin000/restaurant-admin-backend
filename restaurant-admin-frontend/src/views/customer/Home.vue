@@ -157,6 +157,14 @@ onMounted(loadFeaturedStores);
             <span class="store-location">{{ storeLocation(store) }}</span>
             <h3>{{ store.storeName }}</h3>
             <p>{{ store.address }}</p>
+            <div v-if="store.featureTags?.length" class="store-tags">
+              <span
+                v-for="feature in store.featureTags.slice(0, 3)"
+                :key="feature.featureKey"
+              >
+                {{ feature.featureLabel }}
+              </span>
+            </div>
             <div class="store-meta">
               <span><i class="bi bi-telephone"></i>{{ store.phone || "電話更新中" }}</span>
               <span><i class="bi bi-train-front"></i>{{ store.mrtInfo || "交通資訊更新中" }}</span>
@@ -461,6 +469,22 @@ onMounted(loadFeaturedStores);
   margin: 0;
   color: #697386;
   line-height: 1.7;
+}
+
+.store-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.store-tags span {
+  border-radius: 999px;
+  background: #faf3ea;
+  color: #8c552e;
+  padding: 5px 9px;
+  font-size: 13px;
+  font-weight: 900;
 }
 
 .store-meta {

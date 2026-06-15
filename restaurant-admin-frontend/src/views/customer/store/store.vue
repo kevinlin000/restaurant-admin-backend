@@ -15,6 +15,7 @@ const selectedCity = ref("");
 const selectedDistrict = ref("");
 const keyword = ref("");
 const activeRegion = ref("all");
+const selectedFeatures = ref([]);
 const openOnly = ref(false);
 const sortMode = ref("recommended");
 const selectedStore = ref(null);
@@ -42,6 +43,7 @@ const hasFilters = computed(
     selectedCity.value ||
     selectedDistrict.value ||
     activeRegion.value !== "all" ||
+    selectedFeatures.value.length > 0 ||
     openOnly.value ||
     resultMode.value === "nearby",
 );
@@ -57,6 +59,20 @@ const selectedRegionLabel = computed(() => selectedRegion.value.label);
 const closestStore = computed(() =>
   stores.value.find((store) => store.distanceKm !== null && store.distanceKm !== undefined),
 );
+
+const featureOptions = computed(() => {
+  const featureMap = new Map();
+  allStores.value.forEach((store) => {
+    (store.featureTags ?? []).forEach((feature) => {
+      if (!featureMap.has(feature.featureKey)) {
+        featureMap.set(feature.featureKey, feature);
+      }
+    });
+  });
+  return [...featureMap.values()].sort(
+    (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.featureLabel.localeCompare(b.featureLabel, "zh-Hant"),
+  );
+});
 
 const todayDayOfWeek = computed(() => {
   const day = new Date().getDay();
@@ -167,6 +183,8 @@ const openStatusText = (store) => (store.openNow ? "營業中" : "非營業時�
 
 const storeLocation = (store) => [store.city, store.district].filter(Boolean).join(" ");
 
+const storeFeatureKeys = (store) => (store.featureTags ?? []).map((feature) => feature.featureKey);
+
 const matchesKeyword = (store, keywordValue) => {
   if (!keywordValue) return true;
   const text = [
@@ -182,9 +200,30 @@ const matchesKeyword = (store, keywordValue) => {
   return text.includes(keywordValue);
 };
 
+const matchesFeatures = (store) => {
+  if (!selectedFeatures.value.length) return true;
+  const keys = storeFeatureKeys(store);
+  return selectedFeatures.value.every((featureKey) => keys.includes(featureKey));
+};
+
+const recommendationScore = (store) => {
+  const keys = storeFeatureKeys(store);
+  const selectedFeatureHits = selectedFeatures.value.filter((featureKey) => keys.includes(featureKey)).length;
+  const hasDistance = store.distanceKm !== null && store.distanceKm !== undefined;
+  const distanceScore = hasDistance ? Math.max(0, 30 - Number(store.distanceKm)) : 0;
+  return (
+    Number(store.openNow) * 100 +
+    selectedFeatureHits * 32 +
+    Math.min(keys.length, 4) * 4 +
+    distanceScore
+  );
+};
+
 const sortStores = (list) => {
   const sorted = [...list];
-  if (sortMode.value === "open") {
+  if (sortMode.value === "recommended") {
+    sorted.sort((a, b) => recommendationScore(b) - recommendationScore(a));
+  } else if (sortMode.value === "open") {
     sorted.sort((a, b) => Number(b.openNow) - Number(a.openNow));
   } else if (sortMode.value === "name") {
     sorted.sort((a, b) => `${a.storeName}`.localeCompare(`${b.storeName}`, "zh-Hant"));
@@ -207,11 +246,13 @@ const filterStores = (source = currentStoreSource()) => {
     const districtMatched =
       !selectedDistrict.value || store.district === selectedDistrict.value;
     const openMatched = !openOnly.value || store.openNow;
+    const featureMatched = matchesFeatures(store);
     return (
       regionMatched &&
       cityMatched &&
       districtMatched &&
       openMatched &&
+      featureMatched &&
       matchesKeyword(store, keywordValue)
     );
   });
@@ -306,6 +347,13 @@ const toggleOpenOnly = () => {
   filterStores();
 };
 
+const toggleFeature = (featureKey) => {
+  selectedFeatures.value = selectedFeatures.value.includes(featureKey)
+    ? selectedFeatures.value.filter((selected) => selected !== featureKey)
+    : [...selectedFeatures.value, featureKey];
+  filterStores();
+};
+
 const updateSort = () => {
   stores.value = sortStores(stores.value);
 };
@@ -315,6 +363,7 @@ const clearFilters = async () => {
   selectedCity.value = "";
   selectedDistrict.value = "";
   activeRegion.value = "all";
+  selectedFeatures.value = [];
   openOnly.value = false;
   sortMode.value = "recommended";
   districts.value = [];
@@ -464,6 +513,22 @@ onMounted(async () => {
           </button>
         </div>
 
+        <div v-if="featureOptions.length" class="feature-row" aria-label="用餐情境篩選">
+          <span>用餐情境</span>
+          <button
+            v-for="feature in featureOptions"
+            :key="feature.featureKey"
+            type="button"
+            :class="[
+              'feature-chip',
+              selectedFeatures.includes(feature.featureKey) ? 'active' : '',
+            ]"
+            @click="toggleFeature(feature.featureKey)"
+          >
+            {{ feature.featureLabel }}
+          </button>
+        </div>
+
         <div class="tools-row">
           <div class="result-summary">
             <span>{{ selectedRegionLabel }}</span>
@@ -544,6 +609,15 @@ onMounted(async () => {
 
               <p class="address">{{ store.address }}</p>
 
+              <div v-if="store.featureTags?.length" class="store-tags">
+                <span
+                  v-for="feature in store.featureTags.slice(0, 3)"
+                  :key="feature.featureKey"
+                >
+                  {{ feature.featureLabel }}
+                </span>
+              </div>
+
               <div class="meta-row">
                 <span><i class="bi bi-telephone"></i>{{ store.phone || "未提供電話" }}</span>
                 <span><i class="bi bi-train-front"></i>{{ store.mrtInfo || "交通資訊更新中" }}</span>
@@ -592,6 +666,15 @@ onMounted(async () => {
                 </div>
 
                 <p class="detail-address">{{ selectedStore.address }}</p>
+
+                <div v-if="selectedStore.featureTags?.length" class="detail-tags">
+                  <span
+                    v-for="feature in selectedStore.featureTags"
+                    :key="feature.featureKey"
+                  >
+                    {{ feature.featureLabel }}
+                  </span>
+                </div>
 
                 <div class="detail-actions">
                   <button class="primary-action link-action" type="button" @click="goReservation(selectedStore)">
@@ -866,6 +949,45 @@ onMounted(async () => {
   background: #a2322f;
 }
 
+.feature-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.feature-row > span {
+  margin-right: 4px;
+  color: #8c552e;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.feature-chip,
+.store-tags span,
+.detail-tags span {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.feature-chip {
+  min-height: 34px;
+  border: 1px solid #d7c6b7;
+  background: #ffffff;
+  color: #8c552e;
+  padding: 0 12px;
+}
+
+.feature-chip.active {
+  border-color: #a2322f;
+  background: #a2322f;
+  color: #ffffff;
+}
+
 .tools-row {
   display: flex;
   align-items: center;
@@ -995,6 +1117,19 @@ onMounted(async () => {
 .address {
   margin: 0;
   line-height: 1.7;
+}
+
+.store-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.store-tags span {
+  background: #faf3ea;
+  color: #8c552e;
+  padding: 5px 9px;
 }
 
 .status-pill {
@@ -1140,6 +1275,19 @@ onMounted(async () => {
 .detail-address {
   margin: 10px 0 0;
   line-height: 1.7;
+}
+
+.detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.detail-tags span {
+  background: #faf3ea;
+  color: #8c552e;
+  padding: 6px 10px;
 }
 
 .detail-actions {
