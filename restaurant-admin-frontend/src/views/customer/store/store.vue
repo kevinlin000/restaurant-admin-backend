@@ -19,6 +19,7 @@ const openOnly = ref(false);
 const sortMode = ref("recommended");
 const selectedStore = ref(null);
 const selectedImageIndex = ref(0);
+const showFullHours = ref(false);
 const loading = ref(false);
 const detailLoading = ref(false);
 const nearbyLoading = ref(false);
@@ -64,10 +65,16 @@ const todayDayOfWeek = computed(() => {
 
 const todayHours = computed(() => {
   if (!selectedStore.value?.storeHours?.length) return [];
-  return selectedStore.value.storeHours.filter(
-    (hour) => hour.dayOfWeek === todayDayOfWeek.value,
+  return sortStoreHours(
+    selectedStore.value.storeHours.filter((hour) => hour.dayOfWeek === todayDayOfWeek.value),
   );
 });
+
+const allHours = computed(() => sortStoreHours(selectedStore.value?.storeHours ?? []));
+
+const visibleHours = computed(() => (showFullHours.value ? allHours.value : todayHours.value));
+
+const hasMoreHours = computed(() => allHours.value.length > todayHours.value.length);
 
 const todayHoursText = computed(() => {
   if (!todayHours.value.length) return "";
@@ -133,6 +140,21 @@ const formatTime = (time) => {
   if (!time) return "";
   return `${time}`.slice(0, 5);
 };
+
+const mealPeriodLabel = (period) =>
+  ({
+    LUNCH: "午餐",
+    DINNER: "晚餐",
+    AFTERNOON_TEA: "下午茶",
+    ALL_DAY: "整日",
+  })[period] || period || "";
+
+const sortStoreHours = (hourList) =>
+  [...hourList].sort((a, b) => {
+    const dayDiff = (a.dayOfWeek ?? 0) - (b.dayOfWeek ?? 0);
+    if (dayDiff !== 0) return dayDiff;
+    return formatTime(a.openTime).localeCompare(formatTime(b.openTime));
+  });
 
 const isHourClosed = (hour) => Boolean(hour.closed ?? hour.isClosed);
 
@@ -202,6 +224,7 @@ const syncSelectedStore = async () => {
   if (!stores.value.length) {
     selectedStore.value = null;
     selectedImageIndex.value = 0;
+    showFullHours.value = false;
     return;
   }
 
@@ -226,6 +249,7 @@ const loadStores = async () => {
     stores.value = [];
     selectedStore.value = null;
     selectedImageIndex.value = 0;
+    showFullHours.value = false;
   } finally {
     loading.value = false;
   }
@@ -335,6 +359,7 @@ const findNearby = () => {
 const loadStoreDetail = async (storeId) => {
   detailLoading.value = true;
   selectedImageIndex.value = 0;
+  showFullHours.value = false;
 
   try {
     const response = await api.get(`/api/stores/${storeId}`);
@@ -348,6 +373,10 @@ const loadStoreDetail = async (storeId) => {
 
 const selectGalleryImage = (index) => {
   selectedImageIndex.value = index;
+};
+
+const toggleHours = () => {
+  showFullHours.value = !showFullHours.value;
 };
 
 const goReservation = (store) => {
@@ -374,7 +403,7 @@ onMounted(async () => {
     <section class="store-hero">
       <div class="container hero-shell">
         <div class="hero-content">
-          <span class="eyebrow">STORE LOCATOR</span>
+          <span class="eyebrow">門市查詢</span>
           <h1>分店資訊</h1>
           <p>查詢鄰近門市、營業狀態與交通資訊，選好地點後直接前往訂位或點餐。</p>
         </div>
@@ -629,10 +658,26 @@ onMounted(async () => {
                 </div>
 
                 <div class="hours-block">
-                  <h3>營業時間</h3>
-                  <div v-if="selectedStore.storeHours?.length" class="hours-list">
-                    <div v-for="hour in selectedStore.storeHours" :key="`${hour.dayOfWeek}-${hour.mealPeriod}`">
-                      <span>{{ hour.dayName }} {{ hour.mealPeriod }}</span>
+                  <div class="section-heading">
+                    <h3>營業時間</h3>
+                    <button
+                      v-if="hasMoreHours"
+                      class="text-action"
+                      type="button"
+                      @click="toggleHours"
+                    >
+                      {{ showFullHours ? "收起" : "完整時段" }}
+                    </button>
+                  </div>
+                  <div v-if="visibleHours.length" class="hours-list">
+                    <div
+                      v-for="hour in visibleHours"
+                      :key="hour.hourId || `${hour.dayOfWeek}-${hour.mealPeriod}`"
+                    >
+                      <span>
+                        {{ showFullHours ? hour.dayName : "今日" }}
+                        {{ mealPeriodLabel(hour.mealPeriod) }}
+                      </span>
                       <strong v-if="isHourClosed(hour)">公休</strong>
                       <strong v-else>{{ formatTime(hour.openTime) }} - {{ formatTime(hour.closeTime) }}</strong>
                     </div>
@@ -885,7 +930,7 @@ onMounted(async () => {
 
 .store-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 430px;
+  grid-template-columns: minmax(0, 1fr) 400px;
   gap: 24px;
   align-items: start;
 }
@@ -900,7 +945,7 @@ onMounted(async () => {
   border: 1px solid #e4d9ce;
   border-radius: 8px;
   background: #ffffff;
-  padding: 20px;
+  padding: 18px 20px;
   text-align: left;
   transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
 }
@@ -908,7 +953,7 @@ onMounted(async () => {
 .store-card:hover,
 .store-card-active {
   border-color: #b1642f;
-  box-shadow: 0 14px 30px rgba(52, 64, 81, 0.12);
+  box-shadow: 0 10px 24px rgba(52, 64, 81, 0.1);
   transform: translateY(-2px);
 }
 
@@ -936,7 +981,7 @@ onMounted(async () => {
 .store-title-row h2 {
   margin: 0;
   color: #263445;
-  font-size: 23px;
+  font-size: 22px;
   font-weight: 900;
 }
 
@@ -981,7 +1026,7 @@ onMounted(async () => {
 
 .meta-row {
   flex-wrap: wrap;
-  margin-top: 16px;
+  margin-top: 14px;
   color: #566a7f;
 }
 
@@ -993,17 +1038,29 @@ onMounted(async () => {
 
 .store-detail {
   position: sticky;
-  top: 104px;
+  top: 92px;
+  max-height: calc(100vh - 112px);
   border: 1px solid #e4d9ce;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: auto;
   background: #ffffff;
-  box-shadow: 0 18px 48px rgba(52, 64, 81, 0.12);
+  box-shadow: 0 14px 36px rgba(52, 64, 81, 0.1);
+  scrollbar-gutter: stable;
+}
+
+.store-detail::-webkit-scrollbar {
+  width: 8px;
+}
+
+.store-detail::-webkit-scrollbar-thumb {
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: #d7c6b7;
 }
 
 .detail-image {
   position: relative;
-  height: 230px;
+  height: 178px;
   background: #f2eee9;
 }
 
@@ -1025,11 +1082,11 @@ onMounted(async () => {
   gap: 8px;
   border-top: 1px solid #eee5dd;
   background: #fbf8f5;
-  padding: 10px;
+  padding: 8px 10px;
 }
 
 .image-thumb {
-  height: 58px;
+  height: 50px;
   overflow: hidden;
   border: 2px solid transparent;
   border-radius: 8px;
@@ -1048,7 +1105,7 @@ onMounted(async () => {
 }
 
 .detail-body {
-  padding: 24px;
+  padding: 20px;
 }
 
 .detail-heading {
@@ -1066,15 +1123,15 @@ onMounted(async () => {
 .detail-heading h2 {
   margin: 0;
   color: #263445;
-  font-size: 28px;
+  font-size: 25px;
   font-weight: 900;
 }
 
 .map-link,
 .icon-action {
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
   border: 1px solid #d7c6b7;
   background: #ffffff;
   color: #8c552e;
@@ -1087,29 +1144,29 @@ onMounted(async () => {
 
 .detail-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr 44px;
-  gap: 10px;
-  margin: 20px 0;
+  grid-template-columns: 1fr 1fr 42px;
+  gap: 8px;
+  margin: 16px 0;
 }
 
 .link-action {
-  height: 44px;
+  height: 42px;
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .insight-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .insight-item {
   border: 1px solid #eee5dd;
   border-radius: 8px;
   background: #fbf8f5;
-  padding: 12px;
+  padding: 10px;
 }
 
 .insight-item span {
@@ -1123,7 +1180,7 @@ onMounted(async () => {
 .insight-item strong {
   display: block;
   color: #263445;
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.4;
 }
 
@@ -1131,23 +1188,23 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
   border-radius: 8px;
   background: #fff2d5;
-  padding: 12px;
+  padding: 10px 12px;
   color: #a16012;
   font-weight: 800;
 }
 
 .info-list {
   display: grid;
-  gap: 14px;
+  gap: 10px;
   margin: 0;
 }
 
 .info-list div {
   border-top: 1px solid #eee8e1;
-  padding-top: 14px;
+  padding-top: 10px;
 }
 
 .info-list dt {
@@ -1164,8 +1221,8 @@ onMounted(async () => {
 }
 
 .map-panel {
-  height: 190px;
-  margin-top: 20px;
+  height: 150px;
+  margin-top: 16px;
   overflow: hidden;
   border: 1px solid #eee5dd;
   border-radius: 8px;
@@ -1179,19 +1236,35 @@ onMounted(async () => {
 }
 
 .hours-block {
-  margin-top: 22px;
+  margin-top: 16px;
 }
 
-.hours-block h3 {
-  margin-bottom: 12px;
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.section-heading h3 {
+  margin: 0;
   color: #263445;
-  font-size: 18px;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.text-action {
+  border: 0;
+  background: transparent;
+  color: #8c552e;
+  font-size: 13px;
   font-weight: 900;
 }
 
 .hours-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .hours-list div {
@@ -1200,7 +1273,7 @@ onMounted(async () => {
   gap: 12px;
   border-radius: 8px;
   background: #faf7f2;
-  padding: 10px 12px;
+  padding: 9px 10px;
   color: #566a7f;
 }
 
@@ -1252,6 +1325,7 @@ onMounted(async () => {
 
   .store-detail {
     position: static;
+    max-height: none;
   }
 
   .tools-row {
