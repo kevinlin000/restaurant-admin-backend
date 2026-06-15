@@ -57,12 +57,10 @@ public class OrderService {
 
         return OrderResponse.builder()
                 .orderId(order.getOrderId())
-                // .userId(order.getUser() != null ? order.getUser().getUserId() : null)
-                // .storeId(order.getStore() != null ? order.getStore().getStoreId() : null)
-                // .tableId(order.getTableInfo() != null ? order.getTableInfo().getTableId() :
-                // null)
-                // .reservationId(order.getReservation() != null ?
-                // order.getReservation().getReservationId() : null)
+                .userId(order.getUserId())
+                .storeId(order.getStoreId())
+                .tableId(order.getTableId())
+                .reservationId(order.getReservationId())
                 .orderType(order.getOrderType())
                 .totalAmount(order.getTotalAmount())
                 .finalAmount(order.getFinalAmount())

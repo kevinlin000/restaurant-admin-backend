@@ -32,21 +32,17 @@ public class Order {
     @Column(name = "order_id")
     private Long orderId;
 
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "user_id")
-    // private User user;
+    @Column(name = "user_id")
+    private Long userId;
 
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "store_id")
-    // private Store store;
+    @Column(name = "store_id")
+    private Long storeId;
 
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "table_id")
-    // private TableInfo tableInfo;
+    @Column(name = "table_id")
+    private Long tableId;
 
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "reservation_id")
-    // private Reservation reservation;
+    @Column(name = "reservation_id")
+    private Long reservationId;
 
     @Column(name = "order_type", length = 20)
     private String orderType;

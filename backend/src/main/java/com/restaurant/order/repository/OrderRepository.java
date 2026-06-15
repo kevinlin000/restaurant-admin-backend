@@ -9,9 +9,9 @@ import com.restaurant.order.entity.Order;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
-    List<Order> findByUser_UserId(Long userId);
+    List<Order> findByUserId(Long userId);
 
-    List<Order> findByStore_StoreId(Long storeId);
+    List<Order> findByStoreId(Long storeId);
 
     List<Order> findByStatus(String status);
 }
