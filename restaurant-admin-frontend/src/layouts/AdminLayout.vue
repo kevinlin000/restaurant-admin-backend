@@ -114,7 +114,7 @@ const toggleMenu = (menu) => {
             <RouterLink to="/admin/menu-create">新增菜單</RouterLink>
           </li>
           <li>
-            <RouterLink to="/admin/menu-edit">修改菜單</RouterLink>
+            <RouterLink to="/admin/menu-edit/1">修改菜單</RouterLink>
           </li>
           <li>
             <RouterLink to="/admin/menu-setting">設定</RouterLink>
