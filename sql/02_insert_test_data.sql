@@ -300,14 +300,15 @@ INSERT INTO role (role_name, description) VALUES
 -- ============================================================
 -- 登入帳號 user（會員與員工共用）
 -- 密碼皆為 password123（BCrypt 雜湊）
--- user_id 依序：1=admin 2=manager 3=staff 4=陳小明 5=林小美
+-- user_id 依序：1=admin 2=manager 3=staff 4=陳小明 5=林小美 6=store manager
 -- ============================================================
 INSERT INTO user (role_id, email, password_hash, name, phone, birthday) VALUES
 (4, 'admin@xuri.com',     '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '系統管理員', '0900-000-000', '1990-01-01'),
 (3, 'manager@xuri.com',   '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '王店長',     '0911-111-111', '1985-06-15'),
 (2, 'staff@xuri.com',     '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '李店員',     '0955-555-555', '1997-09-10'),
 (1, 'user1@example.com',  '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '陳小明',     '0922-222-222', '1995-03-20'),
-(1, 'user2@example.com',  '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '林小美',     '0933-333-333', '1998-11-08');
+(1, 'user2@example.com',  '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '林小美',     '0933-333-333', '1998-11-08'),
+(3, 'storemanager@store.local', '$2a$10$rJDF6fkfGR8sCuqi/N6mOuyTqvK0UYIm3Q61GWsbNl/t9.e6HK87.', 'storemanager', '0966-666-666', '1992-06-15');
 
 -- ============================================================
 -- 會員資料 members（顧客；對應 user 4、5 → 陳小明 / 林小美）
@@ -317,11 +318,12 @@ INSERT INTO members (user_id, point_balance, member_level) VALUES
 (5, 880, 'SILVER');
 
 -- ============================================================
--- 員工資料 staff（manager + staff；皆屬信義店 store_id=1）
+-- 員工資料 staff（manager + staff + store manager；皆屬信義店 store_id=1）
 -- ============================================================
 INSERT INTO staff (user_id, store_id, staff_no, hire_date, status) VALUES
 (2, 1, 'M001', '2023-01-01', 'ACTIVE'),
-(3, 1, 'S001', '2024-07-15', 'ACTIVE');
+(3, 1, 'S001', '2024-07-15', 'ACTIVE'),
+(6, 1, 'STORE_MGR', '2026-06-15', 'ACTIVE');
 
 -- ============================================================
 -- 菜單分類
