@@ -35,6 +35,10 @@ public interface StoreService {
     StoreImageResponse createStoreImage(Long storeId, StoreImageCreateRequest request);
     StoreImageResponse updateStoreImage(Long storeId, Long imageId, StoreImageUpdateRequest request);
     void deleteStoreImage(Long storeId, Long imageId);
+    List<StoreFeatureResponse> getStoreFeatures(Long storeId);
+    StoreFeatureResponse createStoreFeature(Long storeId, StoreFeatureCreateRequest request);
+    StoreFeatureResponse updateStoreFeature(Long storeId, Long featureId, StoreFeatureUpdateRequest request);
+    void deleteStoreFeature(Long storeId, Long featureId);
     List<TableInfoResponse> getTablesByStore(Long storeId);
     TableInfoResponse createTable(Long storeId, TableCreateRequest request);
     TableInfoResponse updateTable(Long storeId, Long tableId, TableUpdateRequest request);

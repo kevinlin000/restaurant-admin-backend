@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,56 +27,63 @@ public class StoreServiceImpl implements StoreService {
     private final StoreHolidayRepository storeHolidayRepository;
     private final StoreImageRepository storeImageRepository;
     private final TableInfoRepository tableInfoRepository;
+    private final StoreFeatureRepository storeFeatureRepository;
 
     // =================== 前台 ===================
 
     @Override
     @Transactional(readOnly = true)
     public List<StoreListResponse> getAllOpenStores() {
-        return storeRepository.findByIsDeletedFalseAndStatusOrderByCityAscDistrictAscStoreNameAsc("OPEN")
-                .stream()
-                .map(s -> toListResponse(s, null))
+        List<Store> stores = storeRepository.findByIsDeletedFalseAndStatusOrderByCityAscDistrictAscStoreNameAsc("OPEN");
+        Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        return stores.stream()
+                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of())))
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<StoreListResponse> searchStores(String keyword) {
-        return storeRepository.searchByKeyword(keyword)
-                .stream()
-                .map(s -> toListResponse(s, null))
+        List<Store> stores = storeRepository.searchByKeyword(keyword);
+        Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        return stores.stream()
+                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of())))
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<StoreListResponse> getStoresByCity(String city) {
-        return storeRepository.findByIsDeletedFalseAndStatusAndCityOrderByDistrictAscStoreNameAsc("OPEN", city)
-                .stream()
-                .map(s -> toListResponse(s, null))
+        List<Store> stores = storeRepository.findByIsDeletedFalseAndStatusAndCityOrderByDistrictAscStoreNameAsc("OPEN", city);
+        Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        return stores.stream()
+                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of())))
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<StoreListResponse> getStoresByCityAndDistrict(String city, String district) {
-        return storeRepository.findByIsDeletedFalseAndStatusAndCityAndDistrictOrderByStoreNameAsc("OPEN", city, district)
-                .stream()
-                .map(s -> toListResponse(s, null))
+        List<Store> stores = storeRepository.findByIsDeletedFalseAndStatusAndCityAndDistrictOrderByStoreNameAsc("OPEN", city, district);
+        Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        return stores.stream()
+                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of())))
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<StoreListResponse> findNearbyStores(NearbySearchRequest request) {
-        return storeRepository.findByIsDeletedFalseAndStatusOrderByCityAscDistrictAscStoreNameAsc("OPEN")
+        List<Store> stores = storeRepository.findByIsDeletedFalseAndStatusOrderByCityAscDistrictAscStoreNameAsc("OPEN");
+        Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        return stores
                 .stream()
                 .filter(s -> s.getLatitude() != null && s.getLongitude() != null)
                 .map(s -> {
                     double dist = haversineKm(
                             request.getLatitude(), request.getLongitude(),
                             s.getLatitude().doubleValue(), s.getLongitude().doubleValue());
-                    return toListResponse(s, dist);
+                    return toListResponse(s, dist, featureMap.getOrDefault(s.getStoreId(), List.of()));
                 })
                 .sorted(Comparator.comparingDouble(StoreListResponse::getDistanceKm))
                 .limit(request.getLimit())
@@ -91,6 +99,10 @@ public class StoreServiceImpl implements StoreService {
         List<StoreHour> hours = storeHourRepository.findByStoreIdOrderByDayOfWeekAscMealPeriodAscOpenTimeAsc(storeId);
         List<StoreImage> images = storeImageRepository.findByStoreIdOrderBySortOrderAsc(storeId);
         List<TableInfo> tables = tableInfoRepository.findByStoreIdOrderByZoneAscTableNumberAsc(storeId);
+        List<StoreFeatureResponse> features = storeFeatureRepository.findByStoreIdOrderBySortOrderAscFeatureIdAsc(storeId)
+                .stream()
+                .map(this::toFeatureResponse)
+                .collect(Collectors.toList());
         List<StoreHoliday> holidays = storeHolidayRepository.findByStoreIdAndHolidayDateBetweenOrderByHolidayDateAsc(
                 storeId, LocalDate.now(), LocalDate.now().plusDays(30));
 
@@ -114,6 +126,7 @@ public class StoreServiceImpl implements StoreService {
                 .imageUrls(images.stream().map(StoreImage::getImageUrl).collect(Collectors.toList()))
                 .tables(tables.stream().map(this::toTableResponse).collect(Collectors.toList()))
                 .upcomingHolidays(holidays.stream().map(this::toHolidayResponse).collect(Collectors.toList()))
+                .featureTags(features)
                 .build();
     }
 
@@ -134,9 +147,10 @@ public class StoreServiceImpl implements StoreService {
     @Override
     @Transactional(readOnly = true)
     public List<StoreListResponse> getAllStoresForAdmin() {
-        return storeRepository.findByIsDeletedFalseOrderByCityAscDistrictAscStoreNameAsc()
-                .stream()
-                .map(s -> toListResponse(s, null))
+        List<Store> stores = storeRepository.findByIsDeletedFalseOrderByCityAscDistrictAscStoreNameAsc();
+        Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        return stores.stream()
+                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of())))
                 .collect(Collectors.toList());
     }
 
@@ -353,6 +367,61 @@ public class StoreServiceImpl implements StoreService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<StoreFeatureResponse> getStoreFeatures(Long storeId) {
+        requireStore(storeId);
+        return storeFeatureRepository.findByStoreIdOrderBySortOrderAscFeatureIdAsc(storeId)
+                .stream().map(this::toFeatureResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public StoreFeatureResponse createStoreFeature(Long storeId, StoreFeatureCreateRequest request) {
+        requireStore(storeId);
+        String featureKey = normalizeFeatureKey(request.getFeatureKey());
+        storeFeatureRepository.findByStoreIdAndFeatureKey(storeId, featureKey)
+                .ifPresent(existing -> {
+                    throw new BusinessException("此門市已存在相同特色標籤：" + featureKey);
+                });
+
+        StoreFeature feature = StoreFeature.builder()
+                .storeId(storeId)
+                .featureKey(featureKey)
+                .featureLabel(request.getFeatureLabel().trim())
+                .sortOrder(request.getSortOrder() == null ? 0 : request.getSortOrder())
+                .build();
+        return toFeatureResponse(storeFeatureRepository.save(feature));
+    }
+
+    @Override
+    @Transactional
+    public StoreFeatureResponse updateStoreFeature(Long storeId, Long featureId, StoreFeatureUpdateRequest request) {
+        requireStore(storeId);
+        StoreFeature feature = storeFeatureRepository.findByFeatureIdAndStoreId(featureId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("門市特色標籤", featureId));
+        String featureKey = normalizeFeatureKey(request.getFeatureKey());
+        storeFeatureRepository.findByStoreIdAndFeatureKey(storeId, featureKey)
+                .filter(existing -> !existing.getFeatureId().equals(featureId))
+                .ifPresent(existing -> {
+                    throw new BusinessException("此門市已存在相同特色標籤：" + featureKey);
+                });
+
+        feature.setFeatureKey(featureKey);
+        feature.setFeatureLabel(request.getFeatureLabel().trim());
+        feature.setSortOrder(request.getSortOrder() == null ? 0 : request.getSortOrder());
+        return toFeatureResponse(storeFeatureRepository.save(feature));
+    }
+
+    @Override
+    @Transactional
+    public void deleteStoreFeature(Long storeId, Long featureId) {
+        requireStore(storeId);
+        StoreFeature feature = storeFeatureRepository.findByFeatureIdAndStoreId(featureId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("門市特色標籤", featureId));
+        storeFeatureRepository.delete(feature);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<TableInfoResponse> getTablesByStore(Long storeId) {
         storeRepository.findByStoreIdAndIsDeletedFalse(storeId)
                 .orElseThrow(() -> new ResourceNotFoundException("門市", storeId));
@@ -441,6 +510,10 @@ public class StoreServiceImpl implements StoreService {
                 });
     }
 
+    private String normalizeFeatureKey(String featureKey) {
+        return featureKey == null ? "" : featureKey.trim().toUpperCase();
+    }
+
     private boolean isOpenNow(Long storeId) {
         LocalDate today = LocalDate.now();
         if (storeHolidayRepository.findByStoreIdAndHolidayDate(storeId, today).isPresent()) {
@@ -464,7 +537,19 @@ public class StoreServiceImpl implements StoreService {
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
-    private StoreListResponse toListResponse(Store s, Double distanceKm) {
+    private Map<Long, List<StoreFeatureResponse>> loadFeatureMap(List<Store> stores) {
+        List<Long> storeIds = stores.stream().map(Store::getStoreId).toList();
+        if (storeIds.isEmpty()) {
+            return Map.of();
+        }
+        return storeFeatureRepository.findByStoreIdInOrderByStoreIdAscSortOrderAscFeatureIdAsc(storeIds)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        StoreFeature::getStoreId,
+                        Collectors.mapping(this::toFeatureResponse, Collectors.toList())));
+    }
+
+    private StoreListResponse toListResponse(Store s, Double distanceKm, List<StoreFeatureResponse> features) {
         return StoreListResponse.builder()
                 .storeId(s.getStoreId())
                 .storeCode(s.getStoreCode())
@@ -480,6 +565,7 @@ public class StoreServiceImpl implements StoreService {
                 .mrtInfo(s.getMrtInfo())
                 .isOpenNow(isOpenNow(s.getStoreId()))
                 .distanceKm(distanceKm)
+                .featureTags(features)
                 .build();
     }
 
@@ -522,6 +608,15 @@ public class StoreServiceImpl implements StoreService {
                 .imageUrl(image.getImageUrl())
                 .caption(image.getCaption())
                 .sortOrder(image.getSortOrder())
+                .build();
+    }
+
+    private StoreFeatureResponse toFeatureResponse(StoreFeature feature) {
+        return StoreFeatureResponse.builder()
+                .featureId(feature.getFeatureId())
+                .featureKey(feature.getFeatureKey())
+                .featureLabel(feature.getFeatureLabel())
+                .sortOrder(feature.getSortOrder())
                 .build();
     }
 }
