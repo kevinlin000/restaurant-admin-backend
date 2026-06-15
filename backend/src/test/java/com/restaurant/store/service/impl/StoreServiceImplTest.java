@@ -5,6 +5,7 @@ import com.restaurant.store.dto.response.StoreListResponse;
 import com.restaurant.store.entity.Store;
 import com.restaurant.store.entity.StoreHoliday;
 import com.restaurant.store.entity.StoreHour;
+import com.restaurant.store.repository.StoreFeatureRepository;
 import com.restaurant.store.repository.StoreHolidayRepository;
 import com.restaurant.store.repository.StoreHourRepository;
 import com.restaurant.store.repository.StoreImageRepository;
@@ -47,6 +48,9 @@ class StoreServiceImplTest {
     @Mock
     private TableInfoRepository tableInfoRepository;
 
+    @Mock
+    private StoreFeatureRepository storeFeatureRepository;
+
     @InjectMocks
     private StoreServiceImpl storeService;
 
@@ -59,6 +63,8 @@ class StoreServiceImplTest {
 
         when(storeRepository.findByIsDeletedFalseAndStatusOrderByCityAscDistrictAscStoreNameAsc("OPEN"))
                 .thenReturn(List.of(kaohsiung, taipei));
+        when(storeFeatureRepository.findByStoreIdInOrderByStoreIdAscSortOrderAscFeatureIdAsc(List.of(2L, 1L)))
+                .thenReturn(List.of());
         when(storeHolidayRepository.findByStoreIdAndHolidayDate(anyLong(), any(LocalDate.class)))
                 .thenReturn(Optional.empty());
         when(storeHourRepository.findByStoreIdAndDayOfWeekAndIsClosedFalseOrderByOpenTimeAsc(anyLong(), anyInt()))
@@ -85,6 +91,8 @@ class StoreServiceImplTest {
 
         when(storeRepository.findByIsDeletedFalseAndStatusOrderByCityAscDistrictAscStoreNameAsc("OPEN"))
                 .thenReturn(List.of(holidayStore, normalStore));
+        when(storeFeatureRepository.findByStoreIdInOrderByStoreIdAscSortOrderAscFeatureIdAsc(List.of(1L, 2L)))
+                .thenReturn(List.of());
         when(storeHolidayRepository.findByStoreIdAndHolidayDate(eq(1L), any(LocalDate.class)))
                 .thenReturn(Optional.of(StoreHoliday.builder().storeId(1L).holidayDate(LocalDate.now()).build()));
         when(storeHolidayRepository.findByStoreIdAndHolidayDate(eq(2L), any(LocalDate.class)))

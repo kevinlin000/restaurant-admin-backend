@@ -95,7 +95,20 @@ CREATE TABLE store_image (
 ) COMMENT = '門市照片（一家店多張）';
 
 -- ============================================================
--- 6. table_info（桌位）
+-- 6. store_feature（門市特色標籤）
+-- ============================================================
+CREATE TABLE store_feature (
+    feature_id      BIGINT AUTO_INCREMENT PRIMARY KEY,
+    store_id        BIGINT NOT NULL,
+    feature_key     VARCHAR(40) NOT NULL COMMENT '標籤代碼，如 BUSINESS / FAMILY / PARKING',
+    feature_label   VARCHAR(30) NOT NULL COMMENT '前台顯示名稱',
+    sort_order      INT DEFAULT 0 COMMENT '排序（小的在前）',
+    FOREIGN KEY (store_id) REFERENCES store(store_id),
+    UNIQUE KEY uk_store_feature (store_id, feature_key)
+) COMMENT = '門市特色標籤（用於情境篩選與推薦排序）';
+
+-- ============================================================
+-- 7. table_info（桌位）
 -- 註：capacity 已改名為 table_size（幾人座，避免與庫存的 count 欄位混淆）
 -- ============================================================
 CREATE TABLE table_info (
@@ -112,7 +125,7 @@ CREATE TABLE table_info (
 ) COMMENT = '桌位資訊（實體桌定義；用來產生 reservation_capacity 的列）';
 
 -- ============================================================
--- 7. role（角色權限）
+-- 8. role（角色權限）
 -- ============================================================
 CREATE TABLE role (
     role_id         BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -121,7 +134,7 @@ CREATE TABLE role (
 ) COMMENT = '角色權限表';
 
 -- ============================================================
--- 8. user（登入帳號；會員與員工共用）
+-- 9. user（登入帳號；會員與員工共用）
 -- ============================================================
 CREATE TABLE user (
     user_id         BIGINT AUTO_INCREMENT PRIMARY KEY,

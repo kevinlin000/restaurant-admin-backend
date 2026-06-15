@@ -32,4 +32,5 @@ public class StoreDetailResponse {
     private List<String> imageUrls;
     private List<TableInfoResponse> tables;
     private List<StoreHolidayResponse> upcomingHolidays;
+    private List<StoreFeatureResponse> featureTags;
 }

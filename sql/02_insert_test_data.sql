@@ -150,6 +150,39 @@ INSERT INTO store_image (store_id, image_url, caption, sort_order) VALUES
 (7, 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1200&q=80', '旅途中安靜用餐席', 2);
 
 -- ============================================================
+-- 門市特色標籤（情境篩選 / 推薦排序）
+-- ============================================================
+INSERT INTO store_feature (store_id, feature_key, feature_label, sort_order) VALUES
+(1, 'BUSINESS', '商務聚餐', 1),
+(1, 'DATE', '約會推薦', 2),
+(1, 'PRIVATE_ROOM', '包廂', 3),
+(1, 'CITY_VIEW', '城市景觀', 4),
+(2, 'STATION', '車站直達', 1),
+(2, 'BUSINESS', '商務聚餐', 2),
+(2, 'GROUP', '團體聚餐', 3),
+(2, 'FAST_SEATING', '快速入席', 4),
+(3, 'FAMILY', '親子友善', 1),
+(3, 'PARKING', '停車方便', 2),
+(3, 'PRIVATE_ROOM', '包廂', 3),
+(3, 'GROUP', '團體聚餐', 4),
+(4, 'DATE', '約會推薦', 1),
+(4, 'PRIVATE_ROOM', '包廂', 2),
+(4, 'BAR', '吧台席', 3),
+(4, 'PARKING', '停車方便', 4),
+(5, 'DATE', '約會推薦', 1),
+(5, 'PRIVATE_ROOM', '包廂', 2),
+(5, 'SHOPPING', '商場用餐', 3),
+(5, 'FAMILY', '親子友善', 4),
+(6, 'GROUP', '團體聚餐', 1),
+(6, 'FAMILY', '親子友善', 2),
+(6, 'PARKING', '停車方便', 3),
+(6, 'PRIVATE_ROOM', '包廂', 4),
+(7, 'TRAVEL', '旅途中用餐', 1),
+(7, 'QUIET', '安靜用餐', 2),
+(7, 'DATE', '約會推薦', 3),
+(7, 'PRIVATE_ROOM', '包廂', 4);
+
+-- ============================================================
 -- 桌位 —— capacity 改 table_size，status 用字串
 -- ============================================================
 -- TPE001 信義店（18 桌）
