@@ -155,12 +155,13 @@
 
 <script setup>
 import { computed, reactive, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { login } from "@/api/member";
 import axios from "axios";
 import Swal from "sweetalert2";
 
 const router = useRouter();
+const route = useRoute();
 
 const currentView = ref("login");
 const showPassword = ref(false);
@@ -357,7 +358,14 @@ const handleLogin = async () => {
       confirmButtonColor: "#d9a372",
     });
 
-    router.push("/");
+    const staffRoles = ["ADMIN", "MANAGER", "STAFF"];
+    const redirectPath = typeof route.query.redirect === "string" ? route.query.redirect : "";
+    const defaultPath = staffRoles.includes(data.roleName) ? "/admin/home" : "/";
+    const targetPath = redirectPath.startsWith("/admin") && staffRoles.includes(data.roleName)
+      ? redirectPath
+      : defaultPath;
+
+    router.push(targetPath);
   } catch (err) {
     errorMsg.value = err.response?.data?.message || "登入失敗，請稍後再試";
   } finally {

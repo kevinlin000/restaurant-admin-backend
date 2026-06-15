@@ -29,7 +29,10 @@ api.interceptors.response.use(
       window.dispatchEvent(new Event("login-state-changed"));
 
       if (router.currentRoute.value.path !== "/login") {
-        router.push("/login");
+        router.push({
+          path: "/login",
+          query: { redirect: router.currentRoute.value.fullPath },
+        });
       }
     }
 

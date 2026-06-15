@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 @Builder
@@ -26,4 +27,5 @@ public class StoreListResponse {
     private String mrtInfo;
     private boolean isOpenNow;
     private Double distanceKm;
+    private List<StoreFeatureResponse> featureTags;
 }
