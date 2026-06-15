@@ -12,6 +12,7 @@ import java.time.LocalTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class StoreHourResponse {
+    private Long hourId;
     private Integer dayOfWeek;
     private String dayName;
     private LocalTime openTime;

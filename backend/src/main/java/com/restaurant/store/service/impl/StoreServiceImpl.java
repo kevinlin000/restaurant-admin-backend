@@ -482,6 +482,7 @@ public class StoreServiceImpl implements StoreService {
     private StoreHourResponse toHourResponse(StoreHour h) {
         String[] dayNames = {"", "週一", "週二", "週三", "週四", "週五", "週六", "週日"};
         return StoreHourResponse.builder()
+                .hourId(h.getHourId())
                 .dayOfWeek(h.getDayOfWeek())
                 .dayName(dayNames[h.getDayOfWeek()])
                 .openTime(h.getOpenTime())
