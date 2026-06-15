@@ -1,8 +1,12 @@
 package com.restaurant.store.service.impl;
 
+import com.restaurant.common.BusinessException;
+import com.restaurant.store.dto.request.StoreFeatureCreateRequest;
 import com.restaurant.store.dto.request.NearbySearchRequest;
+import com.restaurant.store.dto.response.StoreFeatureResponse;
 import com.restaurant.store.dto.response.StoreListResponse;
 import com.restaurant.store.entity.Store;
+import com.restaurant.store.entity.StoreFeature;
 import com.restaurant.store.entity.StoreHoliday;
 import com.restaurant.store.entity.StoreHour;
 import com.restaurant.store.repository.StoreFeatureRepository;
@@ -24,6 +28,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -105,6 +110,48 @@ class StoreServiceImplTest {
         assertThat(result).extracting(StoreListResponse::getStoreId).containsExactly(1L, 2L);
         assertThat(result.get(0).isOpenNow()).isFalse();
         assertThat(result.get(1).isOpenNow()).isTrue();
+    }
+
+    @Test
+    void createStoreFeatureNormalizesKeyAndPersistsFeature() {
+        Store store = store(1L, "TPE001", "敘日信義 A11 店", "台北市", "信義區",
+                25.0360390, 121.5674080);
+        StoreFeatureCreateRequest request = new StoreFeatureCreateRequest();
+        request.setFeatureKey(" private_room ");
+        request.setFeatureLabel(" 包廂 ");
+        request.setSortOrder(3);
+
+        when(storeRepository.findByStoreIdAndIsDeletedFalse(1L)).thenReturn(Optional.of(store));
+        when(storeFeatureRepository.findByStoreIdAndFeatureKey(1L, "PRIVATE_ROOM")).thenReturn(Optional.empty());
+        when(storeFeatureRepository.save(any(StoreFeature.class))).thenAnswer(invocation -> {
+            StoreFeature feature = invocation.getArgument(0);
+            feature.setFeatureId(10L);
+            return feature;
+        });
+
+        StoreFeatureResponse result = storeService.createStoreFeature(1L, request);
+
+        assertThat(result.getFeatureId()).isEqualTo(10L);
+        assertThat(result.getFeatureKey()).isEqualTo("PRIVATE_ROOM");
+        assertThat(result.getFeatureLabel()).isEqualTo("包廂");
+        assertThat(result.getSortOrder()).isEqualTo(3);
+    }
+
+    @Test
+    void createStoreFeatureRejectsDuplicateKeyInSameStore() {
+        Store store = store(1L, "TPE001", "敘日信義 A11 店", "台北市", "信義區",
+                25.0360390, 121.5674080);
+        StoreFeatureCreateRequest request = new StoreFeatureCreateRequest();
+        request.setFeatureKey("business");
+        request.setFeatureLabel("商務聚餐");
+
+        when(storeRepository.findByStoreIdAndIsDeletedFalse(1L)).thenReturn(Optional.of(store));
+        when(storeFeatureRepository.findByStoreIdAndFeatureKey(1L, "BUSINESS"))
+                .thenReturn(Optional.of(StoreFeature.builder().featureId(1L).storeId(1L).featureKey("BUSINESS").build()));
+
+        assertThatThrownBy(() -> storeService.createStoreFeature(1L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("已存在相同特色標籤");
     }
 
     private static Store store(Long id, String code, String name, String city, String district,

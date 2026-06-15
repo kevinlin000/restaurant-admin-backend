@@ -3,6 +3,7 @@ package com.restaurant.store.controller;
 import com.restaurant.common.ApiResponse;
 import com.restaurant.store.dto.request.*;
 import com.restaurant.store.dto.response.StoreDetailResponse;
+import com.restaurant.store.dto.response.StoreFeatureResponse;
 import com.restaurant.store.dto.response.StoreHolidayResponse;
 import com.restaurant.store.dto.response.StoreHourResponse;
 import com.restaurant.store.dto.response.StoreImageResponse;
@@ -154,6 +155,38 @@ public class StoreAdminController {
     public ApiResponse<Void> deleteStoreImage(@PathVariable Long storeId, @PathVariable Long imageId) {
         storeService.deleteStoreImage(storeId, imageId);
         return ApiResponse.success("門市圖片已刪除");
+    }
+
+    // =================== 門市特色標籤 ===================
+
+    @GetMapping("/api/admin/stores/{storeId}/features")
+    @Operation(summary = "取得門市特色標籤")
+    public ApiResponse<List<StoreFeatureResponse>> getStoreFeatures(@PathVariable Long storeId) {
+        return ApiResponse.success(storeService.getStoreFeatures(storeId));
+    }
+
+    @PostMapping("/api/admin/stores/{storeId}/features")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "新增門市特色標籤")
+    public ApiResponse<StoreFeatureResponse> createStoreFeature(
+            @PathVariable Long storeId, @Valid @RequestBody StoreFeatureCreateRequest request) {
+        return ApiResponse.success("特色標籤已新增", storeService.createStoreFeature(storeId, request));
+    }
+
+    @PutMapping("/api/admin/stores/{storeId}/features/{featureId}")
+    @Operation(summary = "修改門市特色標籤")
+    public ApiResponse<StoreFeatureResponse> updateStoreFeature(
+            @PathVariable Long storeId,
+            @PathVariable Long featureId,
+            @Valid @RequestBody StoreFeatureUpdateRequest request) {
+        return ApiResponse.success("特色標籤已更新", storeService.updateStoreFeature(storeId, featureId, request));
+    }
+
+    @DeleteMapping("/api/admin/stores/{storeId}/features/{featureId}")
+    @Operation(summary = "刪除門市特色標籤")
+    public ApiResponse<Void> deleteStoreFeature(@PathVariable Long storeId, @PathVariable Long featureId) {
+        storeService.deleteStoreFeature(storeId, featureId);
+        return ApiResponse.success("特色標籤已刪除");
     }
 
     // =================== 桌位 ===================

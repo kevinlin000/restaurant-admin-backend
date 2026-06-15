@@ -367,6 +367,61 @@ public class StoreServiceImpl implements StoreService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<StoreFeatureResponse> getStoreFeatures(Long storeId) {
+        requireStore(storeId);
+        return storeFeatureRepository.findByStoreIdOrderBySortOrderAscFeatureIdAsc(storeId)
+                .stream().map(this::toFeatureResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public StoreFeatureResponse createStoreFeature(Long storeId, StoreFeatureCreateRequest request) {
+        requireStore(storeId);
+        String featureKey = normalizeFeatureKey(request.getFeatureKey());
+        storeFeatureRepository.findByStoreIdAndFeatureKey(storeId, featureKey)
+                .ifPresent(existing -> {
+                    throw new BusinessException("此門市已存在相同特色標籤：" + featureKey);
+                });
+
+        StoreFeature feature = StoreFeature.builder()
+                .storeId(storeId)
+                .featureKey(featureKey)
+                .featureLabel(request.getFeatureLabel().trim())
+                .sortOrder(request.getSortOrder() == null ? 0 : request.getSortOrder())
+                .build();
+        return toFeatureResponse(storeFeatureRepository.save(feature));
+    }
+
+    @Override
+    @Transactional
+    public StoreFeatureResponse updateStoreFeature(Long storeId, Long featureId, StoreFeatureUpdateRequest request) {
+        requireStore(storeId);
+        StoreFeature feature = storeFeatureRepository.findByFeatureIdAndStoreId(featureId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("門市特色標籤", featureId));
+        String featureKey = normalizeFeatureKey(request.getFeatureKey());
+        storeFeatureRepository.findByStoreIdAndFeatureKey(storeId, featureKey)
+                .filter(existing -> !existing.getFeatureId().equals(featureId))
+                .ifPresent(existing -> {
+                    throw new BusinessException("此門市已存在相同特色標籤：" + featureKey);
+                });
+
+        feature.setFeatureKey(featureKey);
+        feature.setFeatureLabel(request.getFeatureLabel().trim());
+        feature.setSortOrder(request.getSortOrder() == null ? 0 : request.getSortOrder());
+        return toFeatureResponse(storeFeatureRepository.save(feature));
+    }
+
+    @Override
+    @Transactional
+    public void deleteStoreFeature(Long storeId, Long featureId) {
+        requireStore(storeId);
+        StoreFeature feature = storeFeatureRepository.findByFeatureIdAndStoreId(featureId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("門市特色標籤", featureId));
+        storeFeatureRepository.delete(feature);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<TableInfoResponse> getTablesByStore(Long storeId) {
         storeRepository.findByStoreIdAndIsDeletedFalse(storeId)
                 .orElseThrow(() -> new ResourceNotFoundException("門市", storeId));
@@ -453,6 +508,10 @@ public class StoreServiceImpl implements StoreService {
                 .ifPresent(existing -> {
                     throw new BusinessException("此星期與時段已設定營業時間");
                 });
+    }
+
+    private String normalizeFeatureKey(String featureKey) {
+        return featureKey == null ? "" : featureKey.trim().toUpperCase();
     }
 
     private boolean isOpenNow(Long storeId) {
@@ -554,6 +613,7 @@ public class StoreServiceImpl implements StoreService {
 
     private StoreFeatureResponse toFeatureResponse(StoreFeature feature) {
         return StoreFeatureResponse.builder()
+                .featureId(feature.getFeatureId())
                 .featureKey(feature.getFeatureKey())
                 .featureLabel(feature.getFeatureLabel())
                 .sortOrder(feature.getSortOrder())
