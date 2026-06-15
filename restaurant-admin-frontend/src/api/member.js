@@ -28,3 +28,11 @@ export const verifyEmailCode = (email, code) =>
     email,
     code,
   });
+
+// 忘記密碼：寄送驗證碼
+export const forgotPassword = (email) =>
+  api.post("/api/members/password/forgot", { email });
+
+// 忘記密碼：重設密碼
+export const resetPassword = (data) =>
+  api.post("/api/members/password/reset", data);
