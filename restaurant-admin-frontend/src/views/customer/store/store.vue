@@ -18,6 +18,7 @@ const activeRegion = ref("all");
 const openOnly = ref(false);
 const sortMode = ref("recommended");
 const selectedStore = ref(null);
+const selectedImageIndex = ref(0);
 const loading = ref(false);
 const detailLoading = ref(false);
 const nearbyLoading = ref(false);
@@ -77,6 +78,16 @@ const todayHoursText = computed(() => {
 });
 
 const nextHoliday = computed(() => selectedStore.value?.upcomingHolidays?.[0] ?? null);
+
+const galleryImages = computed(() => {
+  if (!selectedStore.value) return [];
+  const urls = selectedStore.value.imageUrls?.filter(Boolean) ?? [];
+  return [...new Set([selectedStore.value.mainImageUrl, ...urls].filter(Boolean))];
+});
+
+const detailHeroImage = computed(
+  () => galleryImages.value[selectedImageIndex.value] || selectedStore.value?.mainImageUrl || logoUrl,
+);
 
 const tableSummary = computed(() => {
   const tables = selectedStore.value?.tables ?? [];
@@ -190,6 +201,7 @@ const filterStores = (source = currentStoreSource()) => {
 const syncSelectedStore = async () => {
   if (!stores.value.length) {
     selectedStore.value = null;
+    selectedImageIndex.value = 0;
     return;
   }
 
@@ -213,6 +225,7 @@ const loadStores = async () => {
     allStores.value = [];
     stores.value = [];
     selectedStore.value = null;
+    selectedImageIndex.value = 0;
   } finally {
     loading.value = false;
   }
@@ -321,6 +334,7 @@ const findNearby = () => {
 
 const loadStoreDetail = async (storeId) => {
   detailLoading.value = true;
+  selectedImageIndex.value = 0;
 
   try {
     const response = await api.get(`/api/stores/${storeId}`);
@@ -330,6 +344,10 @@ const loadStoreDetail = async (storeId) => {
   } finally {
     detailLoading.value = false;
   }
+};
+
+const selectGalleryImage = (index) => {
+  selectedImageIndex.value = index;
 };
 
 const goReservation = (store) => {
@@ -513,12 +531,24 @@ onMounted(async () => {
             <template v-else-if="selectedStore">
               <div class="detail-image">
                 <img
-                  :src="selectedStore.mainImageUrl || logoUrl"
+                  :src="detailHeroImage"
                   :alt="selectedStore.storeName"
                 />
                 <span :class="['status-pill image-status', selectedStore.openNow ? 'open' : 'closed']">
                   {{ openStatusText(selectedStore) }}
                 </span>
+              </div>
+
+              <div v-if="galleryImages.length > 1" class="image-strip" aria-label="門市圖片">
+                <button
+                  v-for="(imageUrl, index) in galleryImages"
+                  :key="imageUrl"
+                  type="button"
+                  :class="['image-thumb', selectedImageIndex === index ? 'active' : '']"
+                  @click="selectGalleryImage(index)"
+                >
+                  <img :src="imageUrl" :alt="`${selectedStore.storeName} 圖片 ${index + 1}`" />
+                </button>
               </div>
 
               <div class="detail-body">
@@ -989,6 +1019,34 @@ onMounted(async () => {
   bottom: 16px;
 }
 
+.image-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  border-top: 1px solid #eee5dd;
+  background: #fbf8f5;
+  padding: 10px;
+}
+
+.image-thumb {
+  height: 58px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 0;
+}
+
+.image-thumb.active {
+  border-color: #b1642f;
+}
+
+.image-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .detail-body {
   padding: 24px;
 }
@@ -1222,9 +1280,14 @@ onMounted(async () => {
 
   .filter-panel,
   .region-row,
+  .image-strip,
   .insight-grid,
   .detail-actions {
     grid-template-columns: 1fr;
+  }
+
+  .image-thumb {
+    height: 72px;
   }
 
   .icon-action {
