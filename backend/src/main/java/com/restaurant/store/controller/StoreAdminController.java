@@ -60,17 +60,19 @@ public class StoreAdminController {
         return ApiResponse.success("桌位已新增", storeService.createTable(storeId, request));
     }
 
-    @PutMapping("/api/admin/tables/{tableId}")
+    @PutMapping("/api/admin/stores/{storeId}/tables/{tableId}")
     @Operation(summary = "修改桌位")
     public ApiResponse<TableInfoResponse> updateTable(
-            @PathVariable Long tableId, @Valid @RequestBody TableUpdateRequest request) {
-        return ApiResponse.success("桌位已更新", storeService.updateTable(tableId, request));
+            @PathVariable Long storeId,
+            @PathVariable Long tableId,
+            @Valid @RequestBody TableUpdateRequest request) {
+        return ApiResponse.success("桌位已更新", storeService.updateTable(storeId, tableId, request));
     }
 
-    @DeleteMapping("/api/admin/tables/{tableId}")
+    @DeleteMapping("/api/admin/stores/{storeId}/tables/{tableId}")
     @Operation(summary = "刪除桌位")
-    public ApiResponse<Void> deleteTable(@PathVariable Long tableId) {
-        storeService.deleteTable(tableId);
+    public ApiResponse<Void> deleteTable(@PathVariable Long storeId, @PathVariable Long tableId) {
+        storeService.deleteTable(storeId, tableId);
         return ApiResponse.success("桌位已刪除");
     }
 }

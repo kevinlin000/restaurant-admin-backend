@@ -23,6 +23,6 @@ public interface StoreService {
     void deleteStore(Long storeId);
     List<TableInfoResponse> getTablesByStore(Long storeId);
     TableInfoResponse createTable(Long storeId, TableCreateRequest request);
-    TableInfoResponse updateTable(Long tableId, TableUpdateRequest request);
-    void deleteTable(Long tableId);
+    TableInfoResponse updateTable(Long storeId, Long tableId, TableUpdateRequest request);
+    void deleteTable(Long storeId, Long tableId);
 }

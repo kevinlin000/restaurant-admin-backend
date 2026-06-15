@@ -213,10 +213,20 @@ public class StoreServiceImpl implements StoreService {
 
     @Override
     @Transactional
-    public TableInfoResponse updateTable(Long tableId, TableUpdateRequest request) {
-        TableInfo table = tableInfoRepository.findById(tableId)
+    public TableInfoResponse updateTable(Long storeId, Long tableId, TableUpdateRequest request) {
+        storeRepository.findByStoreIdAndIsDeletedFalse(storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("門市", storeId));
+
+        TableInfo table = tableInfoRepository.findByTableIdAndStoreId(tableId, storeId)
                 .orElseThrow(() -> new ResourceNotFoundException("桌位", tableId));
-        if (request.getTableNumber() != null) table.setTableNumber(request.getTableNumber());
+        if (request.getTableNumber() != null) {
+            tableInfoRepository.findByStoreIdAndTableNumber(storeId, request.getTableNumber())
+                    .filter(existing -> !existing.getTableId().equals(tableId))
+                    .ifPresent(existing -> {
+                        throw new BusinessException("桌號 " + request.getTableNumber() + " 在此門市已存在");
+                    });
+            table.setTableNumber(request.getTableNumber());
+        }
         if (request.getTableSize() != null) table.setTableSize(request.getTableSize());
         if (request.getTableType() != null) table.setTableType(request.getTableType());
         if (request.getZone() != null) table.setZone(request.getZone());
@@ -227,8 +237,11 @@ public class StoreServiceImpl implements StoreService {
 
     @Override
     @Transactional
-    public void deleteTable(Long tableId) {
-        TableInfo table = tableInfoRepository.findById(tableId)
+    public void deleteTable(Long storeId, Long tableId) {
+        storeRepository.findByStoreIdAndIsDeletedFalse(storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("門市", storeId));
+
+        TableInfo table = tableInfoRepository.findByTableIdAndStoreId(tableId, storeId)
                 .orElseThrow(() -> new ResourceNotFoundException("桌位", tableId));
         tableInfoRepository.delete(table);
     }
