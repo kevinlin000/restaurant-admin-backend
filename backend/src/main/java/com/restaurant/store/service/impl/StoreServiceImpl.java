@@ -141,6 +141,12 @@ public class StoreServiceImpl implements StoreService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public StoreDetailResponse getStoreDetailForAdmin(Long storeId) {
+        return getStoreDetail(storeId);
+    }
+
+    @Override
     @Transactional
     public StoreDetailResponse createStore(StoreCreateRequest request) {
         Store store = Store.builder()
@@ -190,6 +196,158 @@ public class StoreServiceImpl implements StoreService {
                 .orElseThrow(() -> new ResourceNotFoundException("門市", storeId));
         store.setIsDeleted(true);
         storeRepository.save(store);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StoreHourResponse> getStoreHours(Long storeId) {
+        requireStore(storeId);
+        return storeHourRepository.findByStoreIdOrderByDayOfWeekAscMealPeriodAscOpenTimeAsc(storeId)
+                .stream().map(this::toHourResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public StoreHourResponse createStoreHour(Long storeId, StoreHourCreateRequest request) {
+        requireStore(storeId);
+        validateHourRange(request.getOpenTime(), request.getCloseTime());
+        ensureUniqueHour(storeId, request.getDayOfWeek(), request.getMealPeriod(), null);
+
+        StoreHour hour = StoreHour.builder()
+                .storeId(storeId)
+                .dayOfWeek(request.getDayOfWeek())
+                .openTime(request.getOpenTime())
+                .closeTime(request.getCloseTime())
+                .mealPeriod(request.getMealPeriod())
+                .isClosed(Boolean.TRUE.equals(request.getIsClosed()))
+                .build();
+        return toHourResponse(storeHourRepository.save(hour));
+    }
+
+    @Override
+    @Transactional
+    public StoreHourResponse updateStoreHour(Long storeId, Long hourId, StoreHourUpdateRequest request) {
+        requireStore(storeId);
+        StoreHour hour = storeHourRepository.findByHourIdAndStoreId(hourId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("營業時間", hourId));
+
+        Integer dayOfWeek = request.getDayOfWeek() != null ? request.getDayOfWeek() : hour.getDayOfWeek();
+        String mealPeriod = request.getMealPeriod() != null ? request.getMealPeriod() : hour.getMealPeriod();
+        LocalTime openTime = request.getOpenTime() != null ? request.getOpenTime() : hour.getOpenTime();
+        LocalTime closeTime = request.getCloseTime() != null ? request.getCloseTime() : hour.getCloseTime();
+
+        validateHourRange(openTime, closeTime);
+        ensureUniqueHour(storeId, dayOfWeek, mealPeriod, hourId);
+
+        hour.setDayOfWeek(dayOfWeek);
+        hour.setMealPeriod(mealPeriod);
+        hour.setOpenTime(openTime);
+        hour.setCloseTime(closeTime);
+        if (request.getIsClosed() != null) hour.setIsClosed(request.getIsClosed());
+        return toHourResponse(storeHourRepository.save(hour));
+    }
+
+    @Override
+    @Transactional
+    public void deleteStoreHour(Long storeId, Long hourId) {
+        requireStore(storeId);
+        StoreHour hour = storeHourRepository.findByHourIdAndStoreId(hourId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("營業時間", hourId));
+        storeHourRepository.delete(hour);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StoreHolidayResponse> getStoreHolidays(Long storeId) {
+        requireStore(storeId);
+        return storeHolidayRepository.findByStoreIdOrderByHolidayDateAsc(storeId)
+                .stream().map(this::toHolidayResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public StoreHolidayResponse createStoreHoliday(Long storeId, StoreHolidayCreateRequest request) {
+        requireStore(storeId);
+        storeHolidayRepository.findByStoreIdAndHolidayDate(storeId, request.getHolidayDate())
+                .ifPresent(existing -> {
+                    throw new BusinessException("此日期已設定公休：" + request.getHolidayDate());
+                });
+
+        StoreHoliday holiday = StoreHoliday.builder()
+                .storeId(storeId)
+                .holidayDate(request.getHolidayDate())
+                .reason(request.getReason())
+                .build();
+        return toHolidayResponse(storeHolidayRepository.save(holiday));
+    }
+
+    @Override
+    @Transactional
+    public StoreHolidayResponse updateStoreHoliday(Long storeId, Long holidayId, StoreHolidayUpdateRequest request) {
+        requireStore(storeId);
+        StoreHoliday holiday = storeHolidayRepository.findByHolidayIdAndStoreId(holidayId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("公休日", holidayId));
+
+        storeHolidayRepository.findByStoreIdAndHolidayDate(storeId, request.getHolidayDate())
+                .filter(existing -> !existing.getHolidayId().equals(holidayId))
+                .ifPresent(existing -> {
+                    throw new BusinessException("此日期已設定公休：" + request.getHolidayDate());
+                });
+
+        holiday.setHolidayDate(request.getHolidayDate());
+        holiday.setReason(request.getReason());
+        return toHolidayResponse(storeHolidayRepository.save(holiday));
+    }
+
+    @Override
+    @Transactional
+    public void deleteStoreHoliday(Long storeId, Long holidayId) {
+        requireStore(storeId);
+        StoreHoliday holiday = storeHolidayRepository.findByHolidayIdAndStoreId(holidayId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("公休日", holidayId));
+        storeHolidayRepository.delete(holiday);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StoreImageResponse> getStoreImages(Long storeId) {
+        requireStore(storeId);
+        return storeImageRepository.findByStoreIdOrderBySortOrderAsc(storeId)
+                .stream().map(this::toImageResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public StoreImageResponse createStoreImage(Long storeId, StoreImageCreateRequest request) {
+        requireStore(storeId);
+        StoreImage image = StoreImage.builder()
+                .storeId(storeId)
+                .imageUrl(request.getImageUrl())
+                .caption(request.getCaption())
+                .sortOrder(request.getSortOrder())
+                .build();
+        return toImageResponse(storeImageRepository.save(image));
+    }
+
+    @Override
+    @Transactional
+    public StoreImageResponse updateStoreImage(Long storeId, Long imageId, StoreImageUpdateRequest request) {
+        requireStore(storeId);
+        StoreImage image = storeImageRepository.findByImageIdAndStoreId(imageId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("門市圖片", imageId));
+        if (request.getImageUrl() != null) image.setImageUrl(request.getImageUrl());
+        if (request.getCaption() != null) image.setCaption(request.getCaption());
+        if (request.getSortOrder() != null) image.setSortOrder(request.getSortOrder());
+        return toImageResponse(storeImageRepository.save(image));
+    }
+
+    @Override
+    @Transactional
+    public void deleteStoreImage(Long storeId, Long imageId) {
+        requireStore(storeId);
+        StoreImage image = storeImageRepository.findByImageIdAndStoreId(imageId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("門市圖片", imageId));
+        storeImageRepository.delete(image);
     }
 
     @Override
@@ -256,6 +414,28 @@ public class StoreServiceImpl implements StoreService {
     }
 
     // =================== Helper ===================
+
+    private Store requireStore(Long storeId) {
+        return storeRepository.findByStoreIdAndIsDeletedFalse(storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("門市", storeId));
+    }
+
+    private void validateHourRange(LocalTime openTime, LocalTime closeTime) {
+        if (openTime == null || closeTime == null) {
+            throw new BusinessException("開店與關店時間不可為空");
+        }
+        if (!closeTime.isAfter(openTime)) {
+            throw new BusinessException("關店時間需晚於開店時間");
+        }
+    }
+
+    private void ensureUniqueHour(Long storeId, Integer dayOfWeek, String mealPeriod, Long currentHourId) {
+        storeHourRepository.findByStoreIdAndDayOfWeekAndMealPeriod(storeId, dayOfWeek, mealPeriod)
+                .filter(existing -> currentHourId == null || !existing.getHourId().equals(currentHourId))
+                .ifPresent(existing -> {
+                    throw new BusinessException("此星期與時段已設定營業時間");
+                });
+    }
 
     private boolean isOpenNow(Long storeId) {
         LocalDate today = LocalDate.now();
@@ -328,6 +508,15 @@ public class StoreServiceImpl implements StoreService {
                 .holidayId(h.getHolidayId())
                 .holidayDate(h.getHolidayDate())
                 .reason(h.getReason())
+                .build();
+    }
+
+    private StoreImageResponse toImageResponse(StoreImage image) {
+        return StoreImageResponse.builder()
+                .imageId(image.getImageId())
+                .imageUrl(image.getImageUrl())
+                .caption(image.getCaption())
+                .sortOrder(image.getSortOrder())
                 .build();
     }
 }
