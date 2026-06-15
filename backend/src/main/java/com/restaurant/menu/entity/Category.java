@@ -4,12 +4,13 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 @Data
-@Entity
-@Table(name = "categories") // 👈 對齊你 ER Model 裡獨立的 categories 資料表！
+@Entity(name = "MenuCategory")
+@Table(name = "menu_category")
 public class Category {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "category_id")
     private Long id;
 
     @Column(name = "category_name", nullable = false)
