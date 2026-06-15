@@ -1,6 +1,7 @@
 package com.restaurant.order.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import java.math.BigDecimal;
+
 import org.springframework.stereotype.Service;
 
 import com.restaurant.order.dto.CreateOrderRequest;
@@ -13,14 +14,24 @@ import com.restaurant.order.repository.PaymentRepository;
 
 @Service
 public class OrderService {
-    @Autowired
-    private OrderRepository orderRepository;
+    private final OrderRepository orderRepository;
 
-    @Autowired
-    private OrderItemRepository orderItemRepository;
+    private final OrderItemRepository orderItemRepository;
 
-    @Autowired
-    private PaymentRepository paymentRepository;
+    private final PaymentRepository paymentRepository;
+
+    private final PaymentService paymentService;
+
+    OrderService(OrderRepository orderRepository,
+            OrderItemRepository orderItemRepository,
+            PaymentRepository paymentRepository,
+            PaymentService paymentService) {
+        this.orderRepository = orderRepository;
+        this.orderItemRepository = orderItemRepository;
+        this.paymentRepository = paymentRepository;
+        this.paymentService = paymentService;
+
+    }
 
     public OrderResponse createOrder(CreateOrderRequest request) {
 
@@ -39,21 +50,37 @@ public class OrderService {
         // 7. 計算 pointsEarned
 
         // 8. 建立 Order
-        Order order = new Order();
+        Order order = Order.builder()
+                .userId(request.getUserId())
+                .storeId(request.getStoreId())
+                .tableId(request.getTableId())
+                .reservationId(request.getReservationId())
+                .orderType(request.getOrderType())
+                // 計算假資料
+                .totalAmount(BigDecimal.valueOf(100))
+                .finalAmount(BigDecimal.valueOf(100))
+                .pointsEarned(0)
+                .pointsUsed(request.getPointsUsed())
+                .invoiceType(request.getInvoiceType())
+                .carrierNumber(request.getCarrierNumber())
+                .status("UNPAID")
+                .build();
         // 9. 建立 OrderItem
 
         // 10. 回傳 OrderResponse
         Order savedOrder = orderRepository.save(order);
-
+        
+System.out.println("finalAmount=" + savedOrder.getFinalAmount());
         // 2. 建立 Payment
         Payment payment = Payment.builder()
-                .order(savedOrder)
-                .paymentMethod(request.getPaymentMethod())
-                .paymentStatus("UNPAID")
-                .build();
+        .order(savedOrder)
+        .paymentMethod(request.getPaymentMethod())
+        .paymentStatus("UNPAID")
+        .amount(savedOrder.getFinalAmount())
+        .build();
 
         paymentRepository.save(payment);
-
+        // paymentService.createUnpaidPayment(savedOrder, request.getPaymentMethod());
         // 3. 回傳
         return
 

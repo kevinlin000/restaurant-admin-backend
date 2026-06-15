@@ -3,7 +3,9 @@
 // Vue
 import { computed, ref, watch } from "vue";
 import axios from "axios";
-
+import { useRouter } from "vue-router";
+//Router
+const router = useRouter();
 
 // =========================
 // Images
@@ -389,8 +391,29 @@ async function submitOrder() {
     console.log("送出的訂單資料：", request);
 
     const response = await axios.post("/api/orders", request);
-    console.log("後端回傳：", response.data);
+    const orderId = response.data.orderId;
 
+    // if (customerForm.value.paymentMethod === "LINE_PAY") {
+    //     router.push(`/payment/linepay/${orderId}`);
+    //     return;
+    // }
+
+    // if (customerForm.value.paymentMethod === "CREDIT_CARD") {
+    //     router.push(`/payment/card/${orderId}`);
+    //     return;
+    // }
+   
+if (customerForm.value.paymentMethod === "CREDIT_CARD") {
+    window.location.href =
+        `http://localhost:8080/api/payments/ecpay/checkout/${orderId}`;
+    return;
+}
+
+if (customerForm.value.paymentMethod === "LINE_PAY") {
+    window.location.href =
+        `http://localhost:8080/api/payments/linepay/request/${orderId}`;
+    return;
+}
     alert("訂單送出成功");
 }
 // =========================
@@ -546,62 +569,53 @@ async function submitOrder() {
                 <h2>確認訂單與填寫聯絡資訊</h2>
 
                 <div class="form-card">
-    <h3>付款方式</h3>
+                    <h3>付款方式</h3>
 
-    <div class="payment-tabs">
-        <button
-            type="button"
-            :class="{ active: customerForm.paymentMethod === 'CASH' }"
-            @click="customerForm.paymentMethod = 'CASH'"
-        >
-            現場付款
-        </button>
+                    <div class="payment-tabs">
+                        <button type="button" :class="{ active: customerForm.paymentMethod === 'CASH' }"
+                            @click="customerForm.paymentMethod = 'CASH'">
+                            現場付款
+                        </button>
 
-        <button
-            type="button"
-            :class="{ active: customerForm.paymentMethod === 'LINE_PAY' }"
-            @click="customerForm.paymentMethod = 'LINE_PAY'"
-        >
-            Line Pay
-        </button>
+                        <button type="button" :class="{ active: customerForm.paymentMethod === 'LINE_PAY' }"
+                            @click="customerForm.paymentMethod = 'LINE_PAY'">
+                            Line Pay
+                        </button>
 
-        <button
-            type="button"
-            :class="{ active: customerForm.paymentMethod === 'CREDIT_CARD' }"
-            @click="customerForm.paymentMethod = 'CREDIT_CARD'"
-        >
-            信用卡
-        </button>
-    </div>
+                        <button type="button" :class="{ active: customerForm.paymentMethod === 'CREDIT_CARD' }"
+                            @click="customerForm.paymentMethod = 'CREDIT_CARD'">
+                            信用卡
+                        </button>
+                    </div>
 
-    <div v-if="customerForm.paymentMethod === 'CASH'" class="payment-box">
-        現場付款，取餐時付款。
-    </div>
+                    <div v-if="customerForm.paymentMethod === 'CASH'" class="payment-box">
+                        現場付款，取餐時付款。
+                    </div>
 
-    <div v-if="customerForm.paymentMethod === 'LINE_PAY'" class="payment-box">
-        <p>Line Pay 掃碼付款</p>
-        <div class="fake-qr">QR</div>
-        <small>Demo 用：正式版會由後端金流 API 產生付款連結或 QR Code。</small>
-    </div>
+                    <div v-if="customerForm.paymentMethod === 'LINE_PAY'" class="payment-box">
+                        <p>Line Pay 掃碼付款</p>
+                        <div class="fake-qr">QR</div>
+                        <small>Demo 用：正式版會由後端金流 API 產生付款連結或 QR Code。</small>
+                    </div>
 
-    <div v-if="customerForm.paymentMethod === 'CREDIT_CARD'" class="payment-box">
-        <label>信用卡卡號</label>
-        <input type="text" placeholder="**** **** **** ****" disabled />
+                    <div v-if="customerForm.paymentMethod === 'CREDIT_CARD'" class="payment-box">
+                        <label>信用卡卡號</label>
+                        <input type="text" placeholder="**** **** **** ****" disabled />
 
-        <label>有效期限</label>
-        <input type="text" placeholder="MM / YY" disabled />
+                        <label>有效期限</label>
+                        <input type="text" placeholder="MM / YY" disabled />
 
-        <label>安全碼</label>
-        <input type="text" placeholder="CVV" disabled />
+                        <label>安全碼</label>
+                        <input type="text" placeholder="CVV" disabled />
 
-        <small>Demo 用：正式版不可自己儲存信用卡資料，應導向綠界 / 藍新 / Line Pay 金流頁。</small>
-    </div>
+                        <small>Demo 用：正式版不可自己儲存信用卡資料，應導向綠界 / 藍新 / Line Pay 金流頁。</small>
+                    </div>
 
-    <div class="payment-total">
-        付款金額
-        <strong>NT${{ totalAmount }}</strong>
-    </div>
-</div>
+                    <div class="payment-total">
+                        付款金額
+                        <strong>NT${{ totalAmount }}</strong>
+                    </div>
+                </div>
 
                 <div class="form-card">
                     <h3>發票 / 載具</h3>
@@ -612,14 +626,12 @@ async function submitOrder() {
                     </label>
 
                     <label class="carrier-option">
-                        <input type="radio" 
-                        value="MOBILE_BARCODE"
-                         v-model="customerForm.invoiceType"
-                        />
+                        <input type="radio" value="MOBILE_BARCODE" v-model="customerForm.invoiceType" />
                         手機條碼載具
 
-                    <input v-if="customerForm.invoiceType === 'MOBILE_BARCODE'" v-model="customerForm.carrierNumber"
-                        @input="formatCarrier" type="text" placeholder="/ABC1234" maxlength="8" class="carrier-input"/>
+                        <input v-if="customerForm.invoiceType === 'MOBILE_BARCODE'" v-model="customerForm.carrierNumber"
+                            @input="formatCarrier" type="text" placeholder="/ABC1234" maxlength="8"
+                            class="carrier-input" />
                     </label>
                 </div>
 
@@ -719,6 +731,7 @@ async function submitOrder() {
     font-weight: bold;
     margin: 12px 0;
 }
+
 .invoice-option,
 .carrier-option {
     display: grid;
@@ -732,6 +745,7 @@ async function submitOrder() {
     flex: 1;
     width: 100%;
 }
+
 .phone-input::placeholder {
     color: #bdbdbd;
 }

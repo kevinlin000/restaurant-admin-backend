@@ -29,9 +29,22 @@ public class Order {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    //之後這四個column 要拿掉換關聯
     @Column(name = "order_id")
     private Long orderId;
 
+    @Column(name = "user_id")
+    private Long userId;
+
+    @Column(name = "store_id")
+    private Long storeId;
+
+    @Column(name = "table_id")
+    private Long tableId;
+
+    @Column(name = "reservation_id")
+    private Long reservationId;
     // @ManyToOne(fetch = FetchType.LAZY)
     // @JoinColumn(name = "user_id")
     // private User user;
