@@ -9,6 +9,7 @@ const tables = ref([]);
 const hours = ref([]);
 const holidays = ref([]);
 const images = ref([]);
+const features = ref([]);
 const activeTab = ref("overview");
 const loadingStores = ref(false);
 const loadingDetail = ref(false);
@@ -21,6 +22,7 @@ const tabs = [
   { key: "hours", label: "營業時間", icon: "bx-time-five" },
   { key: "holidays", label: "特殊公休", icon: "bx-calendar-x" },
   { key: "images", label: "門市圖片", icon: "bx-image" },
+  { key: "features", label: "特色標籤", icon: "bx-purchase-tag" },
   { key: "tables", label: "桌位", icon: "bx-chair" },
 ];
 
@@ -57,6 +59,23 @@ const imageForm = reactive({
   caption: "",
   sortOrder: 0,
 });
+
+const featureForm = reactive({
+  featureKey: "",
+  featureLabel: "",
+  sortOrder: 0,
+});
+
+const commonFeatureOptions = [
+  { featureKey: "BUSINESS", featureLabel: "商務聚餐" },
+  { featureKey: "FAMILY", featureLabel: "親子友善" },
+  { featureKey: "DATE", featureLabel: "約會推薦" },
+  { featureKey: "PRIVATE_ROOM", featureLabel: "包廂" },
+  { featureKey: "GROUP", featureLabel: "團體聚餐" },
+  { featureKey: "PARKING", featureLabel: "停車方便" },
+  { featureKey: "STATION", featureLabel: "車站直達" },
+  { featureKey: "QUIET", featureLabel: "安靜用餐" },
+];
 
 const selectedStore = computed(
   () => selectedStoreDetail.value ?? stores.value.find((store) => store.storeId === selectedStoreId.value),
@@ -132,6 +151,7 @@ const loadSelectedStoreResources = async () => {
     hours.value = [];
     holidays.value = [];
     images.value = [];
+    features.value = [];
     return;
   }
 
@@ -139,11 +159,12 @@ const loadSelectedStoreResources = async () => {
   resetMessages();
 
   try {
-    const [detailRes, hoursRes, holidaysRes, imagesRes, tablesRes] = await Promise.all([
+    const [detailRes, hoursRes, holidaysRes, imagesRes, featuresRes, tablesRes] = await Promise.all([
       api.get(`/api/admin/stores/${selectedStoreId.value}`),
       api.get(`/api/admin/stores/${selectedStoreId.value}/hours`),
       api.get(`/api/admin/stores/${selectedStoreId.value}/holidays`),
       api.get(`/api/admin/stores/${selectedStoreId.value}/images`),
+      api.get(`/api/admin/stores/${selectedStoreId.value}/features`),
       api.get(`/api/admin/stores/${selectedStoreId.value}/tables`),
     ]);
 
@@ -151,7 +172,11 @@ const loadSelectedStoreResources = async () => {
     hours.value = unwrap(hoursRes);
     holidays.value = unwrap(holidaysRes);
     images.value = unwrap(imagesRes);
+    features.value = unwrap(featuresRes);
     tables.value = unwrap(tablesRes);
+    if (!featureForm.featureKey && !featureForm.featureLabel) {
+      featureForm.sortOrder = features.value.length + 1;
+    }
   } catch (error) {
     showError(error, "無法載入門市設定資料");
   } finally {
@@ -181,6 +206,18 @@ const resetImageForm = () => {
   imageForm.imageUrl = "";
   imageForm.caption = "";
   imageForm.sortOrder = images.value.length;
+};
+
+const resetFeatureForm = () => {
+  featureForm.featureKey = "";
+  featureForm.featureLabel = "";
+  featureForm.sortOrder = features.value.length + 1;
+};
+
+const applyFeaturePreset = (feature) => {
+  featureForm.featureKey = feature.featureKey;
+  featureForm.featureLabel = feature.featureLabel;
+  featureForm.sortOrder = features.value.length + 1;
 };
 
 const createHour = async () => {
@@ -279,6 +316,40 @@ const deleteImage = async (imageId) => {
     await loadSelectedStoreResources();
   } catch (error) {
     showError(error, "刪除門市圖片失敗");
+  }
+};
+
+const createFeature = async () => {
+  if (!selectedStoreId.value) return;
+  saving.value = true;
+  resetMessages();
+
+  try {
+    await api.post(`/api/admin/stores/${selectedStoreId.value}/features`, {
+      featureKey: featureForm.featureKey,
+      featureLabel: featureForm.featureLabel,
+      sortOrder: Number(featureForm.sortOrder) || 0,
+    });
+    message.value = "特色標籤已新增";
+    resetFeatureForm();
+    await loadSelectedStoreResources();
+  } catch (error) {
+    showError(error, "新增特色標籤失敗");
+  } finally {
+    saving.value = false;
+  }
+};
+
+const deleteFeature = async (featureId) => {
+  if (!selectedStoreId.value || !window.confirm("確定刪除此特色標籤？")) return;
+  resetMessages();
+
+  try {
+    await api.delete(`/api/admin/stores/${selectedStoreId.value}/features/${featureId}`);
+    message.value = "特色標籤已刪除";
+    await loadSelectedStoreResources();
+  } catch (error) {
+    showError(error, "刪除特色標籤失敗");
   }
 };
 
@@ -388,6 +459,10 @@ onMounted(loadStores);
                 <span>公休日</span>
               </div>
               <div>
+                <strong>{{ features.length }}</strong>
+                <span>特色標籤</span>
+              </div>
+              <div>
                 <strong>{{ availableTableCount }}/{{ tables.length }}</strong>
                 <span>可用桌位</span>
               </div>
@@ -435,6 +510,15 @@ onMounted(loadStores);
             <article class="description-card">
               <h3>門市特色</h3>
               <p>{{ selectedStore.description || "尚未填寫門市特色。" }}</p>
+            </article>
+            <article class="description-card">
+              <h3>前台情境標籤</h3>
+              <div v-if="features.length" class="feature-list compact">
+                <span v-for="feature in features" :key="feature.featureId">
+                  {{ feature.featureLabel }}
+                </span>
+              </div>
+              <p v-else>尚未設定情境標籤，前台無法依用餐情境推薦此門市。</p>
             </article>
           </section>
 
@@ -534,6 +618,61 @@ onMounted(loadStores);
                 <button type="button" @click="deleteImage(image.imageId)">刪除</button>
               </article>
               <div v-if="images.length === 0" class="state-box">尚未建立門市圖片</div>
+            </div>
+          </section>
+
+          <section v-else-if="activeTab === 'features'" class="content-section">
+            <div class="preset-row">
+              <span>常用標籤</span>
+              <button
+                v-for="feature in commonFeatureOptions"
+                :key="feature.featureKey"
+                type="button"
+                @click="applyFeaturePreset(feature)"
+              >
+                {{ feature.featureLabel }}
+              </button>
+            </div>
+
+            <form class="setting-form feature-form" @submit.prevent="createFeature">
+              <label>
+                標籤代碼
+                <input
+                  v-model.trim="featureForm.featureKey"
+                  maxlength="40"
+                  placeholder="PRIVATE_ROOM"
+                  required
+                  type="text"
+                />
+              </label>
+              <label>
+                顯示名稱
+                <input
+                  v-model.trim="featureForm.featureLabel"
+                  maxlength="30"
+                  placeholder="包廂"
+                  required
+                  type="text"
+                />
+              </label>
+              <label>
+                排序
+                <input v-model.number="featureForm.sortOrder" min="0" type="number" />
+              </label>
+              <button class="submit-btn" :disabled="saving" type="submit">新增標籤</button>
+            </form>
+
+            <div class="feature-list">
+              <article v-for="feature in features" :key="feature.featureId" class="feature-card">
+                <div>
+                  <strong>{{ feature.featureLabel }}</strong>
+                  <span>{{ feature.featureKey }} · 排序 {{ feature.sortOrder ?? 0 }}</span>
+                </div>
+                <button type="button" @click="deleteFeature(feature.featureId)">刪除</button>
+              </article>
+              <div v-if="features.length === 0" class="state-box">
+                尚未建立特色標籤，前台情境篩選不會顯示此店特色。
+              </div>
             </div>
           </section>
 
@@ -878,6 +1017,10 @@ onMounted(loadStores);
   grid-template-columns: minmax(280px, 1fr) minmax(180px, 0.5fr) 100px auto;
 }
 
+.feature-form {
+  grid-template-columns: minmax(180px, 0.8fr) minmax(180px, 0.8fr) 100px auto;
+}
+
 .setting-form label {
   display: grid;
   gap: 6px;
@@ -941,6 +1084,77 @@ onMounted(loadStores);
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   gap: 12px;
+}
+
+.preset-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.preset-row span {
+  margin-right: 4px;
+  color: #8c552e;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.preset-row button,
+.feature-list.compact span {
+  border-radius: 999px;
+  background: #faf3ea;
+  color: #8c552e;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.preset-row button {
+  border: 1px solid #ead8c6;
+  padding: 8px 11px;
+}
+
+.feature-list {
+  display: grid;
+  gap: 10px;
+}
+
+.feature-list.compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.feature-list.compact span {
+  display: inline-flex;
+  padding: 6px 10px;
+}
+
+.feature-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid #ebe4dc;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.feature-card strong {
+  display: block;
+  color: #263445;
+}
+
+.feature-card span {
+  color: #697386;
+  font-size: 13px;
+}
+
+.feature-card button {
+  border: 0;
+  background: transparent;
+  color: #b42318;
+  font-weight: 900;
 }
 
 .image-card,
@@ -1011,7 +1225,8 @@ onMounted(loadStores);
   .store-summary,
   .setting-form,
   .setting-form.three,
-  .image-form {
+  .image-form,
+  .feature-form {
     grid-template-columns: 1fr;
   }
 }
