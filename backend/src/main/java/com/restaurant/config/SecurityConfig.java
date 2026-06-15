@@ -50,6 +50,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/members/password/reset").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/members/test-mail").permitAll()
 
+                        // ===== 前台門市查詢（公開）=====
+                        .requestMatchers("/api/stores/**").permitAll()
+
                         // ===== 會員路由（需要登入，CUSTOMER 角色）=====
                         .requestMatchers(HttpMethod.GET, "/api/members/me").hasAuthority("ROLE_CUSTOMER")
                         .requestMatchers(HttpMethod.PUT, "/api/members/me").hasAuthority("ROLE_CUSTOMER")
@@ -59,6 +62,10 @@ public class SecurityConfig {
                         // ===== 員工管理路由（需要 ADMIN 角色）=====
                         .requestMatchers(HttpMethod.POST, "/api/members/staff").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/members/staff/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
+
+                        // ===== 後台門市管理（需要 ADMIN / MANAGER）=====
+                        .requestMatchers("/api/admin/stores/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
+                        .requestMatchers("/api/admin/tables/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
 
                         // 其餘所有請求都需要登入
                         .anyRequest().authenticated())
