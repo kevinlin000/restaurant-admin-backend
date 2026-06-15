@@ -210,7 +210,7 @@ public class StoreServiceImpl implements StoreService {
     @Transactional
     public StoreHourResponse createStoreHour(Long storeId, StoreHourCreateRequest request) {
         requireStore(storeId);
-        validateHourRange(request.getOpenTime(), request.getCloseTime());
+        validateHourRange(request.getOpenTime(), request.getCloseTime(), Boolean.TRUE.equals(request.getIsClosed()));
         ensureUniqueHour(storeId, request.getDayOfWeek(), request.getMealPeriod(), null);
 
         StoreHour hour = StoreHour.builder()
@@ -235,15 +235,16 @@ public class StoreServiceImpl implements StoreService {
         String mealPeriod = request.getMealPeriod() != null ? request.getMealPeriod() : hour.getMealPeriod();
         LocalTime openTime = request.getOpenTime() != null ? request.getOpenTime() : hour.getOpenTime();
         LocalTime closeTime = request.getCloseTime() != null ? request.getCloseTime() : hour.getCloseTime();
+        Boolean isClosed = request.getIsClosed() != null ? request.getIsClosed() : hour.getIsClosed();
 
-        validateHourRange(openTime, closeTime);
+        validateHourRange(openTime, closeTime, Boolean.TRUE.equals(isClosed));
         ensureUniqueHour(storeId, dayOfWeek, mealPeriod, hourId);
 
         hour.setDayOfWeek(dayOfWeek);
         hour.setMealPeriod(mealPeriod);
         hour.setOpenTime(openTime);
         hour.setCloseTime(closeTime);
-        if (request.getIsClosed() != null) hour.setIsClosed(request.getIsClosed());
+        hour.setIsClosed(isClosed);
         return toHourResponse(storeHourRepository.save(hour));
     }
 
@@ -420,9 +421,12 @@ public class StoreServiceImpl implements StoreService {
                 .orElseThrow(() -> new ResourceNotFoundException("門市", storeId));
     }
 
-    private void validateHourRange(LocalTime openTime, LocalTime closeTime) {
+    private void validateHourRange(LocalTime openTime, LocalTime closeTime, boolean isClosed) {
         if (openTime == null || closeTime == null) {
             throw new BusinessException("開店與關店時間不可為空");
+        }
+        if (isClosed) {
+            return;
         }
         if (!closeTime.isAfter(openTime)) {
             throw new BusinessException("關店時間需晚於開店時間");
