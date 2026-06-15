@@ -12,7 +12,7 @@ import AdminReservationSetting from "@/views/admin/reservation/ReservationSettin
 import AdminMenuCreate from "@/views/admin/menu/menu-create.vue";
 import AdminMenuEdit from "@/views/admin/menu/menu-edit.vue";
 import AdminMenuSetting from "@/views/admin/menu/menu-setting.vue";
-import CustomerMenu from "@/views/customer/menu/CustomerMenu.vue";
+import CustomerMenu from "@/views/customer/menu/menu.vue";
 import CustomerOrder from "@/views/customer/order/order.vue";
 import CustomerStore from "@/views/customer/store/store.vue";
 // ＊刪除(改不切頁)＊
@@ -110,7 +110,7 @@ const routers = [
         component: AdminMenuCreate,
       },
       {
-        path: "menu-edit",
+        path: "menu-edit/:id",
         name: "AdminMenuEdit",
         component: AdminMenuEdit,
       },

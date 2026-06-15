@@ -37,10 +37,15 @@ build/
 # ========================
 # Node / Vue
 # ========================
+node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/.env.local
 frontend/.env.*.local
+restaurant-admin-frontend/node_modules/
+restaurant-admin-frontend/dist/
+restaurant-admin-frontend/.env.local
+restaurant-admin-frontend/.env.*.local
 
 # ========================
 # IDE
