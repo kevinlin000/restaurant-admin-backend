@@ -2,7 +2,7 @@ import axios from "axios";
 import router from "@/router";
 
 const api = axios.create({
-  baseURL: "http://localhost:8080",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "",
   timeout: 10000,
 });
 
@@ -29,7 +29,10 @@ api.interceptors.response.use(
       window.dispatchEvent(new Event("login-state-changed"));
 
       if (router.currentRoute.value.path !== "/login") {
-        router.push("/login");
+        router.push({
+          path: "/login",
+          query: { redirect: router.currentRoute.value.fullPath },
+        });
       }
     }
 

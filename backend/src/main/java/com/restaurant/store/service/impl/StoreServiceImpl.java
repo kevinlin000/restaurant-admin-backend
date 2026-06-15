@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,56 +27,63 @@ public class StoreServiceImpl implements StoreService {
     private final StoreHolidayRepository storeHolidayRepository;
     private final StoreImageRepository storeImageRepository;
     private final TableInfoRepository tableInfoRepository;
+    private final StoreFeatureRepository storeFeatureRepository;
 
     // =================== 前台 ===================
 
     @Override
     @Transactional(readOnly = true)
     public List<StoreListResponse> getAllOpenStores() {
-        return storeRepository.findByIsDeletedFalseAndStatus("OPEN")
-                .stream()
-                .map(s -> toListResponse(s, null))
+        List<Store> stores = storeRepository.findByIsDeletedFalseAndStatusOrderByCityAscDistrictAscStoreNameAsc("OPEN");
+        Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        return stores.stream()
+                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of())))
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<StoreListResponse> searchStores(String keyword) {
-        return storeRepository.searchByKeyword(keyword)
-                .stream()
-                .map(s -> toListResponse(s, null))
+        List<Store> stores = storeRepository.searchByKeyword(keyword);
+        Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        return stores.stream()
+                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of())))
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<StoreListResponse> getStoresByCity(String city) {
-        return storeRepository.findByIsDeletedFalseAndStatusAndCity("OPEN", city)
-                .stream()
-                .map(s -> toListResponse(s, null))
+        List<Store> stores = storeRepository.findByIsDeletedFalseAndStatusAndCityOrderByDistrictAscStoreNameAsc("OPEN", city);
+        Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        return stores.stream()
+                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of())))
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<StoreListResponse> getStoresByCityAndDistrict(String city, String district) {
-        return storeRepository.findByIsDeletedFalseAndStatusAndCityAndDistrict("OPEN", city, district)
-                .stream()
-                .map(s -> toListResponse(s, null))
+        List<Store> stores = storeRepository.findByIsDeletedFalseAndStatusAndCityAndDistrictOrderByStoreNameAsc("OPEN", city, district);
+        Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        return stores.stream()
+                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of())))
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<StoreListResponse> findNearbyStores(NearbySearchRequest request) {
-        return storeRepository.findByIsDeletedFalseAndStatus("OPEN")
+        List<Store> stores = storeRepository.findByIsDeletedFalseAndStatusOrderByCityAscDistrictAscStoreNameAsc("OPEN");
+        Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        return stores
                 .stream()
                 .filter(s -> s.getLatitude() != null && s.getLongitude() != null)
                 .map(s -> {
                     double dist = haversineKm(
                             request.getLatitude(), request.getLongitude(),
                             s.getLatitude().doubleValue(), s.getLongitude().doubleValue());
-                    return toListResponse(s, dist);
+                    return toListResponse(s, dist, featureMap.getOrDefault(s.getStoreId(), List.of()));
                 })
                 .sorted(Comparator.comparingDouble(StoreListResponse::getDistanceKm))
                 .limit(request.getLimit())
@@ -88,10 +96,14 @@ public class StoreServiceImpl implements StoreService {
         Store store = storeRepository.findByStoreIdAndIsDeletedFalse(storeId)
                 .orElseThrow(() -> new ResourceNotFoundException("門市", storeId));
 
-        List<StoreHour> hours = storeHourRepository.findByStoreId(storeId);
+        List<StoreHour> hours = storeHourRepository.findByStoreIdOrderByDayOfWeekAscMealPeriodAscOpenTimeAsc(storeId);
         List<StoreImage> images = storeImageRepository.findByStoreIdOrderBySortOrderAsc(storeId);
-        List<TableInfo> tables = tableInfoRepository.findByStoreId(storeId);
-        List<StoreHoliday> holidays = storeHolidayRepository.findByStoreIdAndHolidayDateBetween(
+        List<TableInfo> tables = tableInfoRepository.findByStoreIdOrderByZoneAscTableNumberAsc(storeId);
+        List<StoreFeatureResponse> features = storeFeatureRepository.findByStoreIdOrderBySortOrderAscFeatureIdAsc(storeId)
+                .stream()
+                .map(this::toFeatureResponse)
+                .collect(Collectors.toList());
+        List<StoreHoliday> holidays = storeHolidayRepository.findByStoreIdAndHolidayDateBetweenOrderByHolidayDateAsc(
                 storeId, LocalDate.now(), LocalDate.now().plusDays(30));
 
         return StoreDetailResponse.builder()
@@ -114,6 +126,7 @@ public class StoreServiceImpl implements StoreService {
                 .imageUrls(images.stream().map(StoreImage::getImageUrl).collect(Collectors.toList()))
                 .tables(tables.stream().map(this::toTableResponse).collect(Collectors.toList()))
                 .upcomingHolidays(holidays.stream().map(this::toHolidayResponse).collect(Collectors.toList()))
+                .featureTags(features)
                 .build();
     }
 
@@ -130,6 +143,22 @@ public class StoreServiceImpl implements StoreService {
     }
 
     // =================== 後台 ===================
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StoreListResponse> getAllStoresForAdmin() {
+        List<Store> stores = storeRepository.findByIsDeletedFalseOrderByCityAscDistrictAscStoreNameAsc();
+        Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        return stores.stream()
+                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of())))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public StoreDetailResponse getStoreDetailForAdmin(Long storeId) {
+        return getStoreDetail(storeId);
+    }
 
     @Override
     @Transactional
@@ -185,10 +214,218 @@ public class StoreServiceImpl implements StoreService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<StoreHourResponse> getStoreHours(Long storeId) {
+        requireStore(storeId);
+        return storeHourRepository.findByStoreIdOrderByDayOfWeekAscMealPeriodAscOpenTimeAsc(storeId)
+                .stream().map(this::toHourResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public StoreHourResponse createStoreHour(Long storeId, StoreHourCreateRequest request) {
+        requireStore(storeId);
+        validateHourRange(request.getOpenTime(), request.getCloseTime(), Boolean.TRUE.equals(request.getIsClosed()));
+        ensureUniqueHour(storeId, request.getDayOfWeek(), request.getMealPeriod(), null);
+
+        StoreHour hour = StoreHour.builder()
+                .storeId(storeId)
+                .dayOfWeek(request.getDayOfWeek())
+                .openTime(request.getOpenTime())
+                .closeTime(request.getCloseTime())
+                .mealPeriod(request.getMealPeriod())
+                .isClosed(Boolean.TRUE.equals(request.getIsClosed()))
+                .build();
+        return toHourResponse(storeHourRepository.save(hour));
+    }
+
+    @Override
+    @Transactional
+    public StoreHourResponse updateStoreHour(Long storeId, Long hourId, StoreHourUpdateRequest request) {
+        requireStore(storeId);
+        StoreHour hour = storeHourRepository.findByHourIdAndStoreId(hourId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("營業時間", hourId));
+
+        Integer dayOfWeek = request.getDayOfWeek() != null ? request.getDayOfWeek() : hour.getDayOfWeek();
+        String mealPeriod = request.getMealPeriod() != null ? request.getMealPeriod() : hour.getMealPeriod();
+        LocalTime openTime = request.getOpenTime() != null ? request.getOpenTime() : hour.getOpenTime();
+        LocalTime closeTime = request.getCloseTime() != null ? request.getCloseTime() : hour.getCloseTime();
+        Boolean isClosed = request.getIsClosed() != null ? request.getIsClosed() : hour.getIsClosed();
+
+        validateHourRange(openTime, closeTime, Boolean.TRUE.equals(isClosed));
+        ensureUniqueHour(storeId, dayOfWeek, mealPeriod, hourId);
+
+        hour.setDayOfWeek(dayOfWeek);
+        hour.setMealPeriod(mealPeriod);
+        hour.setOpenTime(openTime);
+        hour.setCloseTime(closeTime);
+        hour.setIsClosed(isClosed);
+        return toHourResponse(storeHourRepository.save(hour));
+    }
+
+    @Override
+    @Transactional
+    public void deleteStoreHour(Long storeId, Long hourId) {
+        requireStore(storeId);
+        StoreHour hour = storeHourRepository.findByHourIdAndStoreId(hourId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("營業時間", hourId));
+        storeHourRepository.delete(hour);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StoreHolidayResponse> getStoreHolidays(Long storeId) {
+        requireStore(storeId);
+        return storeHolidayRepository.findByStoreIdOrderByHolidayDateAsc(storeId)
+                .stream().map(this::toHolidayResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public StoreHolidayResponse createStoreHoliday(Long storeId, StoreHolidayCreateRequest request) {
+        requireStore(storeId);
+        storeHolidayRepository.findByStoreIdAndHolidayDate(storeId, request.getHolidayDate())
+                .ifPresent(existing -> {
+                    throw new BusinessException("此日期已設定公休：" + request.getHolidayDate());
+                });
+
+        StoreHoliday holiday = StoreHoliday.builder()
+                .storeId(storeId)
+                .holidayDate(request.getHolidayDate())
+                .reason(request.getReason())
+                .build();
+        return toHolidayResponse(storeHolidayRepository.save(holiday));
+    }
+
+    @Override
+    @Transactional
+    public StoreHolidayResponse updateStoreHoliday(Long storeId, Long holidayId, StoreHolidayUpdateRequest request) {
+        requireStore(storeId);
+        StoreHoliday holiday = storeHolidayRepository.findByHolidayIdAndStoreId(holidayId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("公休日", holidayId));
+
+        storeHolidayRepository.findByStoreIdAndHolidayDate(storeId, request.getHolidayDate())
+                .filter(existing -> !existing.getHolidayId().equals(holidayId))
+                .ifPresent(existing -> {
+                    throw new BusinessException("此日期已設定公休：" + request.getHolidayDate());
+                });
+
+        holiday.setHolidayDate(request.getHolidayDate());
+        holiday.setReason(request.getReason());
+        return toHolidayResponse(storeHolidayRepository.save(holiday));
+    }
+
+    @Override
+    @Transactional
+    public void deleteStoreHoliday(Long storeId, Long holidayId) {
+        requireStore(storeId);
+        StoreHoliday holiday = storeHolidayRepository.findByHolidayIdAndStoreId(holidayId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("公休日", holidayId));
+        storeHolidayRepository.delete(holiday);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StoreImageResponse> getStoreImages(Long storeId) {
+        requireStore(storeId);
+        return storeImageRepository.findByStoreIdOrderBySortOrderAsc(storeId)
+                .stream().map(this::toImageResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public StoreImageResponse createStoreImage(Long storeId, StoreImageCreateRequest request) {
+        requireStore(storeId);
+        StoreImage image = StoreImage.builder()
+                .storeId(storeId)
+                .imageUrl(request.getImageUrl())
+                .caption(request.getCaption())
+                .sortOrder(request.getSortOrder())
+                .build();
+        return toImageResponse(storeImageRepository.save(image));
+    }
+
+    @Override
+    @Transactional
+    public StoreImageResponse updateStoreImage(Long storeId, Long imageId, StoreImageUpdateRequest request) {
+        requireStore(storeId);
+        StoreImage image = storeImageRepository.findByImageIdAndStoreId(imageId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("門市圖片", imageId));
+        if (request.getImageUrl() != null) image.setImageUrl(request.getImageUrl());
+        if (request.getCaption() != null) image.setCaption(request.getCaption());
+        if (request.getSortOrder() != null) image.setSortOrder(request.getSortOrder());
+        return toImageResponse(storeImageRepository.save(image));
+    }
+
+    @Override
+    @Transactional
+    public void deleteStoreImage(Long storeId, Long imageId) {
+        requireStore(storeId);
+        StoreImage image = storeImageRepository.findByImageIdAndStoreId(imageId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("門市圖片", imageId));
+        storeImageRepository.delete(image);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StoreFeatureResponse> getStoreFeatures(Long storeId) {
+        requireStore(storeId);
+        return storeFeatureRepository.findByStoreIdOrderBySortOrderAscFeatureIdAsc(storeId)
+                .stream().map(this::toFeatureResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public StoreFeatureResponse createStoreFeature(Long storeId, StoreFeatureCreateRequest request) {
+        requireStore(storeId);
+        String featureKey = normalizeFeatureKey(request.getFeatureKey());
+        storeFeatureRepository.findByStoreIdAndFeatureKey(storeId, featureKey)
+                .ifPresent(existing -> {
+                    throw new BusinessException("此門市已存在相同特色標籤：" + featureKey);
+                });
+
+        StoreFeature feature = StoreFeature.builder()
+                .storeId(storeId)
+                .featureKey(featureKey)
+                .featureLabel(request.getFeatureLabel().trim())
+                .sortOrder(request.getSortOrder() == null ? 0 : request.getSortOrder())
+                .build();
+        return toFeatureResponse(storeFeatureRepository.save(feature));
+    }
+
+    @Override
+    @Transactional
+    public StoreFeatureResponse updateStoreFeature(Long storeId, Long featureId, StoreFeatureUpdateRequest request) {
+        requireStore(storeId);
+        StoreFeature feature = storeFeatureRepository.findByFeatureIdAndStoreId(featureId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("門市特色標籤", featureId));
+        String featureKey = normalizeFeatureKey(request.getFeatureKey());
+        storeFeatureRepository.findByStoreIdAndFeatureKey(storeId, featureKey)
+                .filter(existing -> !existing.getFeatureId().equals(featureId))
+                .ifPresent(existing -> {
+                    throw new BusinessException("此門市已存在相同特色標籤：" + featureKey);
+                });
+
+        feature.setFeatureKey(featureKey);
+        feature.setFeatureLabel(request.getFeatureLabel().trim());
+        feature.setSortOrder(request.getSortOrder() == null ? 0 : request.getSortOrder());
+        return toFeatureResponse(storeFeatureRepository.save(feature));
+    }
+
+    @Override
+    @Transactional
+    public void deleteStoreFeature(Long storeId, Long featureId) {
+        requireStore(storeId);
+        StoreFeature feature = storeFeatureRepository.findByFeatureIdAndStoreId(featureId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("門市特色標籤", featureId));
+        storeFeatureRepository.delete(feature);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<TableInfoResponse> getTablesByStore(Long storeId) {
         storeRepository.findByStoreIdAndIsDeletedFalse(storeId)
                 .orElseThrow(() -> new ResourceNotFoundException("門市", storeId));
-        return tableInfoRepository.findByStoreId(storeId)
+        return tableInfoRepository.findByStoreIdOrderByZoneAscTableNumberAsc(storeId)
                 .stream().map(this::toTableResponse).collect(Collectors.toList());
     }
 
@@ -213,10 +450,20 @@ public class StoreServiceImpl implements StoreService {
 
     @Override
     @Transactional
-    public TableInfoResponse updateTable(Long tableId, TableUpdateRequest request) {
-        TableInfo table = tableInfoRepository.findById(tableId)
+    public TableInfoResponse updateTable(Long storeId, Long tableId, TableUpdateRequest request) {
+        storeRepository.findByStoreIdAndIsDeletedFalse(storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("門市", storeId));
+
+        TableInfo table = tableInfoRepository.findByTableIdAndStoreId(tableId, storeId)
                 .orElseThrow(() -> new ResourceNotFoundException("桌位", tableId));
-        if (request.getTableNumber() != null) table.setTableNumber(request.getTableNumber());
+        if (request.getTableNumber() != null) {
+            tableInfoRepository.findByStoreIdAndTableNumber(storeId, request.getTableNumber())
+                    .filter(existing -> !existing.getTableId().equals(tableId))
+                    .ifPresent(existing -> {
+                        throw new BusinessException("桌號 " + request.getTableNumber() + " 在此門市已存在");
+                    });
+            table.setTableNumber(request.getTableNumber());
+        }
         if (request.getTableSize() != null) table.setTableSize(request.getTableSize());
         if (request.getTableType() != null) table.setTableType(request.getTableType());
         if (request.getZone() != null) table.setZone(request.getZone());
@@ -227,13 +474,45 @@ public class StoreServiceImpl implements StoreService {
 
     @Override
     @Transactional
-    public void deleteTable(Long tableId) {
-        TableInfo table = tableInfoRepository.findById(tableId)
+    public void deleteTable(Long storeId, Long tableId) {
+        storeRepository.findByStoreIdAndIsDeletedFalse(storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("門市", storeId));
+
+        TableInfo table = tableInfoRepository.findByTableIdAndStoreId(tableId, storeId)
                 .orElseThrow(() -> new ResourceNotFoundException("桌位", tableId));
         tableInfoRepository.delete(table);
     }
 
     // =================== Helper ===================
+
+    private Store requireStore(Long storeId) {
+        return storeRepository.findByStoreIdAndIsDeletedFalse(storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("門市", storeId));
+    }
+
+    private void validateHourRange(LocalTime openTime, LocalTime closeTime, boolean isClosed) {
+        if (openTime == null || closeTime == null) {
+            throw new BusinessException("開店與關店時間不可為空");
+        }
+        if (isClosed) {
+            return;
+        }
+        if (!closeTime.isAfter(openTime)) {
+            throw new BusinessException("關店時間需晚於開店時間");
+        }
+    }
+
+    private void ensureUniqueHour(Long storeId, Integer dayOfWeek, String mealPeriod, Long currentHourId) {
+        storeHourRepository.findByStoreIdAndDayOfWeekAndMealPeriod(storeId, dayOfWeek, mealPeriod)
+                .filter(existing -> currentHourId == null || !existing.getHourId().equals(currentHourId))
+                .ifPresent(existing -> {
+                    throw new BusinessException("此星期與時段已設定營業時間");
+                });
+    }
+
+    private String normalizeFeatureKey(String featureKey) {
+        return featureKey == null ? "" : featureKey.trim().toUpperCase();
+    }
 
     private boolean isOpenNow(Long storeId) {
         LocalDate today = LocalDate.now();
@@ -243,7 +522,7 @@ public class StoreServiceImpl implements StoreService {
         int todayDow = today.getDayOfWeek().getValue(); // ISO: 週一=1, 週日=7
         LocalTime now = LocalTime.now();
         List<StoreHour> hours = storeHourRepository
-                .findByStoreIdAndDayOfWeekAndIsClosedFalse(storeId, todayDow);
+                .findByStoreIdAndDayOfWeekAndIsClosedFalseOrderByOpenTimeAsc(storeId, todayDow);
         return hours.stream()
                 .anyMatch(h -> !now.isBefore(h.getOpenTime()) && !now.isAfter(h.getCloseTime()));
     }
@@ -258,7 +537,19 @@ public class StoreServiceImpl implements StoreService {
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
-    private StoreListResponse toListResponse(Store s, Double distanceKm) {
+    private Map<Long, List<StoreFeatureResponse>> loadFeatureMap(List<Store> stores) {
+        List<Long> storeIds = stores.stream().map(Store::getStoreId).toList();
+        if (storeIds.isEmpty()) {
+            return Map.of();
+        }
+        return storeFeatureRepository.findByStoreIdInOrderByStoreIdAscSortOrderAscFeatureIdAsc(storeIds)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        StoreFeature::getStoreId,
+                        Collectors.mapping(this::toFeatureResponse, Collectors.toList())));
+    }
+
+    private StoreListResponse toListResponse(Store s, Double distanceKm, List<StoreFeatureResponse> features) {
         return StoreListResponse.builder()
                 .storeId(s.getStoreId())
                 .storeCode(s.getStoreCode())
@@ -274,12 +565,14 @@ public class StoreServiceImpl implements StoreService {
                 .mrtInfo(s.getMrtInfo())
                 .isOpenNow(isOpenNow(s.getStoreId()))
                 .distanceKm(distanceKm)
+                .featureTags(features)
                 .build();
     }
 
     private StoreHourResponse toHourResponse(StoreHour h) {
         String[] dayNames = {"", "週一", "週二", "週三", "週四", "週五", "週六", "週日"};
         return StoreHourResponse.builder()
+                .hourId(h.getHourId())
                 .dayOfWeek(h.getDayOfWeek())
                 .dayName(dayNames[h.getDayOfWeek()])
                 .openTime(h.getOpenTime())
@@ -306,6 +599,24 @@ public class StoreServiceImpl implements StoreService {
                 .holidayId(h.getHolidayId())
                 .holidayDate(h.getHolidayDate())
                 .reason(h.getReason())
+                .build();
+    }
+
+    private StoreImageResponse toImageResponse(StoreImage image) {
+        return StoreImageResponse.builder()
+                .imageId(image.getImageId())
+                .imageUrl(image.getImageUrl())
+                .caption(image.getCaption())
+                .sortOrder(image.getSortOrder())
+                .build();
+    }
+
+    private StoreFeatureResponse toFeatureResponse(StoreFeature feature) {
+        return StoreFeatureResponse.builder()
+                .featureId(feature.getFeatureId())
+                .featureKey(feature.getFeatureKey())
+                .featureLabel(feature.getFeatureLabel())
+                .sortOrder(feature.getSortOrder())
                 .build();
     }
 }

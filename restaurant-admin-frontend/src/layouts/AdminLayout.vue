@@ -164,13 +164,7 @@ const toggleMenu = (menu) => {
 
         <ul v-show="openMenu.store" class="submenu">
           <li>
-            <RouterLink to="/admin/store-create">新增分店</RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/admin/store-edit">修改分店</RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/admin/store-setting">設定</RouterLink>
+            <RouterLink to="/admin/store">分店與桌位</RouterLink>
           </li>
         </ul>
       </li>

@@ -37,6 +37,10 @@ public class Order {
     @Column(name = "user_id")
     private Long userId;
 
+    // @ManyToOne(fetch = FetchType.LAZY)
+    // @JoinColumn(name = "user_id")
+    // private User user;
+
     @Column(name = "store_id")
     private Long storeId;
 
@@ -45,21 +49,6 @@ public class Order {
 
     @Column(name = "reservation_id")
     private Long reservationId;
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "user_id")
-    // private User user;
-
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "store_id")
-    // private Store store;
-
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "table_id")
-    // private TableInfo tableInfo;
-
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "reservation_id")
-    // private Reservation reservation;
 
     @Column(name = "order_type", length = 20)
     private String orderType;
