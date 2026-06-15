@@ -6,6 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface StoreHourRepository extends JpaRepository<StoreHour, Long> {
-    List<StoreHour> findByStoreId(Long storeId);
-    List<StoreHour> findByStoreIdAndDayOfWeekAndIsClosedFalse(Long storeId, Integer dayOfWeek);
+    List<StoreHour> findByStoreIdOrderByDayOfWeekAscMealPeriodAscOpenTimeAsc(Long storeId);
+    List<StoreHour> findByStoreIdAndDayOfWeekAndIsClosedFalseOrderByOpenTimeAsc(Long storeId, Integer dayOfWeek);
 }

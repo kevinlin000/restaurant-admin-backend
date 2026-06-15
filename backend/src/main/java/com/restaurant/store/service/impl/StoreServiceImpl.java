@@ -32,7 +32,7 @@ public class StoreServiceImpl implements StoreService {
     @Override
     @Transactional(readOnly = true)
     public List<StoreListResponse> getAllOpenStores() {
-        return storeRepository.findByIsDeletedFalseAndStatus("OPEN")
+        return storeRepository.findByIsDeletedFalseAndStatusOrderByCityAscDistrictAscStoreNameAsc("OPEN")
                 .stream()
                 .map(s -> toListResponse(s, null))
                 .collect(Collectors.toList());
@@ -50,7 +50,7 @@ public class StoreServiceImpl implements StoreService {
     @Override
     @Transactional(readOnly = true)
     public List<StoreListResponse> getStoresByCity(String city) {
-        return storeRepository.findByIsDeletedFalseAndStatusAndCity("OPEN", city)
+        return storeRepository.findByIsDeletedFalseAndStatusAndCityOrderByDistrictAscStoreNameAsc("OPEN", city)
                 .stream()
                 .map(s -> toListResponse(s, null))
                 .collect(Collectors.toList());
@@ -59,7 +59,7 @@ public class StoreServiceImpl implements StoreService {
     @Override
     @Transactional(readOnly = true)
     public List<StoreListResponse> getStoresByCityAndDistrict(String city, String district) {
-        return storeRepository.findByIsDeletedFalseAndStatusAndCityAndDistrict("OPEN", city, district)
+        return storeRepository.findByIsDeletedFalseAndStatusAndCityAndDistrictOrderByStoreNameAsc("OPEN", city, district)
                 .stream()
                 .map(s -> toListResponse(s, null))
                 .collect(Collectors.toList());
@@ -68,7 +68,7 @@ public class StoreServiceImpl implements StoreService {
     @Override
     @Transactional(readOnly = true)
     public List<StoreListResponse> findNearbyStores(NearbySearchRequest request) {
-        return storeRepository.findByIsDeletedFalseAndStatus("OPEN")
+        return storeRepository.findByIsDeletedFalseAndStatusOrderByCityAscDistrictAscStoreNameAsc("OPEN")
                 .stream()
                 .filter(s -> s.getLatitude() != null && s.getLongitude() != null)
                 .map(s -> {
@@ -88,10 +88,10 @@ public class StoreServiceImpl implements StoreService {
         Store store = storeRepository.findByStoreIdAndIsDeletedFalse(storeId)
                 .orElseThrow(() -> new ResourceNotFoundException("門市", storeId));
 
-        List<StoreHour> hours = storeHourRepository.findByStoreId(storeId);
+        List<StoreHour> hours = storeHourRepository.findByStoreIdOrderByDayOfWeekAscMealPeriodAscOpenTimeAsc(storeId);
         List<StoreImage> images = storeImageRepository.findByStoreIdOrderBySortOrderAsc(storeId);
-        List<TableInfo> tables = tableInfoRepository.findByStoreId(storeId);
-        List<StoreHoliday> holidays = storeHolidayRepository.findByStoreIdAndHolidayDateBetween(
+        List<TableInfo> tables = tableInfoRepository.findByStoreIdOrderByZoneAscTableNumberAsc(storeId);
+        List<StoreHoliday> holidays = storeHolidayRepository.findByStoreIdAndHolidayDateBetweenOrderByHolidayDateAsc(
                 storeId, LocalDate.now(), LocalDate.now().plusDays(30));
 
         return StoreDetailResponse.builder()
@@ -134,7 +134,7 @@ public class StoreServiceImpl implements StoreService {
     @Override
     @Transactional(readOnly = true)
     public List<StoreListResponse> getAllStoresForAdmin() {
-        return storeRepository.findByIsDeletedFalse()
+        return storeRepository.findByIsDeletedFalseOrderByCityAscDistrictAscStoreNameAsc()
                 .stream()
                 .map(s -> toListResponse(s, null))
                 .collect(Collectors.toList());
@@ -197,7 +197,7 @@ public class StoreServiceImpl implements StoreService {
     public List<TableInfoResponse> getTablesByStore(Long storeId) {
         storeRepository.findByStoreIdAndIsDeletedFalse(storeId)
                 .orElseThrow(() -> new ResourceNotFoundException("門市", storeId));
-        return tableInfoRepository.findByStoreId(storeId)
+        return tableInfoRepository.findByStoreIdOrderByZoneAscTableNumberAsc(storeId)
                 .stream().map(this::toTableResponse).collect(Collectors.toList());
     }
 
@@ -265,7 +265,7 @@ public class StoreServiceImpl implements StoreService {
         int todayDow = today.getDayOfWeek().getValue(); // ISO: 週一=1, 週日=7
         LocalTime now = LocalTime.now();
         List<StoreHour> hours = storeHourRepository
-                .findByStoreIdAndDayOfWeekAndIsClosedFalse(storeId, todayDow);
+                .findByStoreIdAndDayOfWeekAndIsClosedFalseOrderByOpenTimeAsc(storeId, todayDow);
         return hours.stream()
                 .anyMatch(h -> !now.isBefore(h.getOpenTime()) && !now.isAfter(h.getCloseTime()));
     }

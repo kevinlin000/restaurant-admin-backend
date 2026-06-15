@@ -10,19 +10,21 @@ import java.util.Optional;
 
 public interface StoreRepository extends JpaRepository<Store, Long> {
 
-    List<Store> findByIsDeletedFalseAndStatus(String status);
+    List<Store> findByIsDeletedFalseAndStatusOrderByCityAscDistrictAscStoreNameAsc(String status);
 
-    List<Store> findByIsDeletedFalseAndStatusAndCity(String status, String city);
+    List<Store> findByIsDeletedFalseAndStatusAndCityOrderByDistrictAscStoreNameAsc(String status, String city);
 
-    List<Store> findByIsDeletedFalseAndStatusAndCityAndDistrict(String status, String city, String district);
+    List<Store> findByIsDeletedFalseAndStatusAndCityAndDistrictOrderByStoreNameAsc(String status, String city, String district);
 
     Optional<Store> findByStoreIdAndIsDeletedFalse(Long storeId);
 
-    List<Store> findByIsDeletedFalse();
+    List<Store> findByIsDeletedFalseOrderByCityAscDistrictAscStoreNameAsc();
 
     @Query("SELECT s FROM Store s WHERE s.isDeleted = false AND s.status = 'OPEN' AND " +
            "(s.storeName LIKE %:keyword% OR s.city LIKE %:keyword% OR " +
-           "s.district LIKE %:keyword% OR s.address LIKE %:keyword%)")
+           "s.district LIKE %:keyword% OR s.address LIKE %:keyword% OR " +
+           "s.phone LIKE %:keyword% OR s.mrtInfo LIKE %:keyword%) " +
+           "ORDER BY s.city, s.district, s.storeName")
     List<Store> searchByKeyword(@Param("keyword") String keyword);
 
     @Query("SELECT DISTINCT s.city FROM Store s WHERE s.isDeleted = false AND s.status = 'OPEN' ORDER BY s.city")

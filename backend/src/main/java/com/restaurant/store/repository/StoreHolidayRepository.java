@@ -10,5 +10,5 @@ import java.util.Optional;
 public interface StoreHolidayRepository extends JpaRepository<StoreHoliday, Long> {
     List<StoreHoliday> findByStoreId(Long storeId);
     Optional<StoreHoliday> findByStoreIdAndHolidayDate(Long storeId, LocalDate date);
-    List<StoreHoliday> findByStoreIdAndHolidayDateBetween(Long storeId, LocalDate from, LocalDate to);
+    List<StoreHoliday> findByStoreIdAndHolidayDateBetweenOrderByHolidayDateAsc(Long storeId, LocalDate from, LocalDate to);
 }
