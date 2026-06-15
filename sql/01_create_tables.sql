@@ -61,7 +61,7 @@ CREATE TABLE store (
 CREATE TABLE store_hour (
     hour_id         BIGINT AUTO_INCREMENT PRIMARY KEY,
     store_id        BIGINT NOT NULL,
-    day_of_week     TINYINT NOT NULL COMMENT '1=週一 ... 7=週日（ISO 8601）',
+    day_of_week     INT NOT NULL COMMENT '1=週一 ... 7=週日（ISO 8601）',
     open_time       TIME NOT NULL COMMENT '開店時間',
     close_time      TIME NOT NULL COMMENT '關店時間',
     meal_period     VARCHAR(20) COMMENT 'LUNCH / DINNER / AFTERNOON_TEA / ALL_DAY',
@@ -102,7 +102,7 @@ CREATE TABLE table_info (
     table_id        BIGINT AUTO_INCREMENT PRIMARY KEY,
     store_id        BIGINT NOT NULL,
     table_number    VARCHAR(10) NOT NULL COMMENT '桌號，如 A01、VIP1',
-    table_size      TINYINT NOT NULL COMMENT '幾人座',
+    table_size      INT NOT NULL COMMENT '幾人座',
     table_type      VARCHAR(20) COMMENT 'REGULAR / BOOTH / VIP_ROOM / BAR',
     zone            VARCHAR(20) COMMENT '樓層或區域，如 1F、2F、露臺',
     status          VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE'
@@ -227,7 +227,7 @@ CREATE TABLE time_slot (
 CREATE TABLE reservation_capacity (
     capacity_id     BIGINT AUTO_INCREMENT PRIMARY KEY,
     slot_id         BIGINT NOT NULL,
-    table_size      TINYINT NOT NULL COMMENT '幾人座（對應 table_info.table_size）',
+    table_size      INT NOT NULL COMMENT '幾人座（對應 table_info.table_size）',
     total_count     INT NOT NULL COMMENT '該人數桌型總數',
     reserved_count  INT NOT NULL DEFAULT 0 COMMENT '已訂數量',
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -281,6 +281,7 @@ CREATE TABLE orders (
     reservation_id  BIGINT COMMENT '關聯訂位（可為 null，外帶不需訂位）',
     order_type      VARCHAR(20) NOT NULL DEFAULT 'DINE_IN' COMMENT 'DINE_IN / TAKEOUT',
     total_amount    DECIMAL(10, 2) NOT NULL DEFAULT 0.00 COMMENT '訂單總金額（鎖定當下價格）',
+    final_amount    DECIMAL(10, 2) NOT NULL DEFAULT 0.00 COMMENT '折抵後實付金額',
     points_used     INT NOT NULL DEFAULT 0 COMMENT '本次折抵點數',
     points_earned   INT NOT NULL DEFAULT 0 COMMENT '本次累積點數',
     status          VARCHAR(20) NOT NULL DEFAULT 'PENDING'

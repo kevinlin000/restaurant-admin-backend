@@ -7,8 +7,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface TableInfoRepository extends JpaRepository<TableInfo, Long> {
-    List<TableInfo> findByStoreId(Long storeId);
+    List<TableInfo> findByStoreIdOrderByZoneAscTableNumberAsc(Long storeId);
     List<TableInfo> findByStoreIdAndStatus(Long storeId, String status);
     boolean existsByStoreIdAndTableNumber(Long storeId, String tableNumber);
+    Optional<TableInfo> findByStoreIdAndTableNumber(Long storeId, String tableNumber);
     Optional<TableInfo> findByTableIdAndStoreId(Long tableId, Long storeId);
 }
