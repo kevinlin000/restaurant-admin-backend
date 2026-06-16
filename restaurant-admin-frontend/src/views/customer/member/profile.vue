@@ -12,35 +12,38 @@
       <template v-else>
         <!-- 左側會員摘要 -->
         <aside class="member-sidebar">
-          <div class="member-name">{{ userInfo.name }}</div>
-          <div class="member-meta">
-            <span class="level-badge">{{ memberLevelText }}</span>
+          <div class="sidebar-card level-card">
+            <p class="sidebar-title">會員等級</p>
+            <div class="level-badge">{{ memberLevelText }}</div>
           </div>
 
-          <div class="side-divider"></div>
+          <div class="sidebar-card point-card">
+            <p class="sidebar-title">目前點數</p>
 
-          <div class="side-info">
-            <p class="side-label">目前點數</p>
-            <p class="side-value">{{ pointInfo.pointBalance }} 點</p>
-          </div>
+            <div class="point-main">
+              <span class="point-number">{{ pointInfo.pointBalance }}</span>
+              <span class="point-unit">點</span>
+            </div>
 
-          <div class="side-info">
-            <p class="side-label">{{ pointInfo.earnRuleText }}</p>
-            <p class="side-note">{{ pointUpgradeHint }}</p>
-          </div>
+            <p class="point-rule">{{ pointInfo.earnRuleText }}</p>
 
-          <div class="birthday-box">
-            <p v-if="isBirthdayMonth" class="birthday-active">
-              🎂 本月壽星
-              <br />
-              本月消費送 焦糖布丁 1份
+            <p v-if="pointInfo.nextLevel" class="upgrade-note">
+              離升級{{ getLevelText(pointInfo.nextLevel) }}還差
+              <span class="highlight-point">{{
+                pointInfo.pointsToNextLevel
+              }}</span>
+              點
             </p>
 
-            <p v-else>
-              🎁 生日月份優惠
-              <br />
-              您的生日月份是 {{ birthdayMonth }} 月
-            </p>
+            <p v-else class="upgrade-note">您已達最高等級：鑽石卡會員</p>
+          </div>
+
+          <div class="birthday-card">
+            <div class="birthday-title">🎂 生日優惠</div>
+            <div class="birthday-text">
+              生日當月於敘日消費，<br />
+              即可獲得焦糖布丁 1 份。
+            </div>
           </div>
         </aside>
 
@@ -119,7 +122,7 @@
                 <div class="info-label">密碼</div>
                 <div class="info-value password-dots">••••••••</div>
                 <button
-                  class="text-action"
+                  class="edit-profile-btn"
                   type="button"
                   @click="openPasswordView"
                 >
@@ -153,7 +156,7 @@
           <template v-else>
             <div class="section-header password-header">
               <button class="back-btn" type="button" @click="backToProfile">
-                ← 返回基本資料
+                返回基本資料
               </button>
             </div>
 
@@ -415,11 +418,12 @@ const birthdayMonth = computed(() => {
 });
 
 const isBirthdayMonth = computed(() => {
-  if (!birthdayMonth.value) return false;
+  if (!userInfo.value?.birthday) return false;
 
+  const birthdayMonth = new Date(userInfo.value.birthday).getMonth() + 1;
   const currentMonth = new Date().getMonth() + 1;
 
-  return birthdayMonth.value === currentMonth;
+  return birthdayMonth === currentMonth;
 });
 
 const isLengthValid = computed(() => {
@@ -653,92 +657,146 @@ const logout = async () => {
   position: relative;
 }
 
-.member-sidebar,
 .member-content {
   background: transparent;
 }
 
 .member-sidebar {
   float: left;
-  width: 220px;
-  padding-right: 28px;
+  width: 240px;
+  padding-top: 8px;
+  padding-right: 10px;
 }
 
 .member-content {
-  margin-left: 250px;
+  margin-left: 280px;
 }
 
-.member-name {
+.sidebar-card {
+  width: 240px;
+  margin-bottom: 26px;
+  padding-bottom: 26px;
+  border-bottom: 1px solid #e6ded5;
+}
+
+.sidebar-title {
+  margin: 0 0 14px;
+  color: #3d4651;
   font-size: 28px;
   font-weight: 800;
-  color: #3d4651;
-  margin-bottom: 8px;
-}
-
-.member-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
 }
 
 .level-badge {
-  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 126px;
+  min-height: 46px;
+  padding: 0 12px;
   border: 1px solid #ead5c3;
-  border-radius: 6px;
-  background: #fffaf7;
+  border-radius: 9px;
+  background: rgba(255, 250, 247, 0.9);
   color: #e3ac7f;
-  font-size: 13px;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
 }
 
-.side-divider {
-  height: 1px;
-  background: #e6ded5;
-  margin: 24px 0;
+.point-card {
+  padding-top: 0;
 }
 
-.side-info {
-  margin-bottom: 20px;
+.point-main {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 4px 0 12px;
 }
 
-.side-label {
-  margin: 0 0 6px;
-  font-size: 14px;
-  color: #7b8794;
+.point-number {
+  color: #e3ac7f;
+  font-size: 48px;
+  font-weight: 900;
+  line-height: 1;
 }
 
-.side-value {
+.point-unit {
+  color: #e3ac7f;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.point-rule {
+  margin: 0 0 10px;
+  color: #6b7c8f;
+  font-size: 16px;
+  line-height: 2;
+}
+
+.upgrade-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
   margin: 0;
-  font-size: 22px;
+  color: #7a5f4c;
+  font-size: 15px;
   font-weight: 700;
-  color: #e3ac7f;
+  line-height: 1.8;
 }
 
-.side-note {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.6;
-  color: #8a6f5a;
+.highlight-point {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  margin: 0 2px;
+  border-radius: 999px;
+  background: #e3ac7f;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 900;
+  box-shadow: 0 6px 14px rgba(227, 172, 127, 0.45);
+  animation: pointPulse 1.5s ease-in-out infinite;
 }
 
-.birthday-box {
-  margin: 20px 0;
-  padding: 14px;
+@keyframes pointPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 6px 14px rgba(227, 172, 127, 0.45);
+  }
+
+  50% {
+    transform: scale(1.12);
+    box-shadow: 0 9px 20px rgba(227, 172, 127, 0.65);
+  }
+}
+
+.birthday-card {
+  width: 240px;
+  margin-top: 0;
+  padding: 18px 20px;
   border-left: 4px solid #e3ac7f;
-  border-radius: 8px;
-  background: #fff7f0;
+  border-radius: 10px;
+  background: rgba(255, 247, 240, 0.92);
   color: #8a6f5a;
-  font-size: 14px;
-  line-height: 1.6;
 }
 
-.birthday-box p {
-  margin: 0;
-}
-
-.birthday-active {
+.birthday-title {
+  margin-bottom: 8px;
   color: #d97706;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.birthday-text {
+  color: #8a6f5a;
+  font-size: 15px;
+  line-height: 1.75;
 }
 
 .section-header {
@@ -899,15 +957,20 @@ const logout = async () => {
 }
 
 .back-btn {
+  background: #e3ac7f;
+  color: #fff;
   border: none;
-  background: transparent;
-  color: #8a6f5a;
-  font-size: 15px;
+  border-radius: 12px;
+  padding: 12px 24px;
+  font-size: 20px;
+  font-weight: 700;
   cursor: pointer;
+  transition: all 0.25s ease;
 }
 
 .back-btn:hover {
-  color: #e3ac7f;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(227, 172, 127, 0.3);
 }
 
 .password-panel {
@@ -1123,6 +1186,10 @@ const logout = async () => {
 
   .member-content {
     margin-left: 0;
+  }
+
+  .birthday-card {
+    width: 100%;
   }
 
   .info-card,
