@@ -18,6 +18,6 @@ public class CategoryController {
     public ApiResponse<List<Category>> getAllCategories() {
         List<Category> categories = categoryRepository.findAll();
         // 🎯 完美對齊組長公告提醒 2：回傳格式統一是 { success, message, data }
-        return ApiResponse.success(categories); 
+        return ApiResponse.success(categories);
     }
 }

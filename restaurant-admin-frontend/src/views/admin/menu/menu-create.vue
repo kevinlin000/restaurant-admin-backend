@@ -93,16 +93,16 @@ const handleAddItemMenu = async () => {
 <template>
   <div class="container-fluid px-4 py-3">
     <h3 class="mb-5 text-secondary fw-bold" style="color: #374151 !important;">
-      <span style="color: #374151;">➕ 菜單管理</span> 
+      <span style="color: #374151;">➕ 菜單管理</span>
       <span class="text-muted fs-5 fw-normal"> / 新增全新項目</span>
     </h3>
-    
+
     <div class="card mb-5 border-0 shadow-sm" style="background-color: #fbfbfd;">
       <div class="card-body p-4">
         <h5 class="mb-4 fw-bold" style="color: #374151;">
           <i class="fa-solid fa-wand-magic-sparkles me-2" style="color: #8162c9;"></i>填寫日式定食餐點資訊
         </h5>
-        
+
         <div class="row g-3">
           <div class="col-md-4">
             <label class="form-label fw-bold small" style="color: #4b5563;">餐點名稱</label>
@@ -144,10 +144,10 @@ const handleAddItemMenu = async () => {
             <label class="form-label fw-bold small" style="color: #4b5563;">過敏原資訊</label>
             <div class="input-group">
               <span class="input-group-text bg-white" style="border-color: #fed7aa; color: #9a3412;">⚠️</span>
-              <input 
-                v-model="newItem.allergenInfo" 
-                type="text" 
-                class="form-control" 
+              <input
+                v-model="newItem.allergenInfo"
+                type="text"
+                class="form-control"
                 placeholder="例如：含堅果、大豆（無則留空）"
                 style="color: #374151; border-color: #fed7aa; background-color: #ffffff; font-weight: 500;"
               >
@@ -172,12 +172,12 @@ const handleAddItemMenu = async () => {
       <div class="card-body p-0">
         <div class="p-3 border-bottom d-flex align-items-center justify-content-between bg-light">
           <h6 class="mb-0 fw-bold" style="color: #374151;"><i class="fa-solid fa-utensils me-2" style="color: #6d28d9;"></i>目前定食餐點列表</h6>
-          
+
           <div style="width: 280px;">
             <input v-model="searchQuery" type="text" class="form-control form-control-sm" placeholder="🔍 輸入品項名稱快速查詢..." style="border-radius: 6px; border: 1px solid #cbd5e1; color: #374151; font-weight: 500; background-color: #ffffff;">
           </div>
         </div>
-        
+
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
             <thead class="table-light small uppercase fw-bold" style="color: #374151;">

@@ -27,10 +27,10 @@ public class CategoryService {
     public Category updateCategory(Long id, Category updatedCategory) {
         Category existingCategory = categoryRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("找不到該分類，無法修改！"));
-        
+
         existingCategory.setCategoryName(updatedCategory.getCategoryName());
         existingCategory.setSortOrder(updatedCategory.getSortOrder());
-        
+
         return categoryRepository.save(existingCategory);
     }
 

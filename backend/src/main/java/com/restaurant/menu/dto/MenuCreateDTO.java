@@ -12,5 +12,5 @@ public class MenuCreateDTO {
     private String imageUrl;
     private String allergenInfo;
     // 🎯 修正：不要再用 String status，全面換成最新官方布林值！
-    private Boolean isActive = true; 
+    private Boolean isActive = true;
 }

@@ -43,8 +43,8 @@ public class MenuItemService {
         menuItem.setPrice(dto.getPrice());
         menuItem.setImageUrl(dto.getImageUrl());
         menuItem.setAllergenInfo(dto.getAllergenInfo());
-        menuItem.setIsActive(dto.getIsActive()); 
-        
+        menuItem.setIsActive(dto.getIsActive());
+
         return menuItemRepository.save(menuItem);
     }
 
@@ -59,7 +59,7 @@ public class MenuItemService {
         existingItem.setPrice(dto.getPrice());
         existingItem.setImageUrl(dto.getImageUrl());
         existingItem.setAllergenInfo(dto.getAllergenInfo());
-        existingItem.setIsActive(dto.getIsActive()); 
+        existingItem.setIsActive(dto.getIsActive());
 
         return menuItemRepository.save(existingItem);
     }
@@ -68,7 +68,7 @@ public class MenuItemService {
     public MenuItem deleteMenuItem(Long id) {
         MenuItem existingItem = menuItemRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("找不到該品項，無法下架！"));
-            
+
         existingItem.setIsActive(false); // 🎯 完美對齊最新的布林值下架！
         return menuItemRepository.save(existingItem);
     }
@@ -82,9 +82,9 @@ public class MenuItemService {
         for (StoreMenu storeMenu : storeMenuItems) {
             // 步驟 B：拿著關聯的 menu_item_id，去總部菜單表把餐點細節（品名、描述、圖片、過敏原）撈出來
             MenuItem item = menuItemRepository.findById(storeMenu.getMenuItemId()).orElse(null);
-            
+
             // 步驟 C：確保總部沒有把這道菜大下架 (is_active = true)
-            if (item != null && item.getIsActive()) { 
+            if (item != null && item.getIsActive()) {
                 StoreMenuDisplayResponse response = new StoreMenuDisplayResponse();
                 response.setId(item.getId());
                 response.setItemName(item.getItemName());
@@ -92,12 +92,27 @@ public class MenuItemService {
                 response.setImageUrl(item.getImageUrl());
                 response.setAllergenInfo(item.getAllergenInfo());
 
-                // 🔥 核心商業邏輯精髓：如果分店有客製化售價，就用分店價；如果為 null，自動退回總部建議售價！
+                // 🔥 核心商業邏輯：如果分店有客製化售價，就用分店價；如果為 null，自動退回總部建議售價！
                 if (storeMenu.getPrice() != null) {
-                    response.setFinalPrice(storeMenu.getPrice()); 
+                    response.setFinalPrice(storeMenu.getPrice());
                 } else {
-                    response.setFinalPrice(item.getPrice()); 
+                    response.setFinalPrice(item.getPrice());
                 }
+
+                // 🔥 售罄實時連動邏輯：
+                // 1. 如果分店設定為不可供應 (isAvailable == false)，則直接鎖定按鈕！
+                // 2. 如果總部把這道菜全台灣停售了 (isActive == false)，也直接鎖定按鈕！
+                if (storeMenu.getIsAvailable() != null && !storeMenu.getIsAvailable()) {
+                    response.setIsSelectable(false); // 鎖定按鈕，顯示已售罄！
+                } else if (item.getIsActive() != null && !item.getIsActive()) {
+                    response.setIsSelectable(false); // 總部停售，鎖定按鈕！
+                } else {
+                    response.setIsSelectable(true);  // 兩道防線皆過，正常開放加入購物車！
+                }
+
+                // 🤝 初始化特色標籤籃子，完美預留組長前台展示空間！
+                // 這樣做能確保前端拿到資料時不為 null，直接絲滑通車！
+                response.setFeatureTags(new ArrayList<>()); 
 
                 displayList.add(response);
             }
