@@ -44,10 +44,18 @@ public class OrderService {
         // 4. 查詢 MenuItem
 
         // 5. 計算 totalAmount
+        BigDecimal totalAmount = BigDecimal.valueOf(100);
 
         // 6. 計算 finalAmount
+        BigDecimal pointsDiscount = BigDecimal.valueOf(
+                request.getPointsUsed() != null ? request.getPointsUsed() : 0);
 
-        // 7. 計算 pointsEarned
+        BigDecimal finalAmount = totalAmount.subtract(pointsDiscount);
+
+        if (finalAmount.compareTo(BigDecimal.ZERO) < 0) {
+            finalAmount = BigDecimal.ZERO;
+        }
+        // 7. pointsEarned 由會員模組計算，這邊先放 0
 
         // 8. 建立 Order
         Order order = Order.builder()
@@ -57,34 +65,32 @@ public class OrderService {
                 .reservationId(request.getReservationId())
                 .orderType(request.getOrderType())
                 // 計算假資料
-                .totalAmount(BigDecimal.valueOf(100))
-                .finalAmount(BigDecimal.valueOf(100))
+                .totalAmount(totalAmount)
+                .finalAmount(finalAmount)
                 .pointsEarned(0)
-                .pointsUsed(request.getPointsUsed())
+                .pointsUsed(request.getPointsUsed() != null ? request.getPointsUsed() : 0)
                 .invoiceType(request.getInvoiceType())
                 .carrierNumber(request.getCarrierNumber())
                 .status("UNPAID")
                 .build();
         // 9. 建立 OrderItem
 
-        // 10. 回傳 OrderResponse
+        // // 10. 儲存 Order
         Order savedOrder = orderRepository.save(order);
-        
-System.out.println("finalAmount=" + savedOrder.getFinalAmount());
+
+        System.out.println("finalAmount=" + savedOrder.getFinalAmount());
         // 2. 建立 Payment
         Payment payment = Payment.builder()
-        .order(savedOrder)
-        .paymentMethod(request.getPaymentMethod())
-        .paymentStatus("UNPAID")
-        .amount(savedOrder.getFinalAmount())
-        .build();
+                .order(savedOrder)
+                .paymentMethod(request.getPaymentMethod())
+                .paymentStatus("UNPAID")
+                .amount(savedOrder.getFinalAmount())
+                .build();
 
         paymentRepository.save(payment);
         // paymentService.createUnpaidPayment(savedOrder, request.getPaymentMethod());
         // 3. 回傳
-        return
-
-        convertToResponse(savedOrder);
+        return convertToResponse(savedOrder);
     }
 
     public OrderResponse getOrderById(Long orderId) {
