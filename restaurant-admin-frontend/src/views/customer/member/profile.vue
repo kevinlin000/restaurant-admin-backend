@@ -21,28 +21,27 @@
 
           <div class="side-info">
             <p class="side-label">目前點數</p>
-            <p class="side-value">{{ userInfo.pointBalance }} 點</p>
+            <p class="side-value">{{ pointInfo.pointBalance }} 點</p>
           </div>
 
           <div class="side-info">
-            <p class="side-label">每消費 $100 即可累積 1 點</p>
-            <p class="side-note">{{ upgradeHint }}</p>
+            <p class="side-label">{{ pointInfo.earnRuleText }}</p>
+            <p class="side-note">{{ pointUpgradeHint }}</p>
           </div>
 
-          <div v-if="birthdayCountdown !== null" class="birthday-box">
-            <p v-if="birthdayCountdown === 0" class="birthday-active">
-              🎉 生日快樂！快來店領取您的生日專屬禮！
+          <div class="birthday-box">
+            <p v-if="isBirthdayMonth" class="birthday-active">
+              🎂 本月壽星
+              <br />
+              本月消費送 焦糖布丁 1份
             </p>
+
             <p v-else>
-              距離您的生日還有
-              <strong>{{ birthdayCountdown }}</strong
-              >天
+              🎁 生日月份優惠
+              <br />
+              您的生日月份是 {{ birthdayMonth }} 月
             </p>
           </div>
-
-          <button class="logout-link" type="button" @click="logout">
-            登出
-          </button>
         </aside>
 
         <!-- 右側內容 -->
@@ -273,7 +272,12 @@
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import Swal from "sweetalert2";
-import { getProfile, updatePassword, updateProfile } from "@/api/member";
+import {
+  getPointBalance,
+  getProfile,
+  updatePassword,
+  updateProfile,
+} from "@/api/member";
 
 const router = useRouter();
 
@@ -288,6 +292,14 @@ const userInfo = ref({
   birthday: "",
   memberLevel: "BRONZE",
   pointBalance: 0,
+});
+
+const pointInfo = ref({
+  pointBalance: 0,
+  memberLevel: "BRONZE",
+  nextLevel: "SILVER",
+  pointsToNextLevel: 30,
+  earnRuleText: "每消費 $100 即可累積 1 點",
 });
 
 const profileForm = ref({
@@ -320,17 +332,7 @@ onMounted(async () => {
   }
 
   try {
-    const res = await getProfile();
-    const data = res.data.data;
-
-    userInfo.value = {
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      birthday: data.birthday,
-      memberLevel: data.memberLevel,
-      pointBalance: data.pointBalance,
-    };
+    await loadMemberPageData();
   } catch (err) {
     errorMsg.value = "無法取得會員資料，請重新登入";
   } finally {
@@ -338,7 +340,34 @@ onMounted(async () => {
   }
 });
 
-const memberLevelText = computed(() => {
+const loadMemberPageData = async () => {
+  const [profileRes, pointRes] = await Promise.all([
+    getProfile(),
+    getPointBalance(),
+  ]);
+
+  const profileData = profileRes.data.data;
+  const pointData = pointRes.data.data;
+
+  pointInfo.value = {
+    pointBalance: pointData.pointBalance ?? 0,
+    memberLevel: pointData.memberLevel || "BRONZE",
+    nextLevel: pointData.nextLevel || null,
+    pointsToNextLevel: pointData.pointsToNextLevel ?? 0,
+    earnRuleText: pointData.earnRuleText || "每消費 $100 即可累積 1 點",
+  };
+
+  userInfo.value = {
+    name: profileData.name,
+    email: profileData.email,
+    phone: profileData.phone,
+    birthday: profileData.birthday,
+    memberLevel: pointInfo.value.memberLevel || profileData.memberLevel,
+    pointBalance: pointInfo.value.pointBalance,
+  };
+};
+
+const getLevelText = (level) => {
   const levels = {
     BRONZE: "銅卡會員",
     SILVER: "銀卡會員",
@@ -346,25 +375,23 @@ const memberLevelText = computed(() => {
     DIAMOND: "鑽石卡會員",
   };
 
-  return levels[userInfo.value.memberLevel] || "一般會員";
+  return levels[level] || "一般會員";
+};
+
+const memberLevelText = computed(() => {
+  return getLevelText(
+    pointInfo.value.memberLevel || userInfo.value.memberLevel,
+  );
 });
 
-const upgradeHint = computed(() => {
-  const points = Number(userInfo.value.pointBalance) || 0;
+const pointUpgradeHint = computed(() => {
+  const nextLevelText = getLevelText(pointInfo.value.nextLevel);
 
-  if (points < 30) {
-    return `距離升級銀卡會員還差 ${30 - points} 點`;
+  if (!pointInfo.value.nextLevel) {
+    return "您已達最高等級：鑽石卡會員";
   }
 
-  if (points < 60) {
-    return `距離升級金卡會員還差 ${60 - points} 點`;
-  }
-
-  if (points < 100) {
-    return `距離升級鑽石卡會員還差 ${100 - points} 點`;
-  }
-
-  return "您已達最高等級：鑽石卡會員";
+  return `距離升級${nextLevelText}還差 ${pointInfo.value.pointsToNextLevel} 點`;
 });
 
 const isPhoneValid = computed(() => {
@@ -381,28 +408,18 @@ const canSubmitProfile = computed(() => {
   return Boolean(name) && isPhoneValid.value && hasChanged;
 });
 
-const birthdayCountdown = computed(() => {
+const birthdayMonth = computed(() => {
   if (!userInfo.value.birthday) return null;
 
-  const today = new Date();
-  const birthday = new Date(userInfo.value.birthday);
-  const birthdayThisYear = new Date(
-    today.getFullYear(),
-    birthday.getMonth(),
-    birthday.getDate(),
-  );
+  return new Date(userInfo.value.birthday).getMonth() + 1;
+});
 
-  let nextBirthday = birthdayThisYear;
+const isBirthdayMonth = computed(() => {
+  if (!birthdayMonth.value) return false;
 
-  if (today > birthdayThisYear) {
-    nextBirthday = new Date(
-      today.getFullYear() + 1,
-      birthday.getMonth(),
-      birthday.getDate(),
-    );
-  }
+  const currentMonth = new Date().getMonth() + 1;
 
-  return Math.ceil((nextBirthday - today) / (1000 * 60 * 60 * 24));
+  return birthdayMonth.value === currentMonth;
 });
 
 const isLengthValid = computed(() => {
@@ -724,20 +741,6 @@ const logout = async () => {
   font-weight: 700;
 }
 
-.logout-link {
-  margin-top: 10px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: #566a7f;
-  font-size: 15px;
-  cursor: pointer;
-}
-
-.logout-link:hover {
-  color: #e3ac7f;
-}
-
 .section-header {
   display: flex;
   justify-content: space-between;
@@ -1034,6 +1037,78 @@ const logout = async () => {
   cursor: not-allowed;
 }
 
+.points-section {
+  margin-top: 24px;
+}
+
+.points-summary-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: center;
+}
+
+.points-card-label {
+  margin: 0 0 6px;
+  color: #7b8794;
+  font-size: 14px;
+}
+
+.points-summary-card h3 {
+  margin: 0;
+  color: #e3ac7f;
+  font-size: 32px;
+  font-weight: 800;
+}
+
+.points-summary-detail {
+  color: #566a7f;
+  font-size: 15px;
+  line-height: 1.7;
+  text-align: right;
+}
+
+.points-summary-detail p {
+  margin: 0;
+}
+
+.points-history-card {
+  margin-top: 18px;
+}
+
+.points-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.points-history-header h3 {
+  margin: 0;
+  color: #3d4651;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.points-history-header span {
+  color: #8a6f5a;
+  font-size: 14px;
+}
+
+.empty-history {
+  padding: 22px;
+  border-radius: 10px;
+  background: #fff7f0;
+  color: #8a6f5a;
+  text-align: center;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 @media (max-width: 900px) {
   .member-page {
     padding: 130px 18px 60px;
@@ -1068,6 +1143,20 @@ const logout = async () => {
   .cancel-profile-btn,
   .save-profile-btn {
     width: 100%;
+  }
+
+  .points-summary-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .points-summary-detail {
+    text-align: left;
+  }
+
+  .history-item {
+    align-items: flex-start;
+    gap: 12px;
   }
 
   .text-action {

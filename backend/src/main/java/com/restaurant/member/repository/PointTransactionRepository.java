@@ -11,6 +11,10 @@ public interface PointTransactionRepository extends JpaRepository<PointTransacti
 
     List<PointTransaction> findByReferenceId(Long referenceId);
 
+    boolean existsByReferenceIdAndTransactionType(
+            Long referenceId,
+            PointTransaction.TransactionType transactionType);
+
     @EntityGraph(attributePaths = { "store" })
     List<PointTransaction> findByUser_UserIdOrderByCreatedAtDesc(Long userId);
 
