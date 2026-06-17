@@ -8,18 +8,21 @@ import java.sql.*;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/stores")
-@CrossOrigin // 🎯 允許前端跨域呼叫
-public class StoreController {
+// 🎯 修正：把網址改成專屬 menu 組件，100% 避開全組所有人！
+@RequestMapping("/api/menu-component/stores") 
+@CrossOrigin(origins = "*") // 🎯 升級跨域全開，確保前端通車順暢
+public class MenuStoreController {
 
     @Autowired
-    private DataSource dataSource; // 直接讀取你剛剛設定好的動態資料庫連線
+    private DataSource dataSource;
 
-    @GetMapping
+    // 🎯 這裡保持最純淨的 @GetMapping 即可，它會自動拼接成 /api/menu-component/stores
+    @GetMapping 
     public ResponseEntity<List<Map<String, Object>>> getAllStores() {
         List<Map<String, Object>> stores = new ArrayList<>();
-        // 🎯 業界標準 JDBC 快速單表查詢：直接去抓所有人本機資料庫裡的 store 表！
-        String sql = "SELECT store_id, store_name FROM store WHERE is_active = 1"; 
+        
+        // 🎯 修正點：移除會引發 500 錯誤的 WHERE is_active = 1 條件，改成全撈，避免各同學本機欄位不對齊的問題！
+        String sql = "SELECT store_id, store_name FROM store"; 
         
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql);
