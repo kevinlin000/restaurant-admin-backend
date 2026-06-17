@@ -58,6 +58,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/orders").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/orders/**").permitAll()
 
+                        .requestMatchers("/api/payments/**").permitAll()
+
                         // ===== 會員路由（需要登入，CUSTOMER 角色）=====
                         .requestMatchers(HttpMethod.GET, "/api/members/me").hasAuthority("ROLE_CUSTOMER")
                         .requestMatchers(HttpMethod.PUT, "/api/members/me").hasAuthority("ROLE_CUSTOMER")
