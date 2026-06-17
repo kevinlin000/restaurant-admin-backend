@@ -64,9 +64,15 @@
               type="button"
               class="verify-btn"
               @click="sendResetCode"
-              :disabled="isSendingCode"
+              :disabled="
+                isSendingCode || resetCodeCountdown > 0 || !forgotEmailValid
+              "
             >
-              {{ isSendingCode ? "發送中..." : "發送驗證碼" }}
+              <span v-if="isSendingCode">發送中...</span>
+              <span v-else-if="resetCodeCountdown > 0"
+                >重新發送 {{ resetCodeCountdown }}s</span
+              >
+              <span v-else>發送驗證碼</span>
             </button>
           </div>
           <p
@@ -154,14 +160,12 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { login } from "@/api/member";
-import axios from "axios";
+import { computed, onUnmounted, reactive, ref } from "vue";
+import { useRouter } from "vue-router";
+import { forgotPassword, login, resetPassword } from "@/api/member";
 import Swal from "sweetalert2";
 
 const router = useRouter();
-const route = useRoute();
 
 const currentView = ref("login");
 const showPassword = ref(false);
@@ -174,6 +178,8 @@ const isLoading = ref(false);
 const isSendingCode = ref(false);
 const isResettingPassword = ref(false);
 const codeSent = ref(false);
+const resetCodeCountdown = ref(0);
+let resetCodeTimer = null;
 
 const form = reactive({
   email: "",
@@ -219,6 +225,36 @@ const passwordConfirmed = computed(() => {
   );
 });
 
+const startResetCodeCountdown = () => {
+  resetCodeCountdown.value = 60;
+
+  if (resetCodeTimer) {
+    clearInterval(resetCodeTimer);
+  }
+
+  resetCodeTimer = setInterval(() => {
+    resetCodeCountdown.value -= 1;
+
+    if (resetCodeCountdown.value <= 0) {
+      clearInterval(resetCodeTimer);
+      resetCodeTimer = null;
+    }
+  }, 1000);
+};
+
+const stopResetCodeCountdown = () => {
+  resetCodeCountdown.value = 0;
+
+  if (resetCodeTimer) {
+    clearInterval(resetCodeTimer);
+    resetCodeTimer = null;
+  }
+};
+
+onUnmounted(() => {
+  stopResetCodeCountdown();
+});
+
 const goForgotPassword = () => {
   currentView.value = "forgot";
   errorMsg.value = "";
@@ -233,6 +269,10 @@ const backToLogin = () => {
 const sendResetCode = async () => {
   forgotErrorMsg.value = "";
 
+  if (isSendingCode.value || resetCodeCountdown.value > 0) {
+    return;
+  }
+
   if (!forgotForm.email) {
     forgotErrorMsg.value = "請先輸入電子信箱";
     return;
@@ -246,12 +286,7 @@ const sendResetCode = async () => {
   isSendingCode.value = true;
 
   try {
-    const res = await axios.post(
-      "http://localhost:8080/api/members/password/forgot",
-      {
-        email: forgotForm.email,
-      },
-    );
+    const res = await forgotPassword(forgotForm.email);
 
     await Swal.fire({
       icon: "success",
@@ -262,6 +297,7 @@ const sendResetCode = async () => {
 
     codeSent.value = true;
     forgotForm.verifyCode = "";
+    startResetCodeCountdown();
   } catch (err) {
     forgotErrorMsg.value = err.response?.data?.message || "寄送驗證碼失敗";
   } finally {
@@ -300,14 +336,11 @@ const handleResetPassword = async () => {
   isResettingPassword.value = true;
 
   try {
-    const res = await axios.post(
-      "http://localhost:8080/api/members/password/reset",
-      {
-        email: forgotForm.email,
-        code: forgotForm.verifyCode,
-        newPassword: forgotForm.newPassword,
-      },
-    );
+    const res = await resetPassword({
+      email: forgotForm.email,
+      code: forgotForm.verifyCode,
+      newPassword: forgotForm.newPassword,
+    });
 
     await Swal.fire({
       icon: "success",
@@ -320,6 +353,7 @@ const handleResetPassword = async () => {
     forgotForm.newPassword = "";
     forgotForm.confirmPassword = "";
     codeSent.value = false;
+    stopResetCodeCountdown();
 
     currentView.value = "login";
     form.email = forgotForm.email;
@@ -358,14 +392,7 @@ const handleLogin = async () => {
       confirmButtonColor: "#d9a372",
     });
 
-    const staffRoles = ["ADMIN", "MANAGER", "STAFF"];
-    const redirectPath = typeof route.query.redirect === "string" ? route.query.redirect : "";
-    const defaultPath = staffRoles.includes(data.roleName) ? "/admin/home" : "/";
-    const targetPath = redirectPath.startsWith("/admin") && staffRoles.includes(data.roleName)
-      ? redirectPath
-      : defaultPath;
-
-    router.push(targetPath);
+    router.push("/");
   } catch (err) {
     errorMsg.value = err.response?.data?.message || "登入失敗，請稍後再試";
   } finally {
@@ -501,7 +528,9 @@ input:focus {
 }
 
 .verify-btn:disabled {
-  opacity: 0.65;
+  background: #c8c8c8;
+  color: #ffffff;
+  opacity: 0.8;
   cursor: not-allowed;
 }
 

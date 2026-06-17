@@ -48,13 +48,15 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/members/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/members/password/forgot").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/members/password/reset").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/members/test-mail").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/members/email/send-code").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/members/email/verify-code").permitAll()
 
                         // ===== 前台門市查詢（公開）=====
                         .requestMatchers("/api/stores/**").permitAll()
 
                         // ===== 會員路由（需要登入，CUSTOMER 角色）=====
                         .requestMatchers(HttpMethod.GET, "/api/members/me").hasAuthority("ROLE_CUSTOMER")
+                        .requestMatchers(HttpMethod.GET, "/api/members/me/points/**").hasAuthority("ROLE_CUSTOMER")
                         .requestMatchers(HttpMethod.PUT, "/api/members/me").hasAuthority("ROLE_CUSTOMER")
                         .requestMatchers(HttpMethod.PUT, "/api/members/me/password").hasAuthority("ROLE_CUSTOMER")
                         .requestMatchers(HttpMethod.DELETE, "/api/members/me").hasAuthority("ROLE_CUSTOMER")

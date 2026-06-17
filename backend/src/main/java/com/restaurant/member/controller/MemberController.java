@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import com.restaurant.member.service.AuthService;
 
 @RestController
 @RequestMapping("/api/members")
@@ -18,8 +17,6 @@ import com.restaurant.member.service.AuthService;
 public class MemberController {
 
     private final UserService userService;
-    private final AuthService authService;
-
     /**
      * 查詢自己的個人資料
      * GET /api/members/me
@@ -63,19 +60,6 @@ public class MemberController {
     public ResponseEntity<ApiResponse<Void>> deleteAccount() {
         userService.deleteAccount(getCurrentUserId());
         return ResponseEntity.ok(ApiResponse.success("帳號已註銷"));
-    }
-
-    @GetMapping("/test-mail")
-    public String testMail() {
-
-        System.out.println("===== TEST MAIL START =====");
-
-        authService.sendEmailVerificationCode(
-                "xeriof81535@gmail.com");
-
-        System.out.println("===== TEST MAIL END =====");
-
-        return "Mail Sent";
     }
 
     /**
