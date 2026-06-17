@@ -438,7 +438,7 @@ const goReservation = (store) => {
 const goOrder = (store) => {
   router.push({
     name: "CustomerOrder",
-    query: { storeId: store.storeId, storeName: store.storeName },
+    query: { storeId: store.storeId, storeName: store.storeName, orderType: "TAKEOUT" },
   });
 };
 
