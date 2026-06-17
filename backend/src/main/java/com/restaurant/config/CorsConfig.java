@@ -16,10 +16,7 @@ public class CorsConfig {
         CorsConfiguration config = new CorsConfiguration();
         
         // 允許前端開發伺服器的來源
-        config.setAllowedOrigins(List.of(
-            "http://localhost:5173",  // Vite 預設 port
-            "http://localhost:3000"   // 備用
-        ));
+        config.setAllowedOriginPatterns(List.of("*"));
         
         // 允許的 HTTP 方法
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
@@ -31,7 +28,7 @@ public class CorsConfig {
         config.setAllowCredentials(true);
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/**", config);
+       source.registerCorsConfiguration("/**", config);
         
         return new CorsFilter(source);
     }

@@ -3,14 +3,18 @@ package com.restaurant.order.entity;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.restaurant.member.entity.User;
+import com.restaurant.store.entity.Store;
+import com.restaurant.store.entity.TableInfo;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-// import jakarta.persistence.FetchType;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-// import jakarta.persistence.JoinColumn;
-// import jakarta.persistence.ManyToOne;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -29,17 +33,30 @@ public class Order {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    // 之後這四個column 要拿掉換關聯
     @Column(name = "order_id")
     private Long orderId;
 
-    @Column(name = "user_id")
-    private Long userId;
+    // @Column(name = "user_id")
+    // private Long userId;
 
-    @Column(name = "store_id")
-    private Long storeId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
 
-    @Column(name = "table_id")
-    private Long tableId;
+    // @Column(name = "store_id")
+    // private Long storeId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "store_id")
+    private Store store;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "table_id")
+    private TableInfo table;
+    // @Column(name = "table_id")
+    // private Long tableId;
 
     @Column(name = "reservation_id")
     private Long reservationId;
@@ -61,6 +78,12 @@ public class Order {
 
     @Column(name = "status", length = 20)
     private String status;
+
+    @Column(name = "invoice_type", length = 30)
+    private String invoiceType;
+
+    @Column(name = "carrier_number", length = 20)
+    private String carrierNumber;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
