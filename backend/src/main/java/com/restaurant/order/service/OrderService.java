@@ -34,8 +34,6 @@ public class OrderService {
 
         private final PaymentRepository paymentRepository;
 
-        private final PaymentService paymentService;
-
         private final UserRepository userRepository;
 
         private final StoreRepository storeRepository;
@@ -47,7 +45,6 @@ public class OrderService {
         OrderService(OrderRepository orderRepository,
                         OrderItemRepository orderItemRepository,
                         PaymentRepository paymentRepository,
-                        PaymentService paymentService,
                         UserRepository userRepository,
                         StoreRepository storeRepository,
                         TableInfoRepository tableInfoRepository,
@@ -55,7 +52,6 @@ public class OrderService {
                 this.orderRepository = orderRepository;
                 this.orderItemRepository = orderItemRepository;
                 this.paymentRepository = paymentRepository;
-                this.paymentService = paymentService;
                 this.userRepository = userRepository;
                 this.storeRepository = storeRepository;
                 this.tableInfoRepository = tableInfoRepository;

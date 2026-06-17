@@ -18,9 +18,6 @@ import AdminStore from "@/views/admin/store/store.vue";
 import CustomerMenu from "@/views/customer/menu/menu.vue";
 
 import CustomerOrder from "@/views/customer/order/order.vue";
-import CreditCardView from "@/views/customer/order/CreditCardView.vue";
-import LinePayView from "@/views/customer/order/LinePayView.vue";
-import PaymentSuccessView from "@/views/customer/order/payment/PaymentSuccessView.vue";
 
 import CustomerStore from "@/views/customer/store/store.vue";
 
@@ -79,21 +76,6 @@ const routers = [
         component: () => import("@/views/customer/member/profile.vue"),
       },
     ],
-  },
-  {
-    path: "/payment/linepay/:orderId",
-    name: "linepay",
-    component: LinePayView,
-  },
-  {
-    path: "/payment/card/:orderId",
-    name: "creditcard",
-    component: CreditCardView,
-  },
-  {
-    path: "/payment-success",
-    name: "PaymentSuccess",
-    component: PaymentSuccessView,
   },
   {
     path: "/admin",

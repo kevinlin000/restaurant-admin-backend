@@ -1,174 +1,347 @@
 <script setup>
-import { ref, computed as vueComputed, onMounted } from 'vue'
+import { ref, computed as vueComputed, onMounted, onUnmounted, watch } from 'vue'
+import axios from 'axios'
 
-// 1. 準備裝從 Java 運過來的美味菜色盒子
+// 🤝 引進 Order 組同學提供的本機圖片
+import tofuImg from "@/assets/images/tofu.jpg";
+import seafoodSaladImg from "@/assets/images/seafood-salad.jpg";
+import sashimiImg from "@/assets/images/sashimi.jpg";
+import salmonSashimiImg from "@/assets/images/salmon-sashimi.jpg";
+import sushiImg from "@/assets/images/sushi.jpg";
+import aburiSalmonSushiImg from "@/assets/images/aburi-salmon-sushi.jpg";
+import sukiyakiImg from "@/assets/images/sukiyaki.jpg";
+import tempuraImg from "@/assets/images/tempura.jpg";
+import matchaDessertImg from "@/assets/images/matcha-dessert.jpg";
+import caramelPuddingImg from "@/assets/images/caramel-pudding.jpg";
+import calpisImg from "@/assets/images/calpis.jpg";
+import japaneseTeaImg from "@/assets/images/japanese-tea.jpg";
+import asahiBeerImg from "@/assets/images/asahi-beer.jpg";
+import japaneseSakeImg from "@/assets/images/japanese-sake.jpg";
+
+// 💡 核心對齊：Java 後端基準網址
+const BACKEND_URL = 'http://localhost:8080'
+
+// 🏪 1. 門市控制中心
+const currentStoreId = ref(null)
+const storeList = ref([])
+
+// 🗂️ 2. 動態分類控制中心
+const categoryList = ref([])
+const currentCategory = ref(null) 
+
+// 🍱 3. 菜單控制中心
 const menuItems = ref([])
-const currentCategory = ref(1)
 
-// 🌟 2. 幻燈片大圖形象數據（模擬彌生軒的高級宣傳大圖）
+// 🌟 4. 幻燈片滾動漸隱控制（終極極慢版）
+const heroOpacity = ref(1)
+
+const handleScroll = () => {
+  const scrollTop = window.scrollY
+  // 🎯 完美留白閾值：滑動到 1000px 內大圖才會徹底變透明
+  const maxScroll = 1000 
+  if (scrollTop <= maxScroll) {
+    heroOpacity.value = 1 - (scrollTop / maxScroll)
+  } else {
+    heroOpacity.value = 0
+  }
+}
+
+// 🎯 智慧型本機圖片自動對應管線
+const getMenuItemImage = (item) => {
+  if (item.imageUrl && (item.imageUrl.startsWith('http://') || item.imageUrl.startsWith('https://'))) {
+    return item.imageUrl;
+  }
+  const name = item.itemName || '';
+  if (name.includes('胡麻豆腐')) return tofuImg;
+  if (name.includes('海鮮沙拉')) return seafoodSaladImg;
+  if (name.includes('綜合生魚片')) return sashimiImg;
+  if (name.includes('鮭魚刺身')) return salmonSashimiImg;
+  if (name.includes('壽司盛合')) return sushiImg;
+  if (name.includes('炙燒鮭魚')) return aburiSalmonSushiImg;
+  if (name.includes('和牛壽喜燒') || name.includes('壽喜燒')) return sukiyakiImg;
+  if (name.includes('天婦羅')) return tempuraImg;
+  if (name.includes('抹茶')) return matchaDessertImg;
+  if (name.includes('布丁') || name.includes('焦糖')) return caramelPuddingImg;
+  if (name.includes('可爾必思')) return calpisImg;
+  if (name.includes('日式綠茶') || name.includes('茶')) return japaneseTeaImg;
+  if (name.includes('生啤酒') || name.includes('Asahi')) return asahiBeerImg;
+  if (name.includes('清酒') || name.includes('吟釀')) return japaneseSakeImg;
+  return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80';
+}
+
+// 🌟 智慧分類小圖標字典（8種不重複）
+const getCategoryIcon = (categoryName) => {
+  if (!categoryName) return '🏮';
+  if (categoryName.includes('前菜') || categoryName.includes('沙拉')) return '🥗';
+  if (categoryName.includes('刺身') || categoryName.includes('生魚片')) return '🐟';
+  if (categoryName.includes('壽司') || categoryName.includes('軍艦')) return '🍣';
+  if (categoryName.includes('熱食') || categoryName.includes('熟食')) return '🍳';
+  if (categoryName.includes('炸物') || categoryName.includes('揚物')) return '🍤';
+  if (categoryName.includes('甜點') || categoryName.includes('甘味')) return '🍰';
+  if (categoryName.includes('飲料') || categoryName.includes('水')) return '🥤';
+  if (categoryName.includes('酒') || categoryName.includes('微醺')) return '🍺';
+  if (categoryName.includes('定食')) return '🍱';
+  return '🏮';
+}
+
+// 🌟 幻燈片大圖形象數據
 const carouselImages = ref([
   { id: 1, url: 'https://images.unsplash.com/photo-1580822184713-fc5400e7fe10?auto=format&fit=crop&w=1200&q=80', title: '日式職人．感動嚴選', desc: '源自日本的美味，現點現做，為您奉上最溫暖的精緻定食' },
   { id: 3, url: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80', title: '讚岐傳承．彈牙美味', desc: '純手工研磨湯頭與究極麵體，體驗醇厚純粹的日式風味' },
   { id: 2, url: 'https://images.unsplash.com/photo-1617196034796-73dfa7b1fd56?auto=format&fit=crop&w=1200&q=80', title: '經典和風．極致饗宴', desc: '嚴選頂級食材，搭配主廚特調醬汁，每一口都是道地和風魂' }
 ])
 
-// 3. 網頁開機立刻發動接線
-onMounted(() => {
-  // 📥 A. 去 Java 後端撈菜單數據
-  fetch('http://localhost:8080/api/menu-items')
-    .then(response => response.json())
-    .then(res => {
-      const rawData = res.data || res
-      if (Array.isArray(rawData)) {
-        menuItems.value = rawData
-        console.log('前台成功連線！已裝載菜單數量：', menuItems.value.length)
+// 🔄 抓取後端真實門市清單
+const fetchStores = async () => {
+  try {
+    const response = await axios.get(`${BACKEND_URL}/api/menu-component/stores`)
+    const rawStores = response.data.data || response.data
+    if (Array.isArray(rawStores) && rawStores.length > 0) {
+      storeList.value = rawStores
+      if (!currentStoreId.value) {
+        currentStoreId.value = storeList.value[0].id
       }
-    })
-    .catch(error => console.error('前台敲門連線失敗：', error))
+    }
+  } catch (error) {
+    console.error('⚠️ 撈取門市失敗！', error)
+  }
+}
 
-  // 🎯 B.大圖自動輪播點火核心！
-  // 用原生 JS 抓住我們 template 裡面的 carousel 盒子，強制初始化並啟動自動輪播
+// 🗂️ 抓取所有真實分類
+const fetchCategories = async () => {
+  try {
+    let response;
+    try { response = await axios.get(`${BACKEND_URL}/api/menu-component/categories`) } catch (e) {
+      response = await axios.get(`${BACKEND_URL}/api/menu-categories`)
+    }
+    const rawCategories = response.data.data || response.data
+    if (Array.isArray(rawCategories) && rawCategories.length > 0) {
+      categoryList.value = rawCategories.map(cat => ({
+        id: cat.id || cat.categoryId,
+        name: cat.name || cat.categoryName
+      }))
+      if (categoryList.value.length > 0 && !currentCategory.value) {
+        currentCategory.value = categoryList.value[0].id
+      }
+    }
+  } catch (error) {
+    console.error('⚠️ 撈取分類失敗！將啟用保底分類', error)
+    categoryList.value = [
+      { id: 1, name: '精緻定食系列' }, { id: 2, name: '經典和風丼飯' },
+      { id: 3, name: '讚岐烏龍/麵類' }, { id: 4, name: '職人單品/壽司' }
+    ]
+    currentCategory.value = 1;
+  }
+}
+
+// 🍜 根據選擇的分店 ID，拉取專屬動態菜單
+const fetchMenuData = async (storeId) => {
+  if (!storeId) return
+  try {
+    const response = await axios.get(`${BACKEND_URL}/api/menu-items/store/${storeId}`)
+    menuItems.value = response.data.data || response.data
+  } catch (error) {
+    console.error(`⚠️ 拉取分店菜單失敗！`, error)
+    menuItems.value = [] 
+  }
+}
+
+const handleStoreChange = () => { fetchMenuData(currentStoreId.value) }
+
+watch(currentStoreId, (newStoreId) => { if (newStoreId) { fetchMenuData(newStoreId) } })
+
+const filteredMenu = vueComputed(() => {
+  if (!Array.isArray(menuItems.value)) return []
+  return menuItems.value.filter(item => Number(item.categoryId) === Number(currentCategory.value))
+})
+
+const addToCart = (item) => { alert(`🎉 成功將【${item.itemName}】加入購物車！`) }
+
+onMounted(async () => {
+  await fetchStores()
+  await fetchCategories()
+  if (currentStoreId.value) { await fetchMenuData(currentStoreId.value) }
+
+  window.addEventListener('scroll', handleScroll)
+
+  // 🔥 點火機制強化：確保 Bootstrap 輪播在所有 DOM 渲染後才啟動
   setTimeout(() => {
     const carouselEl = document.getElementById('yayoiHeroCarousel')
     if (carouselEl && window.bootstrap) {
-      // 強制設定：每 4000 毫秒（4秒）換一張圖，並且滑鼠移過去時不要暫停（ride: 'carousel'）
-      new window.bootstrap.Carousel(carouselEl, {
-        interval: 4000,
-        ride: 'carousel',
-        wrap: true
+      new window.bootstrap.Carousel(carouselEl, { 
+        interval: 3500, 
+        ride: 'carousel', 
+        pause: 'hover',
+        wrap: true 
       })
-      console.log('🚀 彌生軒職人大圖自動輪播系統：成功點火！')
     }
-  }, 500) // 延遲半秒等 DOM 完全長好，最安全穩健
+  }, 600)
 })
 
-// 🚀 精準對齊後台修改好的純布林值 isActive 規格！
-const filteredMenu = vueComputed(() => {
-  return menuItems.value.filter(item => {
-    return item.categoryId === currentCategory.value &&
-           (item.isActive === true || item.isActive === 'true' || item.isActive == 1)
-  })
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
 })
 </script>
 
 <template>
-  <div class="overflow-visible bg-neutral-50" style="min-height: 100vh; background-color: #fafafa;">
-
+  <div class="overflow-visible" style="min-height: 100vh; background-color: #fafafa;">
+    
     <div style="height: 90px; width: 100%;"></div>
 
-    <div id="yayoiHeroCarousel" class="carousel slide carousel-fade shadow-sm mb-5" data-bs-ride="carousel" style="border-radius: 12px; overflow: hidden;">
-      <div class="carousel-indicators">
+    <div 
+      id="yayoiHeroCarousel" 
+      class="carousel slide carousel-fade shadow-sm" 
+      data-bs-ride="carousel"
+      style="position: fixed; top: 90px; left: 0; width: 100%; height: 420px; z-index: 1; overflow: hidden; will-change: opacity; transition: opacity 0.05s linear;"
+      :style="{ opacity: heroOpacity }"
+    >
+      <div class="carousel-indicators" style="z-index: 15;">
         <button type="button" data-bs-target="#yayoiHeroCarousel" data-bs-slide-to="0" class="active"></button>
         <button type="button" data-bs-target="#yayoiHeroCarousel" data-bs-slide-to="1"></button>
         <button type="button" data-bs-target="#yayoiHeroCarousel" data-bs-slide-to="2"></button>
       </div>
-
-      <div class="carousel-inner">
-        <div v-for="(slide, index) in carouselImages" :key="slide.id" :class="['carousel-item', index === 0 ? 'active' : '']" data-bs-interval="4000">
-          <div class="position-relative" style="height: 400px;">
-            <img :src="slide.url" class="d-block w-100 h-100" style="object-fit: cover; filter: brightness(0.75);" :alt="slide.title">
-            <div class="carousel-caption d-none d-md-block text-start" style="left: 8%; bottom: 15%; z-index: 10;">
-              <h2 class="display-6 fw-bold text-white mb-2" style="letter-spacing: 2px; text-shadow: 1px 1px 8px rgba(0,0,0,0.6);">{{ slide.title }}</h2>
-              <p class="fs-5 text-white-50 fw-light mb-0" style="text-shadow: 1px 1px 5px rgba(0,0,0,0.5);">{{ slide.desc }}</p>
+      <div class="carousel-inner h-100">
+        <div v-for="(slide, index) in carouselImages" :key="slide.id" :class="['carousel-item h-100', index === 0 ? 'active' : '']">
+          <div class="position-relative h-100 w-100">
+            <img :src="slide.url" class="d-block w-100 h-100" style="object-fit: cover; filter: brightness(0.65);" :alt="slide.title">
+            
+            <div class="carousel-caption text-start" style="left: 8%; bottom: 25%; z-index: 20; max-width: 65%;">
+              <h2 class="fw-bold text-white mb-2" style="font-size: 2.2rem; letter-spacing: 3px; text-shadow: 2px 4px 10px rgba(0,0,0,0.85), 0 0 6px rgba(0,0,0,0.6);">
+                {{ slide.title }}
+              </h2>
+              <p class="fs-5 text-white-50 fw-light mb-0" style="font-size: 1.2rem; letter-spacing: 1.5px; color: rgba(255, 255, 255, 0.75) !important; text-shadow: 1px 2px 8px rgba(0,0,0,0.85);">
+                {{ slide.desc }}
+              </p>
             </div>
           </div>
         </div>
       </div>
-
-      <button class="carousel-control-prev" type="button" data-bs-target="#yayoiHeroCarousel" data-bs-slide="prev">
-        <span class="carousel-control-prev-icon"></span>
-      </button>
-      <button class="carousel-control-next" type="button" data-bs-target="#yayoiHeroCarousel" data-bs-slide="next">
-        <span class="carousel-control-next-icon"></span>
-      </button>
     </div>
 
-    <div class="container px-2 py-2">
-      <div class="row g-4">
-
-        <div class="col-md-3 mb-4">
-          <div class="list-group shadow-sm sticky-top" style="top: 110px; z-index: 90; border-radius: 8px; overflow: hidden;">
-            <button @click="currentCategory = 1" :class="['list-group-item list-group-item-action py-3 fw-bold border-light-subtle transition-all', currentCategory === 1 ? 'yayoi-active' : 'text-secondary']">🥗 精選日式前菜</button>
-            <button @click="currentCategory = 2" :class="['list-group-item list-group-item-action py-3 fw-bold border-light-subtle transition-all', currentCategory === 2 ? 'yayoi-active' : 'text-secondary']">🐟 旬味生魚片系列</button>
-            <button @click="currentCategory = 3" :class="['list-group-item list-group-item-action py-3 fw-bold border-light-subtle transition-all', currentCategory === 3 ? 'yayoi-active' : 'text-secondary']">🍣 職人握壽司盛合</button>
-            <button @click="currentCategory = 4" :class="['list-group-item list-group-item-action py-3 fw-bold border-light-subtle transition-all', currentCategory === 4 ? 'yayoi-active' : 'text-secondary']">🍳 主廚熱騰騰熟食</button>
-            <button @click="currentCategory = 6" :class="['list-group-item list-group-item-action py-3 fw-bold border-light-subtle transition-all', currentCategory === 6 ? 'yayoi-active' : 'text-secondary']">🍰 職人手作甜點</button>
-            <button @click="currentCategory = 7" :class="['list-group-item list-group-item-action py-3 fw-bold border-light-subtle transition-all', currentCategory === 7 ? 'yayoi-active' : 'text-secondary']">🥤 特調清爽飲料</button>
-            <button @click="currentCategory = 8" :class="['list-group-item list-group-item-action py-3 fw-bold border-light-subtle transition-all', currentCategory === 8 ? 'yayoi-active' : 'text-secondary']">🍺 微醺日式酒水</button>
-          </div>
-        </div>
-
-        <div class="col-md-9">
-          <div class="row row-cols-1 row-cols-md-2 g-4">
-            <div class="col" v-for="item in filteredMenu" :key="item.id">
-              <div class="card h-100 border-0 shadow-sm overflow-hidden hover-shadow bg-white transition-all" style="border-radius: 12px;">
-                <div class="position-relative overflow-hidden" style="height: 240px;">
-                  <img :src="item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80'" class="card-img-top h-100 w-100 transition-scale" style="object-fit: cover;" :alt="item.itemName">
+    <div class="main-content-wrapper position-relative" style="z-index: 10; background-color: #fafafa; margin-top: 420px; padding-top: 40px; padding-bottom: 100px;">
+      <div class="container px-2">
+        <div class="row g-4">
+          
+          <div class="col-md-3 mb-4">
+            <div class="sticky-top" style="top: 110px; z-index: 90;">
+              <div class="card shadow-sm mb-4 border-0" style="border-radius: 8px;">
+                <div class="card-body p-3 bg-white" style="border-radius: 8px;">
+                  <label class="form-label fw-bold text-secondary small mb-2">📍 請選擇您要查看的門市：</label>
+                  <select v-model="currentStoreId" @change="handleStoreChange" class="form-select border-2 fw-bold select-store-style">
+                    <option v-for="store in storeList" :key="store.id" :value="store.id">{{ store.name }}</option>
+                  </select>
                 </div>
+              </div>
 
-                <div class="card-body d-flex flex-column p-4">
-                  <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h5 class="card-title fw-bold mb-0" style="color: #374151;">{{ item.itemName }}</h5>
-                    <span class="fs-4 fw-bold" style="color: #b45309;">${{ item.price }}</span>
-                  </div>
-
-                  <p class="card-text small flex-grow-1 mb-3" style="line-height: 1.6; color: #6b7280;">{{ item.description || '精選道地食材，主廚極致匠心巨作，為您帶來最純粹的日式味蕾饗宴。' }}</p>
-
-                  <div v-if="item.allergenInfo" class="alert alert-warning py-1 px-2 mb-3 border-0 rounded-2 d-flex align-items-center bg-opacity-10" style="font-size: 0.75rem; color: #9a3412; background-color: #ffedd5;">
-                    <i class="fa-solid fa-triangle-exclamation me-1"></i> 過敏原提示：{{ item.allergenInfo }}
-                  </div>
-
-                  <button class="btn w-100 fw-bold mt-auto py-2 text-white border-0 shadow-sm yayoi-btn">
-                    <i class="fa-solid fa-cart-plus me-1"></i>加入購物車
-                  </button>
-                </div>
+              <div class="list-group shadow-sm border-0 bg-white" style="border-radius: 12px; overflow: hidden;">
+                <button 
+                  v-for="cat in categoryList" 
+                  :key="cat.id"
+                  @click="currentCategory = cat.id" 
+                  :class="['list-group-item list-group-item-action py-3 px-4 fw-bold border-0 border-bottom border-light-subtle d-flex align-items-center transition-all category-btn', currentCategory === cat.id ? 'yayoi-active' : 'text-secondary bg-white']"
+                >
+                  <span class="fs-5 me-3 icon-wrapper">{{ getCategoryIcon(cat.name) }}</span>
+                  <span class="category-text-label">{{ cat.name }}</span>
+                </button>
               </div>
             </div>
           </div>
 
-          <div v-if="filteredMenu.length === 0" class="text-center py-5 text-muted border border-dashed rounded-3 bg-white shadow-sm mt-2">
-            <div class="fs-1 mb-2">👨‍🍳</div>
-            <div class="fw-bold" style="color: #4b5563;">該系列品項正由主廚精製籌備中</div>
-            <div class="small text-muted mt-1">敬請期待！</div>
+          <div class="col-md-9">
+            <div class="row row-cols-1 row-cols-md-2 g-4">
+              <div class="col" v-for="item in filteredMenu" :key="item.id">
+                <div class="card h-100 border-0 shadow-sm overflow-hidden hover-shadow bg-white transition-all" style="border-radius: 12px;">
+                  <div class="position-relative overflow-hidden" style="height: 240px;">
+                    <img :src="getMenuItemImage(item)" class="card-img-top h-100 w-100 transition-scale" style="object-fit: cover;" :alt="item.itemName">
+                  </div>
+                  <div class="card-body d-flex flex-column p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <h5 class="card-title fw-bold mb-0" style="color: #374151;">{{ item.itemName }}</h5>
+                      <span class="fs-4 fw-bold" style="color: #b45309;">
+                        ${{ item.finalPrice || item.price || 0 }}
+                      </span>
+                    </div>
+                    <p class="card-text small flex-grow-1 mb-3" style="line-height: 1.6; color: #6b7280;">{{ item.description }}</p>
+                    <div v-if="item.allergenInfo" class="alert alert-warning py-1 px-2 mb-3 border-0 rounded-2 d-flex align-items-center bg-opacity-10" style="font-size: 0.75rem; color: #9a3412; background-color: #ffedd5;">
+                      ⚠️ 過敏原提示：{{ item.allergenInfo }}
+                    </div>
+                    <button v-if="item.isSelectable !== false" @click="addToCart(item)" class="btn w-100 fw-bold mt-auto py-2 text-white border-0 shadow-sm yayoi-btn">
+                      <i class="fa-solid fa-cart-plus me-1"></i>加入購物車
+                    </button>
+                    <button v-else class="btn btn-secondary w-100 fw-bold mt-auto py-2 border-0" style="border-radius: 6px; cursor: not-allowed;" disabled>
+                      ❌ 已售罄 / 暫不供應
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div v-if="filteredMenu.length === 0" class="text-center py-5 text-muted border border-dashed rounded-3 bg-white shadow-sm mt-2">
+              <div class="fs-1 mb-2">👨‍🍳</div>
+              <div class="fw-bold" style="color: #4b5563;">該門市此系列品項正由主廚精製籌備中</div>
+              <div class="small text-muted mt-1">敬請期待或切換其他分店！</div>
+            </div>
           </div>
-        </div>
 
+        </div>
       </div>
     </div>
+
   </div>
 </template>
 
 <style scoped>
-/* 🌟 日式職人美學樣式 */
+/* ✨ 全域核心動態特效 */
 .transition-all { transition: all 0.3s ease; }
 .transition-scale { transition: transform 0.5s ease; }
 
-/* 卡片懸浮滑順放大與長陰影效果 */
-.hover-shadow:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 12px 20px rgba(0,0,0,0.06) !important;
+/* 🍱 右側餐點卡片懸停：優雅上浮與細緻陰影 */
+.hover-shadow:hover { 
+  transform: translateY(-6px); 
+  box-shadow: 0 12px 20px rgba(0,0,0,0.06) !important; 
 }
-.hover-shadow:hover .transition-scale {
-  transform: scale(1.04);
+.hover-shadow:hover .transition-scale { transform: scale(1.04); }
+
+/* 🗂️ 左側分類按鈕：融合日系極致消炭色美學 */
+.category-btn { 
+  letter-spacing: 0.8px;                 /* 💡 保持日式排版的空氣感字距 */
+  color: #4b5563 !important;             /* 💡 升級：深炭灰，內斂、有重量，絕非刺眼死黑 */
+  font-weight: 650 !important;           /* 💡 升級：優化字體扎實度，清晰好讀 */
+  transition: all 0.25s ease-in-out;
 }
 
-/* 導覽列激活：竹木暖棕與莫蘭迪暮紫的完美合體 */
+/* 🖱️ 分類按鈕滑鼠懸停（Hover）：清爽的琥珀白與暖棕互動 */
+.category-btn:hover:not(.yayoi-active) { 
+  background-color: #fff7ed !important;  
+  color: #b45309 !important;             
+}
+
+/* 🎯 分類按鈕選中狀態：高質感竹木暖棕漸層（文字純白利落） */
 .yayoi-active {
   background-color: #b45309 !important;
   background-image: linear-gradient(135deg, #cc7d24 0%, #b45309 100%) !important;
   color: #ffffff !important;
-  border-color: #b45309 !important;
+  font-weight: 700 !important;
 }
 
-/* 購物車按鈕職人橘 */
+/* 💡 文字標籤防線：確保完美繼承消炭色 */
+.category-text-label {
+  color: inherit;                        
+}
+
+/* 🍣 小 Icon 特效：滑鼠指過去會生動地放大歪頭 */
+.icon-wrapper { display: inline-block; transition: transform 0.2s ease; }
+.category-btn:hover .icon-wrapper { transform: scale(1.15) rotate(5deg); }
+
+/* 🛒 橘色動態購物車按鈕 */
 .yayoi-btn {
   background-color: #ea580c;
   background-image: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   border-radius: 6px;
-  transition: opacity 0.2s;
 }
-.yayoi-btn:hover {
-  opacity: 0.9;
-  color: #ffffff;
-}
+.yayoi-btn:hover { opacity: 0.9; color: #ffffff; }
+
+/* 🏪 門市下拉選單深色質感邊框 */
+.select-store-style { border-color: #4a3728; cursor: pointer; }
+.select-store-style:focus { border-color: #b45309; box-shadow: 0 0 0 0.25rem rgba(180, 83, 9, 0.25); }
 </style>
