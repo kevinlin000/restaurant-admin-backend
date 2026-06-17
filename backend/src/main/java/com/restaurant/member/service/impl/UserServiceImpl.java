@@ -56,9 +56,7 @@ public class UserServiceImpl implements UserService {
         if (request.getPhone() != null && !request.getPhone().isBlank()) {
             user.setPhone(request.getPhone());
         }
-        if (request.getBirthday() != null) {
-            user.setBirthday(request.getBirthday());
-        }
+
         userRepository.save(user);
 
         return toMemberProfileResponse(user, profile);

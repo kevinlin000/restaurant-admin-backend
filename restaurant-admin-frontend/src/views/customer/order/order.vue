@@ -1,9 +1,11 @@
 <script setup>
 // =========================
 // Vue
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import axios from "axios";
-
+import { useRouter } from "vue-router";
+//Router
+const router = useRouter();
 
 // =========================
 // Images
@@ -46,7 +48,7 @@ const orderForm = ref({
     userId: 1,
     storeId: 1,
     tableId: 1,
-    reservationId: 1,
+    reservationId: null,
     orderType: "DINE_IN",
     pointsUsed: 0,
 });
@@ -65,6 +67,18 @@ const customerForm = ref({
     invoiceType: "NONE",
     carrierNumber: "",
 });
+
+watch(
+    () => customerForm.value.invoiceType,
+    (newValue) => {
+        if (
+            newValue === "MOBILE_BARCODE" &&
+            !customerForm.value.carrierNumber
+        ) {
+            customerForm.value.carrierNumber = "/";
+        }
+    }
+);
 
 // =========================
 // Menu Data
@@ -85,7 +99,7 @@ const menuItems = ref([
         categoryId: 1,
         itemName: "海鮮沙拉",
         description: "新鮮時蔬搭配鮮蝦、花枝",
-        price: 180,
+        price: 120,
         imageUrl: seafoodSaladImg,
         status: "AVAILABLE",
         allergenInfo: "含甲殼類",
@@ -105,7 +119,7 @@ const menuItems = ref([
         categoryId: 2,
         itemName: "鮭魚刺身",
         description: "挪威鮭魚薄切",
-        price: 320,
+        price: 420,
         imageUrl: salmonSashimiImg,
         status: "AVAILABLE",
         allergenInfo: "含生食",
@@ -115,7 +129,7 @@ const menuItems = ref([
         categoryId: 3,
         itemName: "握壽司盛合",
         description: "主廚推薦 8 貫握壽司",
-        price: 520,
+        price: 680,
         imageUrl: sushiImg,
         status: "AVAILABLE",
         allergenInfo: "含生食",
@@ -125,7 +139,7 @@ const menuItems = ref([
         categoryId: 3,
         itemName: "炙燒鮭魚壽司",
         description: "炙燒表面焦香，入口即化",
-        price: 260,
+        price: 380,
         imageUrl: aburiSalmonSushiImg,
         status: "AVAILABLE",
         allergenInfo: "含生食",
@@ -297,6 +311,25 @@ function backToMenu() {
     step.value = "MENU";
 }
 
+function formatCarrier() {
+    let value = customerForm.value.carrierNumber;
+
+    value = value.toUpperCase();
+
+    if (!value.startsWith("/")) {
+        value = "/" + value.replace(/\//g, "");
+    }
+
+    value =
+        "/" +
+        value
+            .substring(1)
+            .replace(/[^0-9A-Z.+-]/g, "")
+            .slice(0, 7);
+
+    customerForm.value.carrierNumber = value;
+}
+
 async function submitOrder() {
     if (
         customerForm.value.invoiceType === "MOBILE_BARCODE" &&
@@ -347,6 +380,7 @@ async function submitOrder() {
         pointsUsed: orderForm.value.pointsUsed,
         invoiceType: customerForm.value.invoiceType,
         carrierNumber: customerForm.value.carrierNumber,
+        paymentMethod: customerForm.value.paymentMethod,
         items: cartItems.value.map((item) => ({
             menuItemId: item.menuItemId,
             quantity: item.quantity,
@@ -357,8 +391,29 @@ async function submitOrder() {
     console.log("送出的訂單資料：", request);
 
     const response = await axios.post("/api/orders", request);
-    console.log("後端回傳：", response.data);
+    const orderId = response.data.orderId;
 
+    // if (customerForm.value.paymentMethod === "LINE_PAY") {
+    //     router.push(`/payment/linepay/${orderId}`);
+    //     return;
+    // }
+
+    // if (customerForm.value.paymentMethod === "CREDIT_CARD") {
+    //     router.push(`/payment/card/${orderId}`);
+    //     return;
+    // }
+   
+if (customerForm.value.paymentMethod === "CREDIT_CARD") {
+    window.location.href =
+        `http://localhost:8080/api/payments/ecpay/checkout/${orderId}`;
+    return;
+}
+
+if (customerForm.value.paymentMethod === "LINE_PAY") {
+    window.location.href =
+        `http://localhost:8080/api/payments/linepay/request/${orderId}`;
+    return;
+}
     alert("訂單送出成功");
 }
 // =========================
@@ -516,10 +571,45 @@ async function submitOrder() {
                 <div class="form-card">
                     <h3>付款方式</h3>
 
-                    <label>
-                        <input type="radio" value="CASH" v-model="customerForm.paymentMethod" />
-                        現場付款
-                    </label>
+                    <div class="payment-tabs">
+                        <button type="button" :class="{ active: customerForm.paymentMethod === 'CASH' }"
+                            @click="customerForm.paymentMethod = 'CASH'">
+                            現場付款
+                        </button>
+
+                        <button type="button" :class="{ active: customerForm.paymentMethod === 'LINE_PAY' }"
+                            @click="customerForm.paymentMethod = 'LINE_PAY'">
+                            Line Pay
+                        </button>
+
+                        <button type="button" :class="{ active: customerForm.paymentMethod === 'CREDIT_CARD' }"
+                            @click="customerForm.paymentMethod = 'CREDIT_CARD'">
+                            信用卡
+                        </button>
+                    </div>
+
+                    <div v-if="customerForm.paymentMethod === 'CASH'" class="payment-box">
+                        現場付款，取餐時付款。
+                    </div>
+
+                    <div v-if="customerForm.paymentMethod === 'LINE_PAY'" class="payment-box">
+                        <p>Line Pay 掃碼付款</p>
+                        <div class="fake-qr">QR</div>
+                        <small>Demo 用：正式版會由後端金流 API 產生付款連結或 QR Code。</small>
+                    </div>
+
+                    <div v-if="customerForm.paymentMethod === 'CREDIT_CARD'" class="payment-box">
+                        <label>信用卡卡號</label>
+                        <input type="text" placeholder="**** **** **** ****" disabled />
+
+                        <label>有效期限</label>
+                        <input type="text" placeholder="MM / YY" disabled />
+
+                        <label>安全碼</label>
+                        <input type="text" placeholder="CVV" disabled />
+
+                        <small>Demo 用：正式版不可自己儲存信用卡資料，應導向綠界 / 藍新 / Line Pay 金流頁。</small>
+                    </div>
 
                     <div class="payment-total">
                         付款金額
@@ -530,18 +620,19 @@ async function submitOrder() {
                 <div class="form-card">
                     <h3>發票 / 載具</h3>
 
-                    <label>
+                    <label class="invoice-option">
                         <input type="radio" value="NONE" v-model="customerForm.invoiceType" />
                         不使用載具
                     </label>
 
-                    <label>
+                    <label class="carrier-option">
                         <input type="radio" value="MOBILE_BARCODE" v-model="customerForm.invoiceType" />
                         手機條碼載具
-                    </label>
 
-                    <input v-if="customerForm.invoiceType === 'MOBILE_BARCODE'" v-model="customerForm.carrierNumber"
-                        type="text" placeholder="/ABC1234" />
+                        <input v-if="customerForm.invoiceType === 'MOBILE_BARCODE'" v-model="customerForm.carrierNumber"
+                            @input="formatCarrier" type="text" placeholder="/ABC1234" maxlength="8"
+                            class="carrier-input" />
+                    </label>
                 </div>
 
                 <div class="form-card">
@@ -597,6 +688,64 @@ async function submitOrder() {
 </template>
 
 <style scoped>
+.payment-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.payment-tabs button {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    background: white;
+    cursor: pointer;
+}
+
+.payment-tabs button.active {
+    background: #e9ad75;
+    color: white;
+    border-color: #e9ad75;
+}
+
+.payment-box {
+    margin-top: 12px;
+    padding: 16px;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    background: #fafafa;
+}
+
+.payment-box input {
+    width: 100%;
+    margin: 6px 0 12px;
+}
+
+.fake-qr {
+    width: 140px;
+    height: 140px;
+    border: 2px solid #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin: 12px 0;
+}
+
+.invoice-option,
+.carrier-option {
+    display: grid;
+    grid-template-columns: 16px 100px 1fr;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.carrier-input {
+    flex: 1;
+    width: 100%;
+}
+
 .phone-input::placeholder {
     color: #bdbdbd;
 }

@@ -19,6 +19,4 @@ public class MemberUpdateRequest {
     @NotBlank(message = "手機號碼不能為空")
     @Pattern(regexp = "^09\\d{8}$", message = "手機號碼格式必須為 09xxxxxxxx")
     private String phone;
-
-    private LocalDate birthday;
 }

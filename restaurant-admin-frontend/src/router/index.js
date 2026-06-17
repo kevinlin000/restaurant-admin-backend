@@ -4,6 +4,7 @@ import AdminLayout from "@/layouts/AdminLayout.vue";
 import CustomerLayout from "@/layouts/CustomerLayout.vue";
 import AdminHome from "@/views/admin/Home.vue";
 import CustomerHome from "@/views/customer/Home.vue";
+
 import AdminReservatioin from "@/views/admin/reservation/Reservation.vue";
 import CustomerReservation from "@/views/customer/reservation/Reservation.vue";
 import AdminReservationList from "@/views/admin/reservation/ReservationList.vue";

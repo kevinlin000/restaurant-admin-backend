@@ -2,22 +2,19 @@ package com.restaurant.member.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-public class ResetPasswordRequest {
+public class VerifyEmailCodeRequest {
 
     @NotBlank(message = "Email 不能為空")
     @Email(message = "Email 格式不正確")
     private String email;
 
     @NotBlank(message = "驗證碼不能為空")
+    @Pattern(regexp = "^\\d{6}$", message = "驗證碼必須為 6 位數字")
     private String code;
-
-    @NotBlank(message = "新密碼不能為空")
-    @Size(min = 8, max = 20, message = "新密碼長度需為 8 到 20 個字元")
-    private String newPassword;
 }
