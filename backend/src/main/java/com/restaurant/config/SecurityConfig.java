@@ -50,6 +50,22 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/members/password/reset").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/members/test-mail").permitAll()
 
+                        // 測試-訂位頁面讀取分店資料
+                        .requestMatchers(HttpMethod.GET, "/api/stores/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/stores/nearby").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/reservations/slots/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/reservations").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/reservations/*").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/api/reservations/*").permitAll()
+                        .requestMatchers(HttpMethod.PATCH, "/api/reservations/*/reserve").permitAll()
+                        .requestMatchers(HttpMethod.DELETE, "/api/reservations/*").permitAll()
+
+                        // 測試-後台訂位與分店設定頁面。
+                        // TODO: 後台分店權限完成後，改由 JWT 判斷可管理分店，並移除 permitAll。
+                        .requestMatchers("/api/admin/stores/**").permitAll()
+                        .requestMatchers("/api/admin/reservations/**").permitAll()
+                        .requestMatchers("/api/admin/reservation-settings/**").permitAll()
+
                         // ===== 前台門市查詢（公開）=====
                         .requestMatchers("/api/stores/**").permitAll()
 

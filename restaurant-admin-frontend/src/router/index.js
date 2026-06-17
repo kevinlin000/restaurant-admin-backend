@@ -8,7 +8,8 @@ import AdminReservatioin from "@/views/admin/reservation/Reservation.vue";
 import CustomerReservation from "@/views/customer/reservation/Reservation.vue";
 import AdminReservationList from "@/views/admin/reservation/ReservationList.vue";
 import AdminReservationTable from "@/views/admin/reservation/ReservationTable.vue";
-import AdminReservationSetting from "@/views/admin/reservation/ReservationSetting.vue";
+import CustomerReservationSuccess from "@/views/customer/reservation/Reservation-success.vue";
+import AdminReservationTimeSetting from '@/views/admin/reservation/ReservationTimeSetting.vue'
 import AdminMenuCreate from "@/views/admin/menu/menu-create.vue";
 import AdminMenuEdit from "@/views/admin/menu/menu-edit.vue";
 import AdminMenuSetting from "@/views/admin/menu/menu-setting.vue";
@@ -16,8 +17,6 @@ import AdminStore from "@/views/admin/store/store.vue";
 import CustomerMenu from "@/views/customer/menu/menu.vue";
 import CustomerOrder from "@/views/customer/order/order.vue";
 import CustomerStore from "@/views/customer/store/store.vue";
-// ＊刪除(改不切頁)＊
-import CustomerReservationSuccess from "@/views/customer/reservation/Reservation-success.vue";
 // 開發時測試用，正式
 
 const routers = [
@@ -38,7 +37,7 @@ const routers = [
         component: CustomerReservation,
       },
       {
-        path: "reservation-success", // ＊刪除(改不切頁)＊
+        path: "reservation-success",
         name: "CustomerReservationSuccess",
         component: CustomerReservationSuccess,
       },
@@ -101,9 +100,9 @@ const routers = [
         component: AdminReservationTable,
       },
       {
-        path: "reservation-setting",
-        name: "AdminReservationSetting",
-        component: AdminReservationSetting,
+        path: "reservation-time-setting",
+        name: "AdminReservationTimeSetting",
+        component: AdminReservationTimeSetting
       },
       {
         path: "menu-create",
