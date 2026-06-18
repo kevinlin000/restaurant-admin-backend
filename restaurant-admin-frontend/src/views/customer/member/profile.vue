@@ -12,37 +12,39 @@
       <template v-else>
         <!-- 左側會員摘要 -->
         <aside class="member-sidebar">
-          <div class="member-name">{{ userInfo.name }}</div>
-          <div class="member-meta">
-            <span class="level-badge">{{ memberLevelText }}</span>
+          <div class="sidebar-card level-card">
+            <p class="sidebar-title">會員等級</p>
+            <div class="level-badge">{{ memberLevelText }}</div>
           </div>
 
-          <div class="side-divider"></div>
+          <div class="sidebar-card point-card">
+            <p class="sidebar-title">目前點數</p>
 
-          <div class="side-info">
-            <p class="side-label">目前點數</p>
-            <p class="side-value">{{ userInfo.pointBalance }} 點</p>
-          </div>
+            <div class="point-main">
+              <span class="point-number">{{ pointInfo.pointBalance }}</span>
+              <span class="point-unit">點</span>
+            </div>
 
-          <div class="side-info">
-            <p class="side-label">升級提醒</p>
-            <p class="side-note">{{ upgradeHint }}</p>
-          </div>
+            <p class="point-rule">{{ pointInfo.earnRuleText }}</p>
 
-          <div v-if="birthdayCountdown !== null" class="birthday-box">
-            <p v-if="birthdayCountdown === 0" class="birthday-active">
-              🎉 生日快樂！快來店領取您的生日專屬禮！
+            <p v-if="pointInfo.nextLevel" class="upgrade-note">
+              離升級{{ getLevelText(pointInfo.nextLevel) }}還差
+              <span class="highlight-point">{{
+                pointInfo.pointsToNextLevel
+              }}</span>
+              點
             </p>
-            <p v-else>
-              距離您的生日還有
-              <strong>{{ birthdayCountdown }}</strong
-              >天
-            </p>
+
+            <p v-else class="upgrade-note">您已達最高等級：鑽石卡會員</p>
           </div>
 
-          <button class="logout-link" type="button" @click="logout">
-            登出
-          </button>
+          <div class="birthday-card">
+            <div class="birthday-title">🎂 生日優惠</div>
+            <div class="birthday-text">
+              生日當月於敘日消費，<br />
+              即可獲得焦糖布丁 1 份。
+            </div>
+          </div>
         </aside>
 
         <!-- 右側內容 -->
@@ -51,17 +53,57 @@
           <template v-if="currentView === 'profile'">
             <div class="section-header">
               <h2>會員基本資料</h2>
+
+              <button
+                v-if="!isEditingProfile"
+                class="edit-profile-btn"
+                type="button"
+                @click="startEditProfile"
+              >
+                編輯資料
+              </button>
             </div>
 
             <div class="info-card">
               <div class="info-row">
                 <div class="info-label">會員姓名</div>
-                <div class="info-value">{{ userInfo.name }}</div>
+
+                <div v-if="!isEditingProfile" class="info-value">
+                  {{ userInfo.name }}
+                </div>
+
+                <div v-else class="edit-field">
+                  <input
+                    v-model.trim="profileForm.name"
+                    type="text"
+                    placeholder="請輸入姓名"
+                    maxlength="50"
+                  />
+                </div>
               </div>
 
               <div class="info-row">
                 <div class="info-label">電話</div>
-                <div class="info-value">{{ userInfo.phone }}</div>
+
+                <div v-if="!isEditingProfile" class="info-value">
+                  {{ userInfo.phone }}
+                </div>
+
+                <div v-else class="edit-field">
+                  <input
+                    v-model.trim="profileForm.phone"
+                    type="tel"
+                    placeholder="請輸入手機號碼，例如 0912345678"
+                    maxlength="10"
+                  />
+
+                  <p
+                    v-if="profileForm.phone && !isPhoneValid"
+                    class="field-error"
+                  >
+                    手機號碼格式必須為 09xxxxxxxx
+                  </p>
+                </div>
               </div>
 
               <div class="info-row">
@@ -80,11 +122,31 @@
                 <div class="info-label">密碼</div>
                 <div class="info-value password-dots">••••••••</div>
                 <button
-                  class="text-action"
+                  class="edit-profile-btn"
                   type="button"
                   @click="openPasswordView"
                 >
                   修改密碼
+                </button>
+              </div>
+
+              <div v-if="isEditingProfile" class="profile-actions">
+                <button
+                  class="cancel-profile-btn"
+                  type="button"
+                  :disabled="isSavingProfile"
+                  @click="cancelEditProfile"
+                >
+                  取消
+                </button>
+
+                <button
+                  class="save-profile-btn"
+                  type="button"
+                  :disabled="!canSubmitProfile || isSavingProfile"
+                  @click="handleUpdateProfile"
+                >
+                  {{ isSavingProfile ? "儲存中..." : "儲存修改" }}
                 </button>
               </div>
             </div>
@@ -94,7 +156,7 @@
           <template v-else>
             <div class="section-header password-header">
               <button class="back-btn" type="button" @click="backToProfile">
-                ← 返回基本資料
+                返回基本資料
               </button>
             </div>
 
@@ -193,17 +255,9 @@
 
                 <div class="password-actions">
                   <button
-                    class="clear-btn"
-                    type="button"
-                    @click="resetPasswordForm"
-                    :disabled="isChangingPassword"
-                  >
-                    清空
-                  </button>
-                  <button
                     class="submit-btn"
                     type="submit"
-                    :disabled="isChangingPassword"
+                    :disabled="!canSubmitPassword || isChangingPassword"
                   >
                     {{ isChangingPassword ? "修改中..." : "確認修改" }}
                   </button>
@@ -221,7 +275,12 @@
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import Swal from "sweetalert2";
-import { getProfile, updatePassword } from "@/api/member";
+import {
+  getPointBalance,
+  getProfile,
+  updatePassword,
+  updateProfile,
+} from "@/api/member";
 
 const router = useRouter();
 
@@ -237,6 +296,22 @@ const userInfo = ref({
   memberLevel: "BRONZE",
   pointBalance: 0,
 });
+
+const pointInfo = ref({
+  pointBalance: 0,
+  memberLevel: "BRONZE",
+  nextLevel: "SILVER",
+  pointsToNextLevel: 30,
+  earnRuleText: "每消費 $100 即可累積 1 點",
+});
+
+const profileForm = ref({
+  name: "",
+  phone: "",
+});
+
+const isEditingProfile = ref(false);
+const isSavingProfile = ref(false);
 
 const passwordForm = ref({
   oldPassword: "",
@@ -260,17 +335,7 @@ onMounted(async () => {
   }
 
   try {
-    const res = await getProfile();
-    const data = res.data.data;
-
-    userInfo.value = {
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      birthday: data.birthday,
-      memberLevel: data.memberLevel,
-      pointBalance: data.pointBalance,
-    };
+    await loadMemberPageData();
   } catch (err) {
     errorMsg.value = "無法取得會員資料，請重新登入";
   } finally {
@@ -278,7 +343,34 @@ onMounted(async () => {
   }
 });
 
-const memberLevelText = computed(() => {
+const loadMemberPageData = async () => {
+  const [profileRes, pointRes] = await Promise.all([
+    getProfile(),
+    getPointBalance(),
+  ]);
+
+  const profileData = profileRes.data.data;
+  const pointData = pointRes.data.data;
+
+  pointInfo.value = {
+    pointBalance: pointData.pointBalance ?? 0,
+    memberLevel: pointData.memberLevel || "BRONZE",
+    nextLevel: pointData.nextLevel || null,
+    pointsToNextLevel: pointData.pointsToNextLevel ?? 0,
+    earnRuleText: pointData.earnRuleText || "每消費 $100 即可累積 1 點",
+  };
+
+  userInfo.value = {
+    name: profileData.name,
+    email: profileData.email,
+    phone: profileData.phone,
+    birthday: profileData.birthday,
+    memberLevel: pointInfo.value.memberLevel || profileData.memberLevel,
+    pointBalance: pointInfo.value.pointBalance,
+  };
+};
+
+const getLevelText = (level) => {
   const levels = {
     BRONZE: "銅卡會員",
     SILVER: "銀卡會員",
@@ -286,43 +378,52 @@ const memberLevelText = computed(() => {
     DIAMOND: "鑽石卡會員",
   };
 
-  return levels[userInfo.value.memberLevel] || "一般會員";
+  return levels[level] || "一般會員";
+};
+
+const memberLevelText = computed(() => {
+  return getLevelText(
+    pointInfo.value.memberLevel || userInfo.value.memberLevel,
+  );
 });
 
-const upgradeHint = computed(() => {
-  if (userInfo.value.memberLevel === "BRONZE") {
-    return "再消費 $1,500 即可升級為銀卡會員";
+const pointUpgradeHint = computed(() => {
+  const nextLevelText = getLevelText(pointInfo.value.nextLevel);
+
+  if (!pointInfo.value.nextLevel) {
+    return "您已達最高等級：鑽石卡會員";
   }
 
-  if (userInfo.value.memberLevel === "SILVER") {
-    return "再消費 $5,000 即可升級為金卡會員";
-  }
-
-  return "您已達最高等級，繼續保持";
+  return `距離升級${nextLevelText}還差 ${pointInfo.value.pointsToNextLevel} 點`;
 });
 
-const birthdayCountdown = computed(() => {
+const isPhoneValid = computed(() => {
+  return /^09\d{8}$/.test(profileForm.value.phone);
+});
+
+const canSubmitProfile = computed(() => {
+  const name = profileForm.value.name.trim();
+  const phone = profileForm.value.phone.trim();
+
+  const hasChanged =
+    name !== userInfo.value.name || phone !== userInfo.value.phone;
+
+  return Boolean(name) && isPhoneValid.value && hasChanged;
+});
+
+const birthdayMonth = computed(() => {
   if (!userInfo.value.birthday) return null;
 
-  const today = new Date();
-  const birthday = new Date(userInfo.value.birthday);
-  const birthdayThisYear = new Date(
-    today.getFullYear(),
-    birthday.getMonth(),
-    birthday.getDate(),
-  );
+  return new Date(userInfo.value.birthday).getMonth() + 1;
+});
 
-  let nextBirthday = birthdayThisYear;
+const isBirthdayMonth = computed(() => {
+  if (!userInfo.value?.birthday) return false;
 
-  if (today > birthdayThisYear) {
-    nextBirthday = new Date(
-      today.getFullYear() + 1,
-      birthday.getMonth(),
-      birthday.getDate(),
-    );
-  }
+  const birthdayMonth = new Date(userInfo.value.birthday).getMonth() + 1;
+  const currentMonth = new Date().getMonth() + 1;
 
-  return Math.ceil((nextBirthday - today) / (1000 * 60 * 60 * 24));
+  return birthdayMonth === currentMonth;
 });
 
 const isLengthValid = computed(() => {
@@ -342,6 +443,85 @@ const isDifferentFromOld = computed(() => {
 
   return passwordForm.value.oldPassword !== passwordForm.value.newPassword;
 });
+
+const canSubmitPassword = computed(() => {
+  return (
+    Boolean(passwordForm.value.oldPassword) &&
+    Boolean(passwordForm.value.newPassword) &&
+    Boolean(passwordForm.value.confirmPassword) &&
+    isLengthValid.value &&
+    isConfirmMatched.value &&
+    isDifferentFromOld.value
+  );
+});
+
+const startEditProfile = () => {
+  profileForm.value = {
+    name: userInfo.value.name || "",
+    phone: userInfo.value.phone || "",
+  };
+
+  isEditingProfile.value = true;
+};
+
+const cancelEditProfile = () => {
+  profileForm.value = {
+    name: userInfo.value.name || "",
+    phone: userInfo.value.phone || "",
+  };
+
+  isEditingProfile.value = false;
+};
+
+const handleUpdateProfile = async () => {
+  if (!canSubmitProfile.value || isSavingProfile.value) return;
+
+  isSavingProfile.value = true;
+
+  try {
+    const res = await updateProfile({
+      name: profileForm.value.name.trim(),
+      phone: profileForm.value.phone.trim(),
+    });
+
+    const data = res.data.data;
+
+    userInfo.value = {
+      ...userInfo.value,
+      name: data.name,
+      phone: data.phone,
+    };
+
+    localStorage.setItem(
+      "userInfo",
+      JSON.stringify({
+        ...JSON.parse(localStorage.getItem("userInfo") || "{}"),
+        name: data.name,
+        phone: data.phone,
+      }),
+    );
+
+    window.dispatchEvent(new Event("login-state-changed"));
+
+    isEditingProfile.value = false;
+
+    await Swal.fire({
+      icon: "success",
+      title: "資料已更新",
+      text: "會員姓名與電話已成功修改",
+      confirmButtonColor: "#d9a372",
+    });
+  } catch (err) {
+    await Swal.fire({
+      icon: "error",
+      title: "資料更新失敗",
+      text: err.response?.data?.message || "請稍後再試",
+      confirmButtonColor: "#d9a372",
+    });
+  } finally {
+    isSavingProfile.value = false;
+  }
+};
 
 const formatBirthday = (birthday) => {
   if (!birthday) return "未提供";
@@ -477,106 +657,146 @@ const logout = async () => {
   position: relative;
 }
 
-.member-sidebar,
 .member-content {
   background: transparent;
 }
 
 .member-sidebar {
   float: left;
-  width: 220px;
-  padding-right: 28px;
+  width: 240px;
+  padding-top: 8px;
+  padding-right: 10px;
 }
 
 .member-content {
-  margin-left: 250px;
+  margin-left: 280px;
 }
 
-.member-name {
+.sidebar-card {
+  width: 240px;
+  margin-bottom: 26px;
+  padding-bottom: 26px;
+  border-bottom: 1px solid #e6ded5;
+}
+
+.sidebar-title {
+  margin: 0 0 14px;
+  color: #3d4651;
   font-size: 28px;
   font-weight: 800;
-  color: #3d4651;
-  margin-bottom: 8px;
-}
-
-.member-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
 }
 
 .level-badge {
-  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 126px;
+  min-height: 46px;
+  padding: 0 12px;
   border: 1px solid #ead5c3;
-  border-radius: 6px;
-  background: #fffaf7;
+  border-radius: 9px;
+  background: rgba(255, 250, 247, 0.9);
   color: #e3ac7f;
-  font-size: 13px;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
 }
 
-.side-divider {
-  height: 1px;
-  background: #e6ded5;
-  margin: 24px 0;
+.point-card {
+  padding-top: 0;
 }
 
-.side-info {
-  margin-bottom: 20px;
+.point-main {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 4px 0 12px;
 }
 
-.side-label {
-  margin: 0 0 6px;
-  font-size: 14px;
-  color: #7b8794;
-}
-
-.side-value {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 700;
+.point-number {
   color: #e3ac7f;
+  font-size: 48px;
+  font-weight: 900;
+  line-height: 1;
 }
 
-.side-note {
+.point-unit {
+  color: #e3ac7f;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.point-rule {
+  margin: 0 0 10px;
+  color: #6b7c8f;
+  font-size: 16px;
+  line-height: 2;
+}
+
+.upgrade-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
   margin: 0;
-  font-size: 14px;
-  line-height: 1.6;
-  color: #8a6f5a;
-}
-
-.birthday-box {
-  margin: 20px 0;
-  padding: 14px;
-  border-left: 4px solid #e3ac7f;
-  border-radius: 8px;
-  background: #fff7f0;
-  color: #8a6f5a;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.birthday-box p {
-  margin: 0;
-}
-
-.birthday-active {
-  color: #d97706;
-  font-weight: 700;
-}
-
-.logout-link {
-  margin-top: 10px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: #566a7f;
+  color: #7a5f4c;
   font-size: 15px;
-  cursor: pointer;
+  font-weight: 700;
+  line-height: 1.8;
 }
 
-.logout-link:hover {
-  color: #e3ac7f;
+.highlight-point {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  margin: 0 2px;
+  border-radius: 999px;
+  background: #e3ac7f;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 900;
+  box-shadow: 0 6px 14px rgba(227, 172, 127, 0.45);
+  animation: pointPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pointPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 6px 14px rgba(227, 172, 127, 0.45);
+  }
+
+  50% {
+    transform: scale(1.12);
+    box-shadow: 0 9px 20px rgba(227, 172, 127, 0.65);
+  }
+}
+
+.birthday-card {
+  width: 240px;
+  margin-top: 0;
+  padding: 18px 20px;
+  border-left: 4px solid #e3ac7f;
+  border-radius: 10px;
+  background: rgba(255, 247, 240, 0.92);
+  color: #8a6f5a;
+}
+
+.birthday-title {
+  margin-bottom: 8px;
+  color: #d97706;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.birthday-text {
+  color: #8a6f5a;
+  font-size: 15px;
+  line-height: 1.75;
 }
 
 .section-header {
@@ -646,20 +866,111 @@ const logout = async () => {
   color: #e3ac7f;
 }
 
+.edit-profile-btn {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #e3ac7f;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.edit-profile-btn:hover {
+  background: #d49a68;
+}
+
+.edit-field {
+  width: 100%;
+}
+
+.edit-field input {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid #d7ccc0;
+  border-radius: 8px;
+  outline: none;
+  background: #fff;
+  color: #3d4651;
+  font-size: 15px;
+  transition: 0.2s;
+}
+
+.edit-field input:focus {
+  border-color: #e3ac7f;
+  box-shadow: 0 0 0 3px rgba(227, 172, 127, 0.16);
+}
+
+.field-error {
+  margin: 6px 0 0;
+  color: #e11d48;
+  font-size: 13px;
+}
+
+.profile-actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 32px;
+}
+
+.cancel-profile-btn,
+.save-profile-btn {
+  width: 160px;
+  height: 46px;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.cancel-profile-btn {
+  background: #8b98a6;
+}
+
+.cancel-profile-btn:hover:not(:disabled) {
+  background: #7b8794;
+}
+
+.save-profile-btn {
+  background: #e3ac7f;
+}
+
+.save-profile-btn:hover:not(:disabled) {
+  background: #d49a68;
+}
+
+.cancel-profile-btn:disabled,
+.save-profile-btn:disabled {
+  background: #c8c8c8;
+  color: #ffffff;
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
 .password-header {
   justify-content: flex-start;
 }
 
 .back-btn {
+  background: #e3ac7f;
+  color: #fff;
   border: none;
-  background: transparent;
-  color: #8a6f5a;
-  font-size: 15px;
+  border-radius: 12px;
+  padding: 12px 24px;
+  font-size: 20px;
+  font-weight: 700;
   cursor: pointer;
+  transition: all 0.25s ease;
 }
 
 .back-btn:hover {
-  color: #e3ac7f;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(227, 172, 127, 0.3);
 }
 
 .password-panel {
@@ -761,42 +1072,104 @@ const logout = async () => {
 }
 
 .password-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  display: flex;
+  justify-content: center;
+  margin-top: 30px;
 }
 
-.clear-btn,
 .submit-btn {
+  width: 280px;
   height: 48px;
   border: none;
   border-radius: 8px;
+  background: #e3ac7f;
   color: #fff;
   font-weight: 700;
   cursor: pointer;
   transition: 0.2s;
 }
 
-.clear-btn {
-  background: #7b8794;
-}
-
-.submit-btn {
-  background: #e3ac7f;
-}
-
-.clear-btn:hover {
-  background: #657180;
-}
-
-.submit-btn:hover {
+.submit-btn:hover:not(:disabled) {
   background: #d49a68;
 }
 
-.clear-btn:disabled,
 .submit-btn:disabled {
-  opacity: 0.65;
+  background: #c8c8c8;
+  color: #ffffff;
+  opacity: 0.8;
   cursor: not-allowed;
+}
+
+.points-section {
+  margin-top: 24px;
+}
+
+.points-summary-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: center;
+}
+
+.points-card-label {
+  margin: 0 0 6px;
+  color: #7b8794;
+  font-size: 14px;
+}
+
+.points-summary-card h3 {
+  margin: 0;
+  color: #e3ac7f;
+  font-size: 32px;
+  font-weight: 800;
+}
+
+.points-summary-detail {
+  color: #566a7f;
+  font-size: 15px;
+  line-height: 1.7;
+  text-align: right;
+}
+
+.points-summary-detail p {
+  margin: 0;
+}
+
+.points-history-card {
+  margin-top: 18px;
+}
+
+.points-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.points-history-header h3 {
+  margin: 0;
+  color: #3d4651;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.points-history-header span {
+  color: #8a6f5a;
+  font-size: 14px;
+}
+
+.empty-history {
+  padding: 22px;
+  border-radius: 10px;
+  background: #fff7f0;
+  color: #8a6f5a;
+  text-align: center;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 @media (max-width: 900px) {
@@ -815,6 +1188,10 @@ const logout = async () => {
     margin-left: 0;
   }
 
+  .birthday-card {
+    width: 100%;
+  }
+
   .info-card,
   .password-panel {
     min-height: auto;
@@ -823,6 +1200,30 @@ const logout = async () => {
 
   .info-row {
     grid-template-columns: 82px 1fr;
+  }
+
+  .profile-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cancel-profile-btn,
+  .save-profile-btn {
+    width: 100%;
+  }
+
+  .points-summary-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .points-summary-detail {
+    text-align: left;
+  }
+
+  .history-item {
+    align-items: flex-start;
+    gap: 12px;
   }
 
   .text-action {

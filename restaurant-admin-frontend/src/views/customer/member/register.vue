@@ -20,7 +20,7 @@
               </span>
               <div>
                 <strong>累積敘日點數</strong>
-                <small>消費後累積會員點數，日後可兌換優惠。</small>
+                <small>消費累積點數即可升級會員等級，享有會員優惠。</small>
               </div>
             </li>
 
@@ -30,7 +30,7 @@
               </span>
               <div>
                 <strong>生日專屬優惠</strong>
-                <small>生日月份享有會員專屬祝福與優惠。</small>
+                <small>生日月份享會員專屬優惠</small>
               </div>
             </li>
           </ul>
@@ -89,12 +89,16 @@
                   placeholder="請輸入電子信箱"
                 />
                 <button
-                  class="verify-btn"
                   type="button"
-                  :disabled="!emailValid"
+                  class="send-code-btn"
+                  :disabled="isSendingCode || countdown > 0 || !emailValid"
                   @click="handleSendVerifyEmail"
                 >
-                  發送驗證信
+                  <span v-if="isSendingCode">發送中...</span>
+                  <span v-else-if="countdown > 0"
+                    >重新發送 {{ countdown }}s</span
+                  >
+                  <span v-else>發送驗證信</span>
                 </button>
               </div>
 
@@ -112,13 +116,17 @@
                   type="text"
                   placeholder="請輸入 6 位數驗證碼"
                   maxlength="6"
+                  :disabled="emailVerified"
                 />
                 <button
-                  class="check-code-btn"
                   type="button"
+                  class="verify-btn"
+                  :class="{ verified: emailVerified }"
+                  :disabled="emailVerified"
                   @click="handleCheckVerifyCode"
                 >
-                  驗證
+                  <span v-if="emailVerified">✓ 驗證成功</span>
+                  <span v-else>驗證</span>
                 </button>
               </div>
 
@@ -127,7 +135,11 @@
                 class="field-hint"
                 :class="emailVerified ? 'valid' : 'neutral'"
               >
-                {{ emailVerified ? "Email 已完成驗證" : "Demo 驗證碼：123456" }}
+                {{
+                  emailVerified
+                    ? "Email 已完成驗證"
+                    : "請至信箱收取 6 位數驗證碼"
+                }}
               </p>
             </div>
           </div>
@@ -221,20 +233,21 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed } from "vue";
+import { ref, reactive, computed, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
-import { register } from "@/api/member";
+import { register, sendEmailCode, verifyEmailCode } from "@/api/member";
 import Swal from "sweetalert2";
 
 const router = useRouter();
-
 const showPassword = ref(false);
 const showConfirmPassword = ref(false);
 const errorMsg = ref("");
 const isLoading = ref(false);
 const verificationSent = ref(false);
 const emailVerified = ref(false);
-
+const isSendingCode = ref(false);
+const countdown = ref(0);
+let countdownTimer = null;
 const form = reactive({
   name: "",
   phone: "",
@@ -276,6 +289,10 @@ const isFormValid = computed(() => {
 const handleSendVerifyEmail = async () => {
   errorMsg.value = "";
 
+  if (isSendingCode.value || countdown.value > 0) {
+    return;
+  }
+
   if (!form.email) {
     await Swal.fire({
       icon: "warning",
@@ -295,20 +312,63 @@ const handleSendVerifyEmail = async () => {
     return;
   }
 
-  verificationSent.value = true;
-  emailVerified.value = false;
-  form.verifyCode = "";
+  isSendingCode.value = true;
 
-  await Swal.fire({
-    icon: "success",
-    title: "驗證信已發送",
-    text: `我們已將驗證信寄送至 ${form.email}`,
-    confirmButtonColor: "#d9a372",
-  });
+  try {
+    await sendEmailCode(form.email);
+
+    verificationSent.value = true;
+    emailVerified.value = false;
+    form.verifyCode = "";
+
+    startCountdown();
+
+    await Swal.fire({
+      icon: "success",
+      title: "驗證信已發送",
+      text: `我們已將驗證碼寄送至 ${form.email}`,
+      confirmButtonColor: "#d9a372",
+    });
+  } catch (err) {
+    verificationSent.value = false;
+    emailVerified.value = false;
+
+    await Swal.fire({
+      icon: "error",
+      title: "驗證信發送失敗",
+      text: err.response?.data?.message || "請稍後再試",
+      confirmButtonColor: "#d9a372",
+    });
+  } finally {
+    isSendingCode.value = false;
+  }
 };
 
 const handleCheckVerifyCode = async () => {
-  if (form.verifyCode === "123456") {
+  errorMsg.value = "";
+
+  if (!form.verifyCode) {
+    await Swal.fire({
+      icon: "warning",
+      title: "請輸入驗證碼",
+      confirmButtonColor: "#d9a372",
+    });
+    return;
+  }
+
+  if (!/^\d{6}$/.test(form.verifyCode)) {
+    await Swal.fire({
+      icon: "error",
+      title: "驗證碼格式不正確",
+      text: "請輸入 6 位數字驗證碼",
+      confirmButtonColor: "#d9a372",
+    });
+    return;
+  }
+
+  try {
+    await verifyEmailCode(form.email, form.verifyCode);
+
     emailVerified.value = true;
     await Swal.fire({
       icon: "success",
@@ -316,18 +376,38 @@ const handleCheckVerifyCode = async () => {
       timer: 1200,
       showConfirmButton: false,
     });
-    return;
+  } catch (err) {
+    emailVerified.value = false;
+    await Swal.fire({
+      icon: "error",
+      title: "驗證碼錯誤",
+      text: err.response?.data?.message || "請確認驗證碼是否正確",
+      confirmButtonColor: "#d9a372",
+    });
   }
-
-  emailVerified.value = false;
-  await Swal.fire({
-    icon: "error",
-    title: "驗證碼錯誤",
-    text: "Demo 驗證碼為 123456",
-    confirmButtonColor: "#d9a372",
-  });
 };
 
+const startCountdown = () => {
+  countdown.value = 60;
+
+  if (countdownTimer) {
+    clearInterval(countdownTimer);
+  }
+
+  countdownTimer = setInterval(() => {
+    countdown.value -= 1;
+
+    if (countdown.value <= 0) {
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+    }
+  }, 1000);
+};
+onUnmounted(() => {
+  if (countdownTimer) {
+    clearInterval(countdownTimer);
+  }
+});
 const handleRegister = async () => {
   errorMsg.value = "";
 
@@ -562,6 +642,7 @@ const handleRegister = async () => {
 }
 
 .verify-btn,
+.send-code-btn,
 .check-code-btn {
   height: 44px;
   border: none;
@@ -574,9 +655,12 @@ const handleRegister = async () => {
   white-space: nowrap;
 }
 
-.verify-btn:disabled {
-  background: #ead3bf;
+.verify-btn:disabled,
+.send-code-btn:disabled {
+  background: #c8c8c8;
+  color: #ffffff;
   cursor: not-allowed;
+  opacity: 0.8;
 }
 
 .check-code-btn {
@@ -660,6 +744,18 @@ const handleRegister = async () => {
 .submit-btn:disabled {
   background: #ead3bf;
   cursor: not-allowed;
+}
+
+.verify-btn.verified,
+.verify-btn.verified:disabled {
+  background: #28a745;
+  color: #ffffff;
+  cursor: default;
+  opacity: 1;
+}
+
+.verify-btn.verified:hover {
+  background: #28a745;
 }
 
 @media (max-width: 900px) {
