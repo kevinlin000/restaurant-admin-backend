@@ -154,8 +154,13 @@ public class PointServiceImpl implements PointService {
     }
 
     private MemberProfile getMemberProfile(Long userId) {
+        User user = getUser(userId);
+
         return memberProfileRepository.findByUserUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("找不到會員資料"));
+                .orElseGet(() -> memberProfileRepository.save(
+                        MemberProfile.builder()
+                                .user(user)
+                                .build()));
     }
 
     private Store getStoreOrNull(Long storeId) {

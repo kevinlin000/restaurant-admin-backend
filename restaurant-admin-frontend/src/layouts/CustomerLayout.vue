@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import Swal from "sweetalert2";
 
@@ -10,6 +10,72 @@ const loadUserInfo = () => {
   const data = localStorage.getItem("userInfo");
   userInfo.value = data ? JSON.parse(data) : null;
 };
+
+const roleName = computed(() => userInfo.value?.roleName || "");
+
+const dropdownItems = computed(() => {
+  if (!userInfo.value) {
+    return [];
+  }
+
+  const profileItem = {
+    label: "個人資料",
+    path: "/profile",
+    icon: "bi-person",
+  };
+
+  if (roleName.value === "CUSTOMER") {
+    return [profileItem];
+  }
+
+  const items = [
+    ...(roleName.value === "ADMIN" ? [] : [profileItem]),
+    {
+      label: "後台首頁",
+      path: "/admin/home",
+      icon: "bi-house",
+      roles: ["STAFF", "MANAGER", "ADMIN"],
+    },
+    {
+      label: "訂位管理",
+      path: "/admin/reservation",
+      icon: "bi-calendar-check",
+      roles: ["STAFF", "MANAGER", "ADMIN"],
+    },
+    {
+      label: "訂單管理",
+      path: "/admin/home",
+      icon: "bi-receipt",
+      roles: ["STAFF", "MANAGER", "ADMIN"],
+    },
+    {
+      label: "菜單管理",
+      path: "/admin/menu-setting",
+      icon: "bi-menu-button-wide",
+      roles: ["MANAGER", "ADMIN"],
+    },
+    {
+      label: "店家檔案設定",
+      path: "/admin/store",
+      icon: "bi-shop",
+      roles: ["MANAGER", "ADMIN"],
+    },
+    {
+      label: "員工管理",
+      path: "/admin/home",
+      icon: "bi-people",
+      roles: ["ADMIN"],
+    },
+    {
+      label: "門市管理",
+      path: "/admin/store",
+      icon: "bi-buildings",
+      roles: ["ADMIN"],
+    },
+  ];
+
+  return items.filter((item) => !item.roles || item.roles.includes(roleName.value));
+});
 
 onMounted(() => {
   loadUserInfo();
@@ -108,11 +174,17 @@ const logout = async () => {
                 </a>
 
                 <ul class="dropdown-menu dropdown-menu-end">
-                  <li>
-                    <RouterLink class="dropdown-item" to="/profile">
-                      個人資料
+                  <li v-for="item in dropdownItems" :key="item.label">
+                    <RouterLink class="dropdown-item" :to="item.path">
+                      <i
+                        v-if="item.icon"
+                        :class="['bi', item.icon, 'me-2']"
+                      ></i>
+                      {{ item.label }}
                     </RouterLink>
                   </li>
+
+                  <li><hr class="dropdown-divider" /></li>
 
                   <li>
                     <button
@@ -120,6 +192,7 @@ const logout = async () => {
                       type="button"
                       @click="logout"
                     >
+                      <i class="bi bi-box-arrow-right me-2"></i>
                       登出
                     </button>
                   </li>

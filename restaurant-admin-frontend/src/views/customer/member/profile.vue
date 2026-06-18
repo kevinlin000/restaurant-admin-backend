@@ -14,6 +14,7 @@
         <aside class="member-sidebar">
           <div class="sidebar-card level-card">
             <p class="sidebar-title">會員等級</p>
+
             <div class="level-badge">{{ memberLevelText }}</div>
           </div>
 
@@ -25,8 +26,6 @@
               <span class="point-unit">點</span>
             </div>
 
-            <p class="point-rule">{{ pointInfo.earnRuleText }}</p>
-
             <p v-if="pointInfo.nextLevel" class="upgrade-note">
               離升級{{ getLevelText(pointInfo.nextLevel) }}還差
               <span class="highlight-point">{{
@@ -36,6 +35,14 @@
             </p>
 
             <p v-else class="upgrade-note">您已達最高等級：鑽石卡會員</p>
+
+            <button
+              class="point-rule-btn"
+              type="button"
+              @click="showPointRuleModal = true"
+            >
+              會員集點規則
+            </button>
           </div>
 
           <div class="birthday-card">
@@ -268,6 +275,43 @@
         </section>
       </template>
     </div>
+
+    <!-- 集點規則彈窗 -->
+    <div
+      v-if="showPointRuleModal"
+      class="rule-modal-mask"
+      @click.self="showPointRuleModal = false"
+    >
+      <div class="rule-modal">
+        <button
+          class="rule-close-btn"
+          type="button"
+          aria-label="關閉集點規則"
+          @click="showPointRuleModal = false"
+        >
+          ×
+        </button>
+
+        <h3>集點規則</h3>
+
+        <div class="rule-content">
+          <div class="rule-section">
+            <h4>累積規則</h4>
+            <p>每消費 $100 即可累積 1 點。</p>
+          </div>
+
+          <div class="rule-section">
+            <h4>會員升級</h4>
+            <ul>
+              <li>銅卡會員：0 ~ 29 點，來店消費享95折</li>
+              <li>銀卡會員：30 ~ 59 點，來店消費享9折</li>
+              <li>金卡會員：60 ~ 99 點，來店消費享85折</li>
+              <li>鑽石會員：達到100 點，來店消費享8折</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -283,11 +327,10 @@ import {
 } from "@/api/member";
 
 const router = useRouter();
-
 const isLoading = ref(true);
 const errorMsg = ref("");
 const currentView = ref("profile");
-
+const showPointRuleModal = ref(false);
 const userInfo = ref({
   name: "",
   email: "",
@@ -381,10 +424,16 @@ const getLevelText = (level) => {
   return levels[level] || "一般會員";
 };
 
+const getLevelByPoint = (point) => {
+  const points = Number(point) || 0;
+  if (points >= 100) return "DIAMOND";
+  if (points >= 60) return "GOLD";
+  if (points >= 30) return "SILVER";
+  return "BRONZE";
+};
+
 const memberLevelText = computed(() => {
-  return getLevelText(
-    pointInfo.value.memberLevel || userInfo.value.memberLevel,
-  );
+  return getLevelText(getLevelByPoint(pointInfo.value.pointBalance));
 });
 
 const pointUpgradeHint = computed(() => {
@@ -692,8 +741,9 @@ const logout = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 126px;
-  min-height: 46px;
+  width: 240px;
+  min-height: 52px;
+  box-sizing: border-box;
   padding: 0 12px;
   border: 1px solid #ead5c3;
   border-radius: 9px;
@@ -1170,6 +1220,101 @@ const logout = async () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.point-rule-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 240px;
+  min-height: 46px;
+  box-sizing: border-box;
+  margin-top: 12px;
+  padding: 0 12px;
+  border: 1px solid #ead5c3;
+  border-radius: 999px;
+  background: rgba(255, 250, 247, 0.95);
+  color: #d99a63;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.point-rule-btn:hover {
+  background: #e3ac7f;
+  color: #fff;
+  border-color: #e3ac7f;
+}
+
+.rule-modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(47, 58, 69, 0.42);
+}
+
+.rule-modal {
+  position: relative;
+  width: min(420px, 100%);
+  padding: 30px 32px 28px;
+  border-radius: 18px;
+  background: #fffaf6;
+  box-shadow: 0 18px 48px rgba(47, 58, 69, 0.2);
+}
+
+.rule-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  border: none;
+  background: transparent;
+  color: #8a6f5a;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rule-close-btn:hover {
+  color: #d49a68;
+}
+
+.rule-modal h3 {
+  margin: 0 0 20px;
+  color: #3d4651;
+  font-size: 26px;
+  font-weight: 900;
+}
+
+.rule-section {
+  padding: 16px 0;
+  border-top: 1px solid #eadfd4;
+}
+
+.rule-section h4 {
+  margin: 0 0 10px;
+  color: #d97706;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.rule-section p {
+  margin: 0;
+  color: #6b7c8f;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.rule-section ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #6b7c8f;
+  font-size: 15px;
+  line-height: 2;
 }
 
 @media (max-width: 900px) {

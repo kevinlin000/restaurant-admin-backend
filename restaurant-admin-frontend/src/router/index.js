@@ -134,4 +134,52 @@ const router = createRouter({
   routes: routers,
 });
 
+const getDefaultPathByRole = (roleName) => {
+  if (["CUSTOMER", "STAFF", "MANAGER"].includes(roleName)) {
+    return "/home";
+  }
+
+  if (roleName === "ADMIN") {
+    return "/admin/home";
+  }
+
+  return "/login";
+};
+
+const getUserInfo = () => {
+  try {
+    return JSON.parse(localStorage.getItem("userInfo") || "{}");
+  } catch (error) {
+    localStorage.removeItem("userInfo");
+    return {};
+  }
+};
+
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem("accessToken");
+  const userInfo = getUserInfo();
+  const roleName = userInfo.roleName;
+
+  const isAdminPage = to.path.startsWith("/admin");
+  const isCustomerProfilePage = to.path === "/profile";
+
+  // 未登入不能進會員中心或後台
+  if (!token && (isAdminPage || isCustomerProfilePage)) {
+    next("/login");
+    return;
+  }
+
+  // 已登入後，不要再進登入或註冊頁
+  if (token && (to.path === "/login" || to.path === "/register")) {
+    next(getDefaultPathByRole(roleName));
+    return;
+  }
+
+  // CUSTOMER 不能進後台
+  if (isAdminPage && roleName === "CUSTOMER") {
+    next("/profile");
+    return;
+  }
+next();
+});
 export default router;

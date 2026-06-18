@@ -33,8 +33,7 @@ public class UserServiceImpl implements UserService {
     public MemberProfileResponse getProfile(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("使用者不存在"));
-        MemberProfile profile = memberProfileRepository.findByUserUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("找不到會員資料"));
+        MemberProfile profile = getOrCreateMemberProfile(user);
 
         return toMemberProfileResponse(user, profile);
     }
@@ -47,8 +46,7 @@ public class UserServiceImpl implements UserService {
     public MemberProfileResponse updateProfile(Long userId, MemberUpdateRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("使用者不存在"));
-        MemberProfile profile = memberProfileRepository.findByUserUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("找不到會員資料"));
+        MemberProfile profile = getOrCreateMemberProfile(user);
 
         if (request.getName() != null && !request.getName().isBlank()) {
             user.setName(request.getName());
@@ -126,6 +124,20 @@ public class UserServiceImpl implements UserService {
 
         staff.setStatus(StaffStatus.RESIGNED);
         staffRepository.save(staff);
+    }
+
+
+    /**
+     * 取得或建立個人會員資料。
+     * 員工 / 店長 / 管理員也是 User，也可能到店消費與累積點數，
+     * 所以若早期員工帳號沒有 members 資料，就在第一次查詢個人資料時自動補上。
+     */
+    private MemberProfile getOrCreateMemberProfile(User user) {
+        return memberProfileRepository.findByUserUserId(user.getUserId())
+                .orElseGet(() -> memberProfileRepository.save(
+                        MemberProfile.builder()
+                                .user(user)
+                                .build()));
     }
 
     /**

@@ -365,6 +365,18 @@ const handleResetPassword = async () => {
   }
 };
 
+const getDefaultPathByRole = (roleName) => {
+  if (["CUSTOMER", "STAFF", "MANAGER"].includes(roleName)) {
+    return "/home";
+  }
+
+  if (roleName === "ADMIN") {
+    return "/admin/home";
+  }
+
+  return "/home";
+};
+
 const handleLogin = async () => {
   errorMsg.value = "";
   isLoading.value = true;
