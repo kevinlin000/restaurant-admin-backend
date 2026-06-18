@@ -36,3 +36,9 @@ export const forgotPassword = (email) =>
 // 忘記密碼：重設密碼
 export const resetPassword = (data) =>
   api.post("/api/members/password/reset", data);
+
+// 查詢會員目前點數
+export const getPointBalance = () => api.get("/api/members/me/points");
+
+// 查詢會員點數紀錄
+export const getPointHistory = () => api.get("/api/members/me/points/history");

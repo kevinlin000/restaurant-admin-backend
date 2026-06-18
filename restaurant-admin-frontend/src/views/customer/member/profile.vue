@@ -12,37 +12,39 @@
       <template v-else>
         <!-- 左側會員摘要 -->
         <aside class="member-sidebar">
-          <div class="member-name">{{ userInfo.name }}</div>
-          <div class="member-meta">
-            <span class="level-badge">{{ memberLevelText }}</span>
+          <div class="sidebar-card level-card">
+            <p class="sidebar-title">會員等級</p>
+            <div class="level-badge">{{ memberLevelText }}</div>
           </div>
 
-          <div class="side-divider"></div>
+          <div class="sidebar-card point-card">
+            <p class="sidebar-title">目前點數</p>
 
-          <div class="side-info">
-            <p class="side-label">目前點數</p>
-            <p class="side-value">{{ userInfo.pointBalance }} 點</p>
-          </div>
+            <div class="point-main">
+              <span class="point-number">{{ pointInfo.pointBalance }}</span>
+              <span class="point-unit">點</span>
+            </div>
 
-          <div class="side-info">
-            <p class="side-label">每消費 $100 即可累積 1 點</p>
-            <p class="side-note">{{ upgradeHint }}</p>
-          </div>
+            <p class="point-rule">{{ pointInfo.earnRuleText }}</p>
 
-          <div v-if="birthdayCountdown !== null" class="birthday-box">
-            <p v-if="birthdayCountdown === 0" class="birthday-active">
-              🎉 生日快樂！快來店領取您的生日專屬禮！
+            <p v-if="pointInfo.nextLevel" class="upgrade-note">
+              離升級{{ getLevelText(pointInfo.nextLevel) }}還差
+              <span class="highlight-point">{{
+                pointInfo.pointsToNextLevel
+              }}</span>
+              點
             </p>
-            <p v-else>
-              距離您的生日還有
-              <strong>{{ birthdayCountdown }}</strong
-              >天
-            </p>
+
+            <p v-else class="upgrade-note">您已達最高等級：鑽石卡會員</p>
           </div>
 
-          <button class="logout-link" type="button" @click="logout">
-            登出
-          </button>
+          <div class="birthday-card">
+            <div class="birthday-title">🎂 生日優惠</div>
+            <div class="birthday-text">
+              生日當月於敘日消費，<br />
+              即可獲得焦糖布丁 1 份。
+            </div>
+          </div>
         </aside>
 
         <!-- 右側內容 -->
@@ -120,7 +122,7 @@
                 <div class="info-label">密碼</div>
                 <div class="info-value password-dots">••••••••</div>
                 <button
-                  class="text-action"
+                  class="edit-profile-btn"
                   type="button"
                   @click="openPasswordView"
                 >
@@ -154,7 +156,7 @@
           <template v-else>
             <div class="section-header password-header">
               <button class="back-btn" type="button" @click="backToProfile">
-                ← 返回基本資料
+                返回基本資料
               </button>
             </div>
 
@@ -273,7 +275,12 @@
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import Swal from "sweetalert2";
-import { getProfile, updatePassword, updateProfile } from "@/api/member";
+import {
+  getPointBalance,
+  getProfile,
+  updatePassword,
+  updateProfile,
+} from "@/api/member";
 
 const router = useRouter();
 
@@ -288,6 +295,14 @@ const userInfo = ref({
   birthday: "",
   memberLevel: "BRONZE",
   pointBalance: 0,
+});
+
+const pointInfo = ref({
+  pointBalance: 0,
+  memberLevel: "BRONZE",
+  nextLevel: "SILVER",
+  pointsToNextLevel: 30,
+  earnRuleText: "每消費 $100 即可累積 1 點",
 });
 
 const profileForm = ref({
@@ -320,17 +335,7 @@ onMounted(async () => {
   }
 
   try {
-    const res = await getProfile();
-    const data = res.data.data;
-
-    userInfo.value = {
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      birthday: data.birthday,
-      memberLevel: data.memberLevel,
-      pointBalance: data.pointBalance,
-    };
+    await loadMemberPageData();
   } catch (err) {
     errorMsg.value = "無法取得會員資料，請重新登入";
   } finally {
@@ -338,7 +343,34 @@ onMounted(async () => {
   }
 });
 
-const memberLevelText = computed(() => {
+const loadMemberPageData = async () => {
+  const [profileRes, pointRes] = await Promise.all([
+    getProfile(),
+    getPointBalance(),
+  ]);
+
+  const profileData = profileRes.data.data;
+  const pointData = pointRes.data.data;
+
+  pointInfo.value = {
+    pointBalance: pointData.pointBalance ?? 0,
+    memberLevel: pointData.memberLevel || "BRONZE",
+    nextLevel: pointData.nextLevel || null,
+    pointsToNextLevel: pointData.pointsToNextLevel ?? 0,
+    earnRuleText: pointData.earnRuleText || "每消費 $100 即可累積 1 點",
+  };
+
+  userInfo.value = {
+    name: profileData.name,
+    email: profileData.email,
+    phone: profileData.phone,
+    birthday: profileData.birthday,
+    memberLevel: pointInfo.value.memberLevel || profileData.memberLevel,
+    pointBalance: pointInfo.value.pointBalance,
+  };
+};
+
+const getLevelText = (level) => {
   const levels = {
     BRONZE: "銅卡會員",
     SILVER: "銀卡會員",
@@ -346,25 +378,23 @@ const memberLevelText = computed(() => {
     DIAMOND: "鑽石卡會員",
   };
 
-  return levels[userInfo.value.memberLevel] || "一般會員";
+  return levels[level] || "一般會員";
+};
+
+const memberLevelText = computed(() => {
+  return getLevelText(
+    pointInfo.value.memberLevel || userInfo.value.memberLevel,
+  );
 });
 
-const upgradeHint = computed(() => {
-  const points = Number(userInfo.value.pointBalance) || 0;
+const pointUpgradeHint = computed(() => {
+  const nextLevelText = getLevelText(pointInfo.value.nextLevel);
 
-  if (points < 30) {
-    return `距離升級銀卡會員還差 ${30 - points} 點`;
+  if (!pointInfo.value.nextLevel) {
+    return "您已達最高等級：鑽石卡會員";
   }
 
-  if (points < 60) {
-    return `距離升級金卡會員還差 ${60 - points} 點`;
-  }
-
-  if (points < 100) {
-    return `距離升級鑽石卡會員還差 ${100 - points} 點`;
-  }
-
-  return "您已達最高等級：鑽石卡會員";
+  return `距離升級${nextLevelText}還差 ${pointInfo.value.pointsToNextLevel} 點`;
 });
 
 const isPhoneValid = computed(() => {
@@ -381,28 +411,19 @@ const canSubmitProfile = computed(() => {
   return Boolean(name) && isPhoneValid.value && hasChanged;
 });
 
-const birthdayCountdown = computed(() => {
+const birthdayMonth = computed(() => {
   if (!userInfo.value.birthday) return null;
 
-  const today = new Date();
-  const birthday = new Date(userInfo.value.birthday);
-  const birthdayThisYear = new Date(
-    today.getFullYear(),
-    birthday.getMonth(),
-    birthday.getDate(),
-  );
+  return new Date(userInfo.value.birthday).getMonth() + 1;
+});
 
-  let nextBirthday = birthdayThisYear;
+const isBirthdayMonth = computed(() => {
+  if (!userInfo.value?.birthday) return false;
 
-  if (today > birthdayThisYear) {
-    nextBirthday = new Date(
-      today.getFullYear() + 1,
-      birthday.getMonth(),
-      birthday.getDate(),
-    );
-  }
+  const birthdayMonth = new Date(userInfo.value.birthday).getMonth() + 1;
+  const currentMonth = new Date().getMonth() + 1;
 
-  return Math.ceil((nextBirthday - today) / (1000 * 60 * 60 * 24));
+  return birthdayMonth === currentMonth;
 });
 
 const isLengthValid = computed(() => {
@@ -636,106 +657,146 @@ const logout = async () => {
   position: relative;
 }
 
-.member-sidebar,
 .member-content {
   background: transparent;
 }
 
 .member-sidebar {
   float: left;
-  width: 220px;
-  padding-right: 28px;
+  width: 240px;
+  padding-top: 8px;
+  padding-right: 10px;
 }
 
 .member-content {
-  margin-left: 250px;
+  margin-left: 280px;
 }
 
-.member-name {
+.sidebar-card {
+  width: 240px;
+  margin-bottom: 26px;
+  padding-bottom: 26px;
+  border-bottom: 1px solid #e6ded5;
+}
+
+.sidebar-title {
+  margin: 0 0 14px;
+  color: #3d4651;
   font-size: 28px;
   font-weight: 800;
-  color: #3d4651;
-  margin-bottom: 8px;
-}
-
-.member-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
 }
 
 .level-badge {
-  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 126px;
+  min-height: 46px;
+  padding: 0 12px;
   border: 1px solid #ead5c3;
-  border-radius: 6px;
-  background: #fffaf7;
+  border-radius: 9px;
+  background: rgba(255, 250, 247, 0.9);
   color: #e3ac7f;
-  font-size: 13px;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
 }
 
-.side-divider {
-  height: 1px;
-  background: #e6ded5;
-  margin: 24px 0;
+.point-card {
+  padding-top: 0;
 }
 
-.side-info {
-  margin-bottom: 20px;
+.point-main {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 4px 0 12px;
 }
 
-.side-label {
-  margin: 0 0 6px;
-  font-size: 14px;
-  color: #7b8794;
-}
-
-.side-value {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 700;
+.point-number {
   color: #e3ac7f;
+  font-size: 48px;
+  font-weight: 900;
+  line-height: 1;
 }
 
-.side-note {
+.point-unit {
+  color: #e3ac7f;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.point-rule {
+  margin: 0 0 10px;
+  color: #6b7c8f;
+  font-size: 16px;
+  line-height: 2;
+}
+
+.upgrade-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
   margin: 0;
-  font-size: 14px;
-  line-height: 1.6;
-  color: #8a6f5a;
-}
-
-.birthday-box {
-  margin: 20px 0;
-  padding: 14px;
-  border-left: 4px solid #e3ac7f;
-  border-radius: 8px;
-  background: #fff7f0;
-  color: #8a6f5a;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.birthday-box p {
-  margin: 0;
-}
-
-.birthday-active {
-  color: #d97706;
-  font-weight: 700;
-}
-
-.logout-link {
-  margin-top: 10px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: #566a7f;
+  color: #7a5f4c;
   font-size: 15px;
-  cursor: pointer;
+  font-weight: 700;
+  line-height: 1.8;
 }
 
-.logout-link:hover {
-  color: #e3ac7f;
+.highlight-point {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  margin: 0 2px;
+  border-radius: 999px;
+  background: #e3ac7f;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 900;
+  box-shadow: 0 6px 14px rgba(227, 172, 127, 0.45);
+  animation: pointPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pointPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 6px 14px rgba(227, 172, 127, 0.45);
+  }
+
+  50% {
+    transform: scale(1.12);
+    box-shadow: 0 9px 20px rgba(227, 172, 127, 0.65);
+  }
+}
+
+.birthday-card {
+  width: 240px;
+  margin-top: 0;
+  padding: 18px 20px;
+  border-left: 4px solid #e3ac7f;
+  border-radius: 10px;
+  background: rgba(255, 247, 240, 0.92);
+  color: #8a6f5a;
+}
+
+.birthday-title {
+  margin-bottom: 8px;
+  color: #d97706;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.birthday-text {
+  color: #8a6f5a;
+  font-size: 15px;
+  line-height: 1.75;
 }
 
 .section-header {
@@ -896,15 +957,20 @@ const logout = async () => {
 }
 
 .back-btn {
+  background: #e3ac7f;
+  color: #fff;
   border: none;
-  background: transparent;
-  color: #8a6f5a;
-  font-size: 15px;
+  border-radius: 12px;
+  padding: 12px 24px;
+  font-size: 20px;
+  font-weight: 700;
   cursor: pointer;
+  transition: all 0.25s ease;
 }
 
 .back-btn:hover {
-  color: #e3ac7f;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(227, 172, 127, 0.3);
 }
 
 .password-panel {
@@ -1034,6 +1100,78 @@ const logout = async () => {
   cursor: not-allowed;
 }
 
+.points-section {
+  margin-top: 24px;
+}
+
+.points-summary-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: center;
+}
+
+.points-card-label {
+  margin: 0 0 6px;
+  color: #7b8794;
+  font-size: 14px;
+}
+
+.points-summary-card h3 {
+  margin: 0;
+  color: #e3ac7f;
+  font-size: 32px;
+  font-weight: 800;
+}
+
+.points-summary-detail {
+  color: #566a7f;
+  font-size: 15px;
+  line-height: 1.7;
+  text-align: right;
+}
+
+.points-summary-detail p {
+  margin: 0;
+}
+
+.points-history-card {
+  margin-top: 18px;
+}
+
+.points-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.points-history-header h3 {
+  margin: 0;
+  color: #3d4651;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.points-history-header span {
+  color: #8a6f5a;
+  font-size: 14px;
+}
+
+.empty-history {
+  padding: 22px;
+  border-radius: 10px;
+  background: #fff7f0;
+  color: #8a6f5a;
+  text-align: center;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 @media (max-width: 900px) {
   .member-page {
     padding: 130px 18px 60px;
@@ -1048,6 +1186,10 @@ const logout = async () => {
 
   .member-content {
     margin-left: 0;
+  }
+
+  .birthday-card {
+    width: 100%;
   }
 
   .info-card,
@@ -1068,6 +1210,20 @@ const logout = async () => {
   .cancel-profile-btn,
   .save-profile-btn {
     width: 100%;
+  }
+
+  .points-summary-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .points-summary-detail {
+    text-align: left;
+  }
+
+  .history-item {
+    align-items: flex-start;
+    gap: 12px;
   }
 
   .text-action {

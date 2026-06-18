@@ -20,7 +20,7 @@
               </span>
               <div>
                 <strong>累積敘日點數</strong>
-                <small>消費後累積會員點數，日後可兌換優惠。</small>
+                <small>消費累積點數即可升級會員等級，享有會員優惠。</small>
               </div>
             </li>
 
@@ -30,7 +30,7 @@
               </span>
               <div>
                 <strong>生日專屬優惠</strong>
-                <small>生日月份享有會員專屬祝福與優惠。</small>
+                <small>生日月份享會員專屬優惠</small>
               </div>
             </li>
           </ul>

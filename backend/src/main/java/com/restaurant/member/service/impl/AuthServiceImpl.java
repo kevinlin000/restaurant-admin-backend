@@ -6,18 +6,27 @@ import com.restaurant.member.dto.LoginResponse;
 import com.restaurant.member.dto.MemberRegisterRequest;
 import com.restaurant.member.dto.StaffCreateRequest;
 import com.restaurant.member.dto.StaffResponse;
-import com.restaurant.member.entity.*;
-import com.restaurant.member.repository.*;
+import com.restaurant.member.entity.MemberProfile;
+import com.restaurant.member.entity.Role;
+import com.restaurant.member.entity.Staff;
+import com.restaurant.member.entity.User;
+import com.restaurant.member.repository.MemberProfileRepository;
+import com.restaurant.member.repository.RoleRepository;
+import com.restaurant.member.repository.StaffRepository;
+import com.restaurant.member.repository.UserRepository;
 import com.restaurant.member.service.AuthService;
+import com.restaurant.member.service.MailService;
 import com.restaurant.member.util.JwtUtil;
 import com.restaurant.store.entity.Store;
 import lombok.RequiredArgsConstructor;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.restaurant.member.service.MailService;
+
+import java.security.SecureRandom;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -30,26 +39,36 @@ public class AuthServiceImpl implements AuthService {
         private final PasswordEncoder passwordEncoder;
         private final JwtUtil jwtUtil;
         private final MailService mailService;
-        private final Map<String, String> verificationCodes = new ConcurrentHashMap<>();
 
-        // -----Member帳號註冊（核心 User + 1:1 MemberProfile）-----
+        // 註冊 Email 驗證用
+        private final Map<String, String> verificationCodes = new ConcurrentHashMap<>();
+        private final Set<String> verifiedEmails = ConcurrentHashMap.newKeySet();
+
+        // 忘記密碼驗證用，避免跟註冊驗證混在一起
+        private final Map<String, String> passwordResetCodes = new ConcurrentHashMap<>();
+
+        private static final SecureRandom RANDOM = new SecureRandom();
+
+        // -----Member 帳號註冊（核心 User + 1:1 MemberProfile）-----
         @Override
         @Transactional
         public LoginResponse registerMember(MemberRegisterRequest request) {
-                // 檢查Email是否重複
+
+                if (!verifiedEmails.contains(request.getEmail())) {
+                        throw new BusinessException("請先完成 Email 驗證");
+                }
+
                 if (userRepository.existsByEmail(request.getEmail())) {
                         throw new BusinessException("此 Email 已被註冊");
                 }
-                // 檢查手機號碼是否重複
+
                 if (userRepository.existsByPhone(request.getPhone())) {
                         throw new BusinessException("此手機號碼已被使用");
                 }
 
-                // 撈取資料庫中的預設角色
                 Role memberRole = roleRepository.findByRoleName("CUSTOMER")
                                 .orElseThrow(() -> new BusinessException("系統角色 CUSTOMER 不存在"));
 
-                // 建立User帳號
                 User user = User.builder()
                                 .role(memberRole)
                                 .email(request.getEmail())
@@ -64,10 +83,17 @@ public class AuthServiceImpl implements AuthService {
                 MemberProfile profile = MemberProfile.builder()
                                 .user(user)
                                 .build();
+
                 memberProfileRepository.save(profile);
 
-                // 註冊完直接產生 token，回傳完整的 LoginResponse
-                String token = jwtUtil.generateToken(user.getUserId(), user.getRole().getRoleName());
+                // 註冊成功後，清掉這次的驗證狀態，避免同一個 email 驗證狀態殘留
+                verifiedEmails.remove(request.getEmail());
+                verificationCodes.remove(request.getEmail());
+
+                String token = jwtUtil.generateToken(
+                                user.getUserId(),
+                                user.getRole().getRoleName());
+
                 return LoginResponse.builder()
                                 .accessToken(token)
                                 .tokenType("Bearer")
@@ -77,7 +103,7 @@ public class AuthServiceImpl implements AuthService {
                                 .build();
         }
 
-        // -----Staff帳號建立（後台管理者幫員工建立核心 User + 1:1 Staff）-----
+        // -----Staff 帳號建立（後台管理者幫員工建立核心 User + 1:1 Staff）-----
         @Override
         @Transactional
         public StaffResponse createStaff(StaffCreateRequest request) {
@@ -89,15 +115,18 @@ public class AuthServiceImpl implements AuthService {
                 Role role = roleRepository.findByRoleName(request.getRoleName())
                                 .orElseThrow(() -> new BusinessException("指定的系統角色不存在：" + request.getRoleName()));
 
-                Store store = Store.builder().storeId(request.getStoreId()).build();
+                Store store = Store.builder()
+                                .storeId(request.getStoreId())
+                                .build();
 
                 User user = User.builder()
                                 .role(role)
                                 .email(request.getEmail())
-                                .passwordHash(passwordEncoder.encode(request.getPassword())) // 預設密碼也要加密！
+                                .passwordHash(passwordEncoder.encode(request.getPassword()))
                                 .name(request.getName())
                                 .phone(request.getPhone())
                                 .build();
+
                 userRepository.save(user);
 
                 Staff staff = Staff.builder()
@@ -106,13 +135,13 @@ public class AuthServiceImpl implements AuthService {
                                 .staffNo(request.getStaffNo())
                                 .hireDate(request.getHireDate())
                                 .build();
+
                 staffRepository.save(staff);
 
                 return toStaffResponse(user, staff);
         }
 
-        // -----統一登入入口（驗證並依據角色簽發JWT通行證）-----
-
+        // -----統一登入入口（驗證並依據角色簽發 JWT 通行證）-----
         @Override
         @Transactional(readOnly = true)
         public LoginResponse login(LoginRequest request) {
@@ -120,13 +149,17 @@ public class AuthServiceImpl implements AuthService {
                 User user = userRepository.findByEmail(request.getEmail())
                                 .orElseThrow(() -> new BusinessException("找不到帳號"));
 
-                boolean passwordMatched = passwordEncoder.matches(request.getPassword(), user.getPasswordHash());
+                boolean passwordMatched = passwordEncoder.matches(
+                                request.getPassword(),
+                                user.getPasswordHash());
 
                 if (!passwordMatched) {
                         throw new BusinessException("帳號或密碼錯誤");
                 }
 
-                String token = jwtUtil.generateToken(user.getUserId(), user.getRole().getRoleName());
+                String token = jwtUtil.generateToken(
+                                user.getUserId(),
+                                user.getRole().getRoleName());
 
                 return LoginResponse.builder()
                                 .accessToken(token)
@@ -137,13 +170,18 @@ public class AuthServiceImpl implements AuthService {
                                 .build();
         }
 
+        // -----寄送註冊 Email 驗證碼-----
         @Override
         public void sendEmailVerificationCode(String email) {
 
-                String code = String.valueOf(
-                                (int) ((Math.random() * 900000) + 100000));
+                if (userRepository.existsByEmail(email)) {
+                        throw new BusinessException("此 Email 已被註冊");
+                }
+
+                String code = generateSixDigitCode();
 
                 verificationCodes.put(email, code);
+                verifiedEmails.remove(email);
 
                 mailService.sendEmail(
                                 email,
@@ -151,44 +189,65 @@ public class AuthServiceImpl implements AuthService {
                                 "您好，您的驗證碼為：" + code);
         }
 
+        // -----驗證註冊 Email 驗證碼-----
         @Override
         public boolean verifyEmailCode(String email, String code) {
 
                 String savedCode = verificationCodes.get(email);
 
-                return savedCode != null &&
-                                savedCode.equals(code);
+                boolean success = savedCode != null && savedCode.equals(code);
+
+                if (success) {
+                        verifiedEmails.add(email);
+                        verificationCodes.remove(email);
+                }
+
+                return success;
         }
 
+        // -----忘記密碼：寄送重設密碼驗證碼-----
         @Override
         public void forgotPassword(String email) {
 
                 User user = userRepository.findByEmail(email)
                                 .orElseThrow(() -> new BusinessException("此 Email 不存在"));
 
-                sendEmailVerificationCode(user.getEmail());
+                String code = generateSixDigitCode();
+
+                passwordResetCodes.put(user.getEmail(), code);
+
+                mailService.sendEmail(
+                                user.getEmail(),
+                                "敘日會員密碼重設驗證信",
+                                "您好，您的密碼重設驗證碼為：" + code);
         }
 
+        // -----重設密碼-----
         @Override
         @Transactional
-        public void resetPassword(
-                        String email,
-                        String code,
-                        String newPassword) {
+        public void resetPassword(String email, String code, String newPassword) {
 
-                if (!verifyEmailCode(email, code)) {
+                String savedCode = passwordResetCodes.get(email);
+
+                if (savedCode == null || !savedCode.equals(code)) {
                         throw new BusinessException("驗證碼錯誤");
                 }
 
                 User user = userRepository.findByEmail(email)
                                 .orElseThrow(() -> new BusinessException("找不到帳號"));
 
-                user.setPasswordHash(
-                                passwordEncoder.encode(newPassword));
+                user.setPasswordHash(passwordEncoder.encode(newPassword));
 
                 userRepository.save(user);
 
-                verificationCodes.remove(email);
+                passwordResetCodes.remove(email);
+        }
+
+        /**
+         * 產生 6 位數驗證碼
+         */
+        private String generateSixDigitCode() {
+                return String.valueOf(RANDOM.nextInt(900000) + 100000);
         }
 
         /**
