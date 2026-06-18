@@ -4,6 +4,7 @@
 import { computed, ref } from "vue";
 import axios from "axios";
 import { useRouter } from "vue-router";
+import Swal from "sweetalert2";
 //Router
 const router = useRouter();
 
@@ -269,6 +270,25 @@ const isNameValid = computed(() => {
 const isPhoneValid = computed(() => {
     return /^09\d{8}$/.test(customerForm.value.phone);
 });
+function showError(message) {
+    Swal.fire({
+        icon: "warning",
+        title: "提醒",
+        text: message,
+        confirmButtonText: "知道了",
+        confirmButtonColor: "#e8ad78",
+    });
+}
+
+function showSuccess(message) {
+    return Swal.fire({
+        icon: "success",
+        title: message,
+        confirmButtonText: "確認",
+        confirmButtonColor: "#e8ad78",
+    });
+}
+
 
 const phoneInput = ref(null);
 const agreePolicyInput = ref(null);
@@ -320,7 +340,7 @@ function removeItem(menuItemId) {
 
 function goCheckout() {
     if (cartItems.value.length === 0) {
-        alert("請先加入餐點");
+        showToast("請先加入餐點", "error");
         return;
     }
 
@@ -355,11 +375,12 @@ function formatOnlyNumber(maxLength) {
 }
 
 async function submitOrder() {
+
     if (
         customerForm.value.invoiceType === "MOBILE_BARCODE" &&
         !/^\/[0-9A-Z.+-]{7}$/.test(customerForm.value.carrierNumber)
     ) {
-        alert("請輸入正確手機條碼載具");
+        showError("請輸入正確手機條碼載具");
         return;
     }
 
@@ -368,7 +389,7 @@ async function submitOrder() {
         customerForm.value.invoiceType === 'TAX_ID' &&
         !/^\d{8}$/.test(customerForm.value.carrierNumber)
     ) {
-        alert('請輸入正確統一編號')
+        showError('請輸入正確統一編號')
         return
     }
 
@@ -377,38 +398,41 @@ async function submitOrder() {
         customerForm.value.invoiceType === 'DONATION' &&
         !/^\d{3,7}$/.test(customerForm.value.carrierNumber)
     ) {
-        alert('請輸入正確愛心碼')
+        showError('請輸入正確愛心碼')
         return
     }
 
     if (!customerForm.value.customerName) {
-        alert("請輸入姓名");
+        showError("請輸入姓名");
         return;
     }
 
     if (!customerForm.value.customerName?.trim()) {
-        alert("請輸入姓名");
+        touched.value.customerName = true;
+        showError("請輸入姓名");
         return;
     }
 
     if (!customerForm.value.phone) {
-        alert("請輸入電話號碼");
+        touched.value.phone = true;
+        showError("請輸入電話號碼");
         return;
     }
     const namePattern = /^[A-Za-z\u4e00-\u9fa5\s]{2,20}$/;
 
     if (!namePattern.test(customerForm.value.customerName.trim())) {
-        alert("姓名格式不正確");
+        showToast("姓名格式不正確", "error");
         return;
     }
 
     if (!/^09\d{8}$/.test(customerForm.value.phone)) {
-        alert("請輸入正確手機號碼");
+        touched.value.phone = true;
+        showToast("請輸入正確手機號碼", "error");
         return;
     }
 
     if (!customerForm.value.agreePolicy) {
-        alert("請先勾選同意條款");
+        showToast("請先勾選同意條款", "error");
         return;
     }
 
@@ -446,23 +470,73 @@ async function submitOrder() {
     // }
 
     if (customerForm.value.paymentMethod === "CREDIT_CARD") {
+        await Swal.fire({
+            icon: "success",
+            title: "訂單建立成功",
+            text: "即將前往綠界付款頁面",
+            confirmButtonText: "前往付款",
+            confirmButtonColor: "#e8ad78",
+        });
+
         window.location.href =
             `http://localhost:8080/api/payments/ecpay/checkout/${orderId}`;
         return;
     }
 
     if (customerForm.value.paymentMethod === "LINE_PAY") {
+        await Swal.fire({
+            icon: "success",
+            title: "訂單建立成功",
+            text: "即將前往 Line Pay 付款頁面",
+            confirmButtonText: "前往付款",
+            confirmButtonColor: "#e8ad78",
+        });
+
         window.location.href =
             `http://localhost:8080/api/payments/linepay/request/${orderId}`;
         return;
     }
-    alert("訂單送出成功");
+
+    // 現場付款
+    await Swal.fire({
+        icon: "success",
+        title: "訂單送出成功",
+        text: "請至櫃台完成付款與取餐",
+        confirmButtonText: "確認",
+        timer: 5000,
+        confirmButtonColor: "#e8ad78",
+    });
+
+    cartItems.value = [];
+
+    customerForm.value = {
+        customerName: "",
+        phone: "",
+        title: "小姐",
+        paymentMethod: "CASH",
+        needTableware: false,
+        agreePolicy: false,
+        invoiceType: "NONE",
+        carrierNumber: "",
+    };
+
+    touched.value = {
+        customerName: false,
+        phone: false,
+    };
+
+    step.value = "MENU";
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+    });
 }
 // =========================
 </script>
 
 <template>
     <!-- 1. 點餐頁 Header -->
+
     <main class="order-page">
         <div v-if="step === 'MENU'">
             <section class="order-header">
