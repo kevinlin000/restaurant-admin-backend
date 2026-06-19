@@ -32,10 +32,6 @@ import '../src/assets/vendor/libs/bootstrap-select/bootstrap-select.css'
 // Page CSS
 import '../src/assets/vendor/css/pages/app-calendar.css'
 
-// import '../src/assets/vendor/js/helpers.js'
-// import '../src/assets/js/config.js'
-
-
 const app = createApp(App)
 
 app.use(createPinia())
