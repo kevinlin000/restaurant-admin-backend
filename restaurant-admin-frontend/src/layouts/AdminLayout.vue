@@ -359,7 +359,10 @@ const logout = () => {
 
           <ul v-show="openMenu.store" class="submenu">
             <li>
-              <a href="#" @click.prevent="goTo('/admin/store', ['ADMIN'])">
+              <a
+                href="#"
+                @click.prevent="goTo('/admin/store', ['MANAGER', 'ADMIN'])"
+              >
                 分店與桌位
               </a>
             </li>
