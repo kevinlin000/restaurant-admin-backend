@@ -10,7 +10,7 @@ import com.restaurant.menu.entity.MenuItem;
 import com.restaurant.menu.entity.StoreMenu;
 import com.restaurant.menu.repository.MenuItemRepository;
 
-import com.restaurant.menu.dto.StoreMenuDisplayResponse; // 🎯 引入剛建好的動態回傳規格
+import com.restaurant.menu.dto.StoreMenuDisplayResponse; // 🎯 引入動態回傳規格
 import com.restaurant.menu.repository.StoreMenuRepository; // 🎯 引入新分店數據庫鑰匙
 import java.util.ArrayList; // 🎯 順便引入 Java 萬能大籃子 ArrayList
 
@@ -20,7 +20,7 @@ public class MenuItemService {
     @Autowired
     private MenuItemRepository menuItemRepository;
 
-    // 💡 1. 補上全新電話線，讓 Service 能同時讀取總部與分店兩張表！
+    // 💡 補上全新電話線，讓 Service 能同時讀取總部與分店兩張表！
     @Autowired
     private StoreMenuRepository storeMenuRepository;
 
@@ -72,6 +72,7 @@ public class MenuItemService {
         existingItem.setIsActive(false); // 🎯 完美對齊最新的布林值下架！
         return menuItemRepository.save(existingItem);
     }
+
     // 🚀 高階商務邏輯：動態計算各店專屬菜單
     public List<StoreMenuDisplayResponse> getStoreMenu(Long storeId) {
         List<StoreMenuDisplayResponse> displayList = new ArrayList<>();
@@ -86,21 +87,42 @@ public class MenuItemService {
             // 步驟 C：確保總部沒有把這道菜大下架 (is_active = true)
             if (item != null && item.getIsActive()) {
                 StoreMenuDisplayResponse response = new StoreMenuDisplayResponse();
+                
+                // 1. 填入餐點基本 ID
                 response.setId(item.getId());
+                
+                // 🎯 核心防禦點修正：如果總部資料庫的 categoryId 剛好是 null，自動給 1L (Long) 保底，絕對不噴 500 空指標異常！
+                response.setCategoryId(item.getCategoryId() != null ? item.getCategoryId() : 1L);
+                
                 response.setItemName(item.getItemName());
                 response.setDescription(item.getDescription());
                 response.setImageUrl(item.getImageUrl());
                 response.setAllergenInfo(item.getAllergenInfo());
 
-                // 🔥 核心商業邏輯精髓：如果分店有客製化售價，就用分店價；如果為 null，自動退回總部建議售價！
+                // 🔥 核心商業邏輯：如果分店有客製化售價，就用分店價；如果為 null，自動退回總部建議售價！
                 if (storeMenu.getPrice() != null) {
                     response.setFinalPrice(storeMenu.getPrice());
                 } else {
                     response.setFinalPrice(item.getPrice());
                 }
 
+                // 🔥 售罄實時連動邏輯：
+                // 1. 如果分店設定為不可供應 (isAvailable == false)，則直接鎖定按鈕！
+                // 2. 如果總部把這道菜全台灣停售了 (isActive == false)，也直接鎖定按鈕！
+                if (storeMenu.getIsAvailable() != null && !storeMenu.getIsAvailable()) {
+                    response.setIsSelectable(false); // 鎖定按鈕，顯示已售罄！
+                } else if (item.getIsActive() != null && !item.getIsActive()) {
+                    response.setIsSelectable(false); // 總部停售，鎖定按鈕！
+                } else {
+                    response.setIsSelectable(true);  // 正常開放加入購物車！
+                }
+
+                // 🤝 初始化特色標籤籃子，完美預留組長前台展示空間！
+                response.setFeatureTags(new ArrayList<>()); 
+
                 displayList.add(response);
             }
-        }     return displayList;
+        }    
+        return displayList;
     }
 }

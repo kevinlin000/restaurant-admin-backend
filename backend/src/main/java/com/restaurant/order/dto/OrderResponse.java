@@ -2,6 +2,7 @@ package com.restaurant.order.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import lombok.Builder;
 import lombok.Data;
@@ -9,7 +10,8 @@ import lombok.Data;
 @Data
 @Builder
 public class OrderResponse {
-     private Long orderId;
+    
+    private Long orderId;
 
     private Long userId;
 
@@ -32,5 +34,13 @@ public class OrderResponse {
     private String status;
 
     private LocalDateTime createdAt;
+
+    private String paymentMethod;
+
+    private String invoiceType;
     
+    private String carrierNumber;
+
+    private List<OrderItemResponse> items;
+
 }

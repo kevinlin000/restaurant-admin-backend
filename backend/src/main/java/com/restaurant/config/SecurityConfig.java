@@ -53,8 +53,23 @@ public class SecurityConfig {
 
                         // ===== 前台公開查詢 =====
                         .requestMatchers(HttpMethod.GET, "/api/stores/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/stores/nearby").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/menu-categories/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/menu-items/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/menu-component/stores/**").permitAll()
+
+                        // ===== 前台訂位（允許未登入訂位）=====
+                        .requestMatchers(HttpMethod.GET, "/api/reservations/slots/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/reservations").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/reservations/*").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/api/reservations/*").permitAll()
+                        .requestMatchers(HttpMethod.PATCH, "/api/reservations/*/reserve").permitAll()
+                        .requestMatchers(HttpMethod.DELETE, "/api/reservations/*").permitAll()
+
+                        // ===== 前台訂單 / 付款（Demo 允許未登入操作）=====
+                        .requestMatchers(HttpMethod.POST, "/api/orders").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/orders/**").permitAll()
+                        .requestMatchers("/api/payments/**").permitAll()
 
                         // ===== 個人資料路由（所有已登入角色都可以看 / 修改自己的資料）=====
                         .requestMatchers("/api/members/me/**")
@@ -76,6 +91,12 @@ public class SecurityConfig {
                         // 門市與桌位管理：給 ADMIN、MANAGER
                         .requestMatchers("/api/admin/stores/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
                         .requestMatchers("/api/admin/tables/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
+
+                        // 後台訂位管理：給 STAFF、MANAGER、ADMIN
+                        .requestMatchers("/api/admin/reservations/**")
+                        .hasAnyAuthority("ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
+                        .requestMatchers("/api/admin/reservation-settings/**")
+                        .hasAnyAuthority("ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
 
                         // 其他所有後台 API：給 STAFF、MANAGER、ADMIN
                         // 這條很重要，避免 CUSTOMER 直接用 Postman 打其他 /api/admin/** API

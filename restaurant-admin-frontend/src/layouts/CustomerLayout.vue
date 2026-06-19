@@ -44,7 +44,7 @@ const dropdownItems = computed(() => {
     },
     {
       label: "訂單管理",
-      path: "/admin/home",
+      path: "/admin/order-manage",
       icon: "bi-receipt",
       roles: ["STAFF", "MANAGER", "ADMIN"],
     },
@@ -56,13 +56,13 @@ const dropdownItems = computed(() => {
     },
     {
       label: "店家檔案設定",
-      path: "/admin/store",
+      path: "/admin/profile",
       icon: "bi-shop",
       roles: ["MANAGER", "ADMIN"],
     },
     {
       label: "員工管理",
-      path: "/admin/home",
+      path: "/admin/member",
       icon: "bi-people",
       roles: ["ADMIN"],
     },
@@ -74,7 +74,9 @@ const dropdownItems = computed(() => {
     },
   ];
 
-  return items.filter((item) => !item.roles || item.roles.includes(roleName.value));
+  return items.filter(
+    (item) => !item.roles || item.roles.includes(roleName.value),
+  );
 });
 
 onMounted(() => {
@@ -107,7 +109,7 @@ const logout = async () => {
 
 <template>
   <div class="layout-wrapper">
-    <!-- Navbar (視窗縮小 navbar-expand-lg)-->
+    <!-- Navbar -->
     <nav class="landing-navbar">
       <div class="container">
         <div class="navbar navbar-expand-lg">
@@ -219,12 +221,8 @@ const logout = async () => {
       </div>
     </footer>
 
-    <!-- Overlay -->
     <div class="layout-overlay layout-menu-toggle"></div>
-
-    <!-- Drag Target Area To SlideIn Menu On Small Screens -->
     <div class="drag-target"></div>
-    <!-- / Layout wrapper -->
   </div>
 </template>
 
@@ -301,7 +299,7 @@ const logout = async () => {
   color: #e3ac7f;
 }
 
-/* 點到目前所在頁面 */
+/* 點到目前所選頁面 */
 .navbar-nav .nav-link.router-link-exact-active:not(.login-btn) {
   color: #e3ac7f;
   font-weight: bold;
@@ -350,7 +348,8 @@ const logout = async () => {
   flex: 1;
   min-height: calc(100vh - 160px);
   background-attachment: scroll;
-  background-color: #f8f3ed;
+  /* background-color:#f8f3ed; */
+  background: url("../assets/images/background.png");
 }
 
 /* footer */
@@ -366,15 +365,12 @@ const logout = async () => {
   .landing-navbar .navbar {
     border-radius: 16px;
   }
-
   .navbar-collapse {
     padding-top: 20px;
   }
-
   .navbar-nav {
     margin-bottom: 20px;
   }
-
   .navbar-nav .nav-link {
     margin: 10px 0;
   }

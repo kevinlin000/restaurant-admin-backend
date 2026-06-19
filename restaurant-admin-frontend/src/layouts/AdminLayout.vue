@@ -233,14 +233,14 @@ const logout = () => {
               <a
                 href="#"
                 @click.prevent="
-                  goTo('/admin/reservation-setting', [
+                  goTo('/admin/reservation-time-setting', [
                     'STAFF',
                     'MANAGER',
                     'ADMIN',
                   ])
                 "
               >
-                設定
+                訂位日期＆時段
               </a>
             </li>
             <hr />

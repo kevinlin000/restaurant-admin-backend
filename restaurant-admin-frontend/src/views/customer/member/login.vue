@@ -43,10 +43,6 @@
 
       <!-- 忘記密碼畫面 -->
       <template v-else>
-        <button class="back-link" type="button" @click="backToLogin">
-          ← 返回登入
-        </button>
-
         <h2 class="title">重設密碼</h2>
         <p class="forgot-desc">
           請輸入註冊時使用的電子信箱，我們會寄送密碼重設驗證碼

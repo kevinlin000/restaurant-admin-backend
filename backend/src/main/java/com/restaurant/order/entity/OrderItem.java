@@ -2,6 +2,8 @@ package com.restaurant.order.entity;
 
 import java.math.BigDecimal;
 
+import com.restaurant.menu.entity.MenuItem;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -23,9 +25,9 @@ public class OrderItem {
     @JoinColumn(name = "order_id")
     private Order order;
 
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "menu_item_id")
-    // private MenuItem menuItem;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "menu_item_id")
+    private MenuItem menuItem;
 
     @Column(name = "quantity")
     private Integer quantity;
