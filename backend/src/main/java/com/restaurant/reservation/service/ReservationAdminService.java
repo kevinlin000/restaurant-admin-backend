@@ -28,6 +28,10 @@ public class ReservationAdminService {
     private final TableInfoRepository tableInfoRepository;
     private final ReservationService reservationService;
 
+    public Long getReservationStoreId(Long reservationId) {
+        return findReservation(reservationId).getStoreId();
+    }
+
     // 訂位名單頁：查某分店全部訂位 -> 轉成包含時段、桌號的 DTO
     public List<ReservationResponse> getReservationList(Long storeId) {
         return reservationRepository.findByStoreIdOrderByCreatedAtDesc(storeId).stream()
@@ -74,8 +78,7 @@ public class ReservationAdminService {
     // 分配或重新分配桌位
     @Transactional
     public ReservationResponse assignTables(AssignTableRequest request) {
-        Reservation reservation = reservationRepository.findById(request.getReservationId())
-                .orElseThrow(() -> new ResourceNotFoundException("訂位", request.getReservationId()));
+        Reservation reservation = findReservation(request.getReservationId());
         if (reservation.isLocked()) {
             throw new BusinessException("已入座或已完成的訂位不能更改桌位");
         }
@@ -115,8 +118,7 @@ public class ReservationAdminService {
     // 店家後台直接更改保留訂位：PENDING 改成 RESERVED
     @Transactional
     public ReservationResponse reserve(Long reservationId) {
-        Reservation reservation = reservationRepository.findById(reservationId)
-                .orElseThrow(() -> new ResourceNotFoundException("訂位", reservationId));
+        Reservation reservation = findReservation(reservationId);
         if (reservation.isLocked()) {
             throw new BusinessException("已入座或已完成的訂位不能更改狀態");
         }
@@ -131,8 +133,7 @@ public class ReservationAdminService {
     // 訂位總覽勾選入座
     @Transactional
     public ReservationResponse checkIn(Long reservationId) {
-        Reservation reservation = reservationRepository.findById(reservationId)
-                .orElseThrow(() -> new ResourceNotFoundException("訂位", reservationId));
+        Reservation reservation = findReservation(reservationId);
         if ("CANCELLED".equals(reservation.getStatus())) {
             throw new BusinessException("已取消的訂位不能入座");
         }
@@ -144,8 +145,7 @@ public class ReservationAdminService {
     // 編輯訂位基本資料
     @Transactional
     public ReservationResponse updateReservationInfo(Long reservationId, CreateReservationRequest request) {
-        Reservation reservation = reservationRepository.findById(reservationId)
-                .orElseThrow(() -> new ResourceNotFoundException("訂位", reservationId));
+        Reservation reservation = findReservation(reservationId);
         if (reservation.isLocked() || "CANCELLED".equals(reservation.getStatus())) {
             throw new BusinessException("已入座、已完成或已取消的訂位不能編輯");
         }
@@ -160,5 +160,10 @@ public class ReservationAdminService {
         reservation.setSpecialRequest(request.getSpecialRequest());
         reservationRepository.save(reservation);
         return reservationService.toResponse(reservation);
+    }
+
+    private Reservation findReservation(Long reservationId) {
+        return reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ResourceNotFoundException("訂位", reservationId));
     }
 }

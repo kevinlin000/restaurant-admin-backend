@@ -5,9 +5,11 @@ import com.restaurant.reservation.dto.TimeSlotRequest;
 import com.restaurant.reservation.entity.ReservationCapacity;
 import com.restaurant.reservation.entity.TimeSlot;
 import com.restaurant.reservation.service.ReservationSettingService;
+import com.restaurant.store.service.StoreAdminAccessService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,19 +29,23 @@ import java.util.List;
 public class ReservationSettingController {
 
     private final ReservationSettingService reservationSettingService;
+    private final StoreAdminAccessService storeAdminAccessService;
 
     // 查詢可訂時段列表
     @GetMapping("/time-slots")
     public ApiResponse<List<TimeSlot>> getTimeSlots(
             @RequestParam Long storeId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            Authentication authentication
     ) {
+        storeAdminAccessService.requireStoreAccess(authentication, storeId);
         return ApiResponse.success(reservationSettingService.getTimeSlots(storeId, date));
     }
 
     // 新增訂位時段，依分店桌位同步產生容量。
     @PostMapping("/time-slots")
-    public ApiResponse<TimeSlot> createTimeSlot(@Valid @RequestBody TimeSlotRequest request) {
+    public ApiResponse<TimeSlot> createTimeSlot(@Valid @RequestBody TimeSlotRequest request, Authentication authentication) {
+        storeAdminAccessService.requireStoreAccess(authentication, request.getStoreId());
         return ApiResponse.success("訂位時段已新增", reservationSettingService.createTimeSlot(request));
     }
 
@@ -47,28 +53,34 @@ public class ReservationSettingController {
     @PutMapping("/time-slots/{slotId}")
     public ApiResponse<TimeSlot> updateTimeSlot(
             @PathVariable Long slotId,
-            @Valid @RequestBody TimeSlotRequest request
+            @Valid @RequestBody TimeSlotRequest request,
+            Authentication authentication
     ) {
+        storeAdminAccessService.requireStoreAccess(authentication, reservationSettingService.getTimeSlotStoreId(slotId));
+        storeAdminAccessService.requireStoreAccess(authentication, request.getStoreId());
         return ApiResponse.success("訂位時段已更新", reservationSettingService.updateTimeSlot(slotId, request));
     }
 
     // 刪除訂位時段。
     @DeleteMapping("/time-slots/{slotId}")
-    public ApiResponse<Void> deleteTimeSlot(@PathVariable Long slotId) {
+    public ApiResponse<Void> deleteTimeSlot(@PathVariable Long slotId, Authentication authentication) {
+        storeAdminAccessService.requireStoreAccess(authentication, reservationSettingService.getTimeSlotStoreId(slotId));
         reservationSettingService.deleteTimeSlot(slotId);
         return ApiResponse.success("訂位時段已刪除");
     }
 
     // 重新計算時段容量
     @PostMapping("/time-slots/{slotId}/rebuild-capacity")
-    public ApiResponse<Void> rebuildCapacity(@PathVariable Long slotId) {
+    public ApiResponse<Void> rebuildCapacity(@PathVariable Long slotId, Authentication authentication) {
+        storeAdminAccessService.requireStoreAccess(authentication, reservationSettingService.getTimeSlotStoreId(slotId));
         reservationSettingService.rebuildCapacity(slotId);
         return ApiResponse.success("容量已重新計算");
     }
 
     // 查某時段容量，顯示總數、已訂、剩餘。
     @GetMapping("/time-slots/{slotId}/capacity")
-    public ApiResponse<List<ReservationCapacity>> getCapacity(@PathVariable Long slotId) {
+    public ApiResponse<List<ReservationCapacity>> getCapacity(@PathVariable Long slotId, Authentication authentication) {
+        storeAdminAccessService.requireStoreAccess(authentication, reservationSettingService.getTimeSlotStoreId(slotId));
         return ApiResponse.success(reservationSettingService.getCapacity(slotId));
     }
 }

@@ -27,6 +27,10 @@ public class ReservationSettingService {
     private final ReservationCapacityRepository capacityRepository;
     private final ReservationRepository reservationRepository;
 
+    public Long getTimeSlotStoreId(Long slotId) {
+        return findTimeSlot(slotId).getStoreId();
+    }
+
     // 日期時段設定名單：查分店全部時段
     public List<TimeSlot> getTimeSlots(Long storeId, java.time.LocalDate date) {
         if (date == null) {
@@ -60,8 +64,7 @@ public class ReservationSettingService {
     // 修改訂位時段
     @Transactional
     public TimeSlot updateTimeSlot(Long slotId, TimeSlotRequest request) {
-        TimeSlot slot = timeSlotRepository.findById(slotId)
-                .orElseThrow(() -> new ResourceNotFoundException("訂位時段", slotId));
+        TimeSlot slot = findTimeSlot(slotId);
 
         timeSlotRepository.findByStoreIdAndReservationDateAndStartTime(
                 request.getStoreId(),
@@ -90,8 +93,7 @@ public class ReservationSettingService {
     // 刪除時段（已有訂位的時段不能刪）
     @Transactional
     public void deleteTimeSlot(Long slotId) {
-        TimeSlot slot = timeSlotRepository.findById(slotId)
-                .orElseThrow(() -> new ResourceNotFoundException("訂位時段", slotId));
+        TimeSlot slot = findTimeSlot(slotId);
         if (reservationRepository.existsBySlotId(slotId)) {
             throw new BusinessException("此時段已有訂位，不能刪除");
         }
@@ -102,8 +104,7 @@ public class ReservationSettingService {
     // 算容量：依 table_info 的可用桌位數建容量 -> reservation_capacity 計算已訂數，算容量
     @Transactional
     public void rebuildCapacity(Long slotId) {
-        TimeSlot slot = timeSlotRepository.findById(slotId)
-                .orElseThrow(() -> new ResourceNotFoundException("訂位時段", slotId));
+        TimeSlot slot = findTimeSlot(slotId);
 
         Map<Integer, Integer> reservedCountBySize = capacityRepository.findBySlotIdOrderByTableSizeAsc(slotId)
                 .stream()
@@ -137,5 +138,10 @@ public class ReservationSettingService {
     // 查時段容量，顯示總數、已訂、剩餘。
     public List<ReservationCapacity> getCapacity(Long slotId) {
         return capacityRepository.findBySlotIdOrderByTableSizeAsc(slotId);
+    }
+
+    private TimeSlot findTimeSlot(Long slotId) {
+        return timeSlotRepository.findById(slotId)
+                .orElseThrow(() -> new ResourceNotFoundException("訂位時段", slotId));
     }
 }
