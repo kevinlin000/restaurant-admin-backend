@@ -2,8 +2,8 @@
 import { ref } from 'vue'
 
 const openMenu = ref({
-  dashboard: true,
-  reservation: true,
+  dashboard: false,
+  reservation: false,
   menu: false,
   order: false,
   store: false
@@ -85,15 +85,9 @@ const toggleMenu = (menu) => {
           <li>
             <RouterLink to="/admin/reservation-table">分配桌位</RouterLink>
           </li>
-          <!-- <li>
-            <RouterLink to="/admin/table-setting">桌位設定</RouterLink>
-          </li> -->
           <li>
-            <RouterLink to="/admin/reservation-setting">設定</RouterLink>
+            <RouterLink to="/admin/reservation-time-setting">訂位日期＆時段</RouterLink>
           </li>
-          <!-- <li>
-            <RouterLink to="/admin/reservation-time">開放預約日期＆時段</RouterLink>
-          </li> -->
           <hr>
         </ul>
       </li>
@@ -169,24 +163,10 @@ const toggleMenu = (menu) => {
         </ul>
       </li>
     </ul>
-
-    <!-- 登入在左側導覽頁下方 -->
-    <!-- <div class="sidebar-footer">
-    <div class="profile-box">
-        <img src="../assets/images/logo.png" class="logo-image"/>
-        <div>
-        <div class="profile-name">店家</div>
-        <div class="profile-role">管理員</div>
-        </div>
-    </div>
-        <hr>
-        <i class="bx bx-log-out me-2 text-danger"></i>
-        <RouterLink class="text-danger" to="/admin/login">登出</RouterLink>
-    </div> -->
     
   </aside>
 
-  <!-- 右上角的 dropdown menu -->
+  <!-- 右上登入資訊 menu -->
   <!-- Main -->
   <div class="main-wrapper">
     <!-- Navbar -->
@@ -302,7 +282,7 @@ const toggleMenu = (menu) => {
   font-size:22px;
 }
 
-/* submenu */
+/* 子目錄 */
 
 .submenu{
   list-style:none;

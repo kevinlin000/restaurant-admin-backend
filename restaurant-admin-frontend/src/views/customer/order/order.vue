@@ -1,12 +1,13 @@
 <script setup>
 // =========================
 // Vue
-import { computed, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import axios from "axios";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import Swal from "sweetalert2";
 //Router
 const router = useRouter();
+const route = useRoute();
 
 // =========================
 // Images
@@ -44,15 +45,29 @@ const activeCategory = ref(1);
 
 // =========================
 // Order Form
+const firstQueryValue = (value) => (Array.isArray(value) ? value[0] : value);
+
+const parsePositiveId = (value, fallback = null) => {
+    const parsed = Number(firstQueryValue(value));
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const normalizeRouteOrderType = (value) => {
+    const normalized = String(firstQueryValue(value) || "TAKEOUT").trim().toUpperCase();
+    if (normalized === "TAKE_OUT") return "TAKEOUT";
+    return normalized === "DINE_IN" ? "DINE_IN" : "TAKEOUT";
+};
 
 const orderForm = ref({
     userId: 1,
-    storeId: 1,
-    tableId: 1,
-    reservationId: null,
-    orderType: "DINE_IN",
+    storeId: parsePositiveId(route.query.storeId, 1),
+    tableId: parsePositiveId(route.query.tableId),
+    reservationId: parsePositiveId(route.query.reservationId),
+    orderType: normalizeRouteOrderType(route.query.orderType),
     pointsUsed: 0,
 });
+
+const selectedStoreName = computed(() => firstQueryValue(route.query.storeName) || `門市 ${orderForm.value.storeId}`);
 
 const step = ref("MENU");
 // MENU = 點餐畫面
@@ -77,8 +92,7 @@ const touched = ref({
 
 // =========================
 // Menu Data
-// 之後改成 Menu API
-const menuItems = ref([
+const fallbackMenuItems = [
     {
         id: 1,
         categoryId: 1,
@@ -219,7 +233,8 @@ const menuItems = ref([
         status: "AVAILABLE",
         allergenInfo: "無",
     },
-]);
+];
+const menuItems = ref([...fallbackMenuItems]);
 // =========================
 // Cart
 // 之後可搬到 Pinia
@@ -295,6 +310,92 @@ const agreePolicyInput = ref(null);
 const carrierInput = ref(null);
 const nameInput = ref(null);
 
+const getMenuItemImage = (item) => {
+    const imageUrl = item.imageUrl || "";
+    if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+        return imageUrl;
+    }
+
+    const name = item.itemName || "";
+    if (name.includes("胡麻")) return tofuImg;
+    if (name.includes("海鮮沙拉")) return seafoodSaladImg;
+    if (name.includes("綜合生魚片")) return sashimiImg;
+    if (name.includes("鮭魚刺身")) return salmonSashimiImg;
+    if (name.includes("握壽司")) return sushiImg;
+    if (name.includes("炙燒鮭魚")) return aburiSalmonSushiImg;
+    if (name.includes("壽喜燒")) return sukiyakiImg;
+    if (name.includes("天婦羅")) return tempuraImg;
+    if (name.includes("抹茶")) return matchaDessertImg;
+    if (name.includes("布丁")) return caramelPuddingImg;
+    if (name.includes("可爾必思")) return calpisImg;
+    if (name.includes("茶")) return japaneseTeaImg;
+    if (name.includes("啤")) return asahiBeerImg;
+    if (name.includes("清酒") || name.includes("吟釀")) return japaneseSakeImg;
+    return tofuImg;
+};
+
+const unwrap = (response) => response.data?.data ?? response.data ?? [];
+
+const normalizeStoreMenuItem = (item) => ({
+    id: item.id ?? item.menuItemId,
+    categoryId: Number(item.categoryId),
+    itemName: item.itemName,
+    description: item.description || "",
+    price: Number(item.finalPrice ?? item.price ?? 0),
+    imageUrl: getMenuItemImage(item),
+    status: item.isSelectable === false ? "SOLD_OUT" : "AVAILABLE",
+    allergenInfo: item.allergenInfo || "無",
+});
+
+const menuLoadError = ref("");
+
+async function loadStoreMenu(storeId) {
+    menuLoadError.value = "";
+
+    try {
+        const response = await axios.get(`/api/menu-items/store/${storeId}`);
+        const items = unwrap(response);
+        if (Array.isArray(items) && items.length > 0) {
+            menuItems.value = items.map(normalizeStoreMenuItem);
+            return;
+        }
+        menuItems.value = [...fallbackMenuItems];
+        menuLoadError.value = "此門市目前沒有可供應菜單，暫時顯示示範菜單";
+    } catch (error) {
+        menuItems.value = [...fallbackMenuItems];
+        menuLoadError.value = "門市菜單暫時無法載入，暫時顯示示範菜單";
+    }
+}
+
+watch(
+    () => route.query.storeId,
+    async (storeId) => {
+        orderForm.value.storeId = parsePositiveId(storeId, 1);
+        cartItems.value = [];
+        await loadStoreMenu(orderForm.value.storeId);
+    }
+);
+
+watch(
+    () => route.query.orderType,
+    (orderType) => {
+        orderForm.value.orderType = normalizeRouteOrderType(orderType);
+    }
+);
+
+watch(
+    () => route.query.tableId,
+    (tableId) => {
+        orderForm.value.tableId = parsePositiveId(tableId);
+    }
+);
+
+watch(
+    () => route.query.reservationId,
+    (reservationId) => {
+        orderForm.value.reservationId = parsePositiveId(reservationId);
+    }
+);
 
 // =========================
 // Cart Functions
@@ -436,11 +537,15 @@ async function submitOrder() {
         return;
     }
 
+    if (orderForm.value.orderType === "DINE_IN" && !orderForm.value.tableId) {
+        alert("內用訂單需要桌位資訊，請從訂位或桌邊 QR Code 進入點餐");
+        return;
+    }
 
     const request = {
         userId: orderForm.value.userId,
         storeId: orderForm.value.storeId,
-        tableId: orderForm.value.tableId,
+        tableId: orderForm.value.orderType === "DINE_IN" ? orderForm.value.tableId : null,
         reservationId: orderForm.value.reservationId,
         orderType: orderForm.value.orderType,
         pointsUsed: orderForm.value.pointsUsed,
@@ -460,7 +565,7 @@ async function submitOrder() {
     const orderId = response.data.orderId;
 
     // if (customerForm.value.paymentMethod === "LINE_PAY") {
-    //     router.push(`/payment/linepay/${orderId}`);
+    //     pusrouter.h(`/payment/linepay/${orderId}`);
     //     return;
     // }
 
@@ -531,6 +636,10 @@ async function submitOrder() {
         behavior: "smooth",
     });
 }
+
+onMounted(() => {
+    loadStoreMenu(orderForm.value.storeId);
+});
 // =========================
 </script>
 
@@ -543,6 +652,10 @@ async function submitOrder() {
                 <div>
                     <h1>點餐</h1>
                     <p>選擇餐點加入購物車，確認後送出訂單。</p>
+                    <p class="store-context">
+                        目前門市：<strong>{{ selectedStoreName }}</strong>
+                        <span>#{{ orderForm.storeId }}</span>
+                    </p>
                 </div>
 
                 <div class="order-type">
@@ -551,8 +664,8 @@ async function submitOrder() {
                         內用
                     </button>
 
-                    <button :class="{ active: orderForm.orderType === 'TAKE_OUT' }"
-                        @click="orderForm.orderType = 'TAKE_OUT'">
+                    <button :class="{ active: orderForm.orderType === 'TAKEOUT' }"
+                        @click="orderForm.orderType = 'TAKEOUT'">
                         外帶
                     </button>
                 </div>
@@ -564,6 +677,10 @@ async function submitOrder() {
                     {{ category.name }}
                 </button>
             </section>
+
+            <p v-if="menuLoadError" class="menu-alert">
+                {{ menuLoadError }}
+            </p>
 
             <!-- 3. 菜單列表：之後可拆 MenuList.vue / MenuCard.vue -->
             <section class="content-layout">
@@ -1181,6 +1298,25 @@ async function submitOrder() {
     margin-bottom: 8px;
 }
 
+.store-context {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 8px 12px;
+    border: 1px solid #ead7c5;
+    border-radius: 999px;
+    background: #fff8f1;
+    color: #8f623e;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.store-context span {
+    color: #9ca8b5;
+    font-weight: 600;
+}
+
 .order-type {
     display: flex;
     gap: 12px;
@@ -1208,6 +1344,16 @@ async function submitOrder() {
     gap: 12px;
     margin-bottom: 32px;
     flex-wrap: wrap;
+}
+
+.menu-alert {
+    margin: -12px 0 24px;
+    padding: 12px 16px;
+    border: 1px solid #ead7c5;
+    border-radius: 12px;
+    background: #fff8f1;
+    color: #8f623e;
+    font-weight: 700;
 }
 
 .content-layout {

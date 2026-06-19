@@ -41,7 +41,7 @@ const logout = async () => {
 
 <template>
   <div class="layout-wrapper">
-    <!-- Navbar (視窗縮小 navbar-expand-lg)-->
+    <!-- Navbar -->
     <nav class="landing-navbar">
       <div class="container">
         <div class="navbar navbar-expand-lg">
@@ -60,8 +60,7 @@ const logout = async () => {
             class="navbar-toggler border-0"
             type="button"
             data-bs-toggle="collapse"
-            data-bs-target="#navbarNav"
-          >
+            data-bs-target="#navbarNav">
             <i class="navbar-toggler-icon"></i>
           </button>
 
@@ -101,8 +100,7 @@ const logout = async () => {
                   href="#"
                   role="button"
                   data-bs-toggle="dropdown"
-                  aria-expanded="false"
-                >
+                  aria-expanded="false">
                   <i class="bi bi-person"></i>
                   Hi，{{ userInfo.name }}
                 </a>
@@ -118,8 +116,7 @@ const logout = async () => {
                     <button
                       class="dropdown-item text-danger"
                       type="button"
-                      @click="logout"
-                    >
+                      @click="logout">
                       登出
                     </button>
                   </li>
@@ -146,16 +143,13 @@ const logout = async () => {
       </div>
     </footer>
 
-    <!-- Overlay -->
     <div class="layout-overlay layout-menu-toggle"></div>
-
-    <!-- Drag Target Area To SlideIn Menu On Small Screens -->
     <div class="drag-target"></div>
-    <!-- / Layout wrapper -->
   </div>
 </template>
 
 <style scoped>
+
 /* 字型 */
 @import url("https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=New+Tegomin&display=swap");
@@ -228,7 +222,7 @@ const logout = async () => {
   color: #e3ac7f;
 }
 
-/* 點到目前所在頁面 */
+/* 點到目前所選頁面 */
 .navbar-nav .nav-link.router-link-exact-active:not(.login-btn) {
   color: #e3ac7f;
   font-weight: bold;
@@ -277,7 +271,8 @@ const logout = async () => {
   flex: 1;
   min-height: calc(100vh - 160px);
   background-attachment: scroll;
-  background-color: #f8f3ed;
+  /* background-color:#f8f3ed; */
+  background: url('../assets/images/background.png');
 }
 
 /* footer */
@@ -293,15 +288,12 @@ const logout = async () => {
   .landing-navbar .navbar {
     border-radius: 16px;
   }
-
   .navbar-collapse {
     padding-top: 20px;
   }
-
   .navbar-nav {
     margin-bottom: 20px;
   }
-
   .navbar-nav .nav-link {
     margin: 10px 0;
   }
