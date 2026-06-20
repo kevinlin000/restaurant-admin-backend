@@ -454,7 +454,7 @@ const handleRegister = async () => {
       showConfirmButton: false,
     });
 
-    router.push("/");
+    router.push("/profile");
   } catch (err) {
     errorMsg.value = err.response?.data?.message || "註冊失敗，請稍後再試";
   } finally {

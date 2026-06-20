@@ -138,6 +138,12 @@ public class AuthServiceImpl implements AuthService {
 
                 staffRepository.save(staff);
 
+                // 員工 / 店長 / 管理員也是 User，也可能到店消費與累積點數，
+                // 因此建立員工帳號時也補一筆 members 個人會員資料。
+                memberProfileRepository.save(MemberProfile.builder()
+                                .user(user)
+                                .build());
+
                 return toStaffResponse(user, staff);
         }
 

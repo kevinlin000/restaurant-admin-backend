@@ -17,7 +17,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  * Spring Security 主設定。
  * - Stateless：每個請求都靠 JWT 驗證
  * - CSRF 關閉：純 REST API 不需要 CSRF 保護
- * - CORS：已由 CorsConfig.java 統一管理，這裡不重複設定
+ * - CORS：由 CorsConfig.java 統一管理
  * - 路由權限：依角色（CUSTOMER / STAFF / MANAGER / ADMIN）分別設定
  */
 @Configuration
@@ -37,7 +37,7 @@ public class SecurityConfig {
                 .cors(cors -> {
                 })
 
-                // 使用 JWT
+                // 使用 JWT，不使用 Session
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 // 路由權限設定
@@ -51,9 +51,14 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/members/email/send-code").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/members/email/verify-code").permitAll()
 
-                        // 測試-訂位頁面讀取分店資料
+                        // ===== 前台公開查詢 =====
                         .requestMatchers(HttpMethod.GET, "/api/stores/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/stores/nearby").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/menu-categories/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/menu-items/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/menu-component/stores/**").permitAll()
+
+                        // ===== 前台訂位（允許未登入訂位）=====
                         .requestMatchers(HttpMethod.GET, "/api/reservations/slots/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/reservations").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/reservations/*").permitAll()
@@ -61,40 +66,46 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/api/reservations/*/reserve").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/api/reservations/*").permitAll()
 
-                        // 測試-後台訂位與分店設定頁面。
-                        // TODO: 後台分店權限完成後，改由 JWT 判斷可管理分店，並移除 permitAll。
-                        .requestMatchers("/api/admin/stores/**").permitAll()
-                        .requestMatchers("/api/admin/reservations/**").permitAll()
-                        .requestMatchers("/api/admin/reservation-settings/**").permitAll()
-
-                        // ===== 前台門市查詢（公開）=====
-                        .requestMatchers("/api/stores/**").permitAll()
-
-                        // ===== 訂單（Demo 測試先公開）=====
+                        // ===== 前台訂單 / 付款（Demo 允許未登入操作）=====
                         .requestMatchers(HttpMethod.POST, "/api/orders").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/orders/**").permitAll()
-
                         .requestMatchers("/api/payments/**").permitAll()
 
-                        // ===== 會員路由（需要登入，CUSTOMER 角色）=====
-                        .requestMatchers(HttpMethod.GET, "/api/members/me").hasAuthority("ROLE_CUSTOMER")
-                        .requestMatchers(HttpMethod.GET, "/api/members/me/points/**").hasAuthority("ROLE_CUSTOMER")
-                        .requestMatchers(HttpMethod.PUT, "/api/members/me").hasAuthority("ROLE_CUSTOMER")
-                        .requestMatchers(HttpMethod.PUT, "/api/members/me/password").hasAuthority("ROLE_CUSTOMER")
-                        .requestMatchers(HttpMethod.DELETE, "/api/members/me").hasAuthority("ROLE_CUSTOMER")
+                        // ===== 個人資料路由（所有已登入角色都可以看 / 修改自己的資料）=====
+                        .requestMatchers("/api/members/me/**")
+                        .hasAnyAuthority("ROLE_CUSTOMER", "ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/members/me")
+                        .hasAnyAuthority("ROLE_CUSTOMER", "ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/members/me")
+                        .hasAnyAuthority("ROLE_CUSTOMER", "ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/members/me")
+                        .hasAnyAuthority("ROLE_CUSTOMER", "ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
 
-                        // ===== 員工管理路由（需要 ADMIN 角色）=====
+                        // ===== 員工管理路由 =====
+                        // 建立員工：只給 ADMIN
                         .requestMatchers(HttpMethod.POST, "/api/members/staff").hasAuthority("ROLE_ADMIN")
+                        // 查詢 / 修改 / 刪除員工：給 ADMIN、MANAGER
                         .requestMatchers("/api/members/staff/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
 
-                        // ===== 後台門市管理（需要 ADMIN / MANAGER）=====
+                        // ===== 後台 API =====
+                        // 門市與桌位管理：給 ADMIN、MANAGER
                         .requestMatchers("/api/admin/stores/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
                         .requestMatchers("/api/admin/tables/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
+
+                        // 後台訂位管理：給 STAFF、MANAGER、ADMIN
+                        .requestMatchers("/api/admin/reservations/**")
+                        .hasAnyAuthority("ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
+                        .requestMatchers("/api/admin/reservation-settings/**")
+                        .hasAnyAuthority("ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
+
+                        // 其他所有後台 API：給 STAFF、MANAGER、ADMIN
+                        // 這條很重要，避免 CUSTOMER 直接用 Postman 打其他 /api/admin/** API
+                        .requestMatchers("/api/admin/**").hasAnyAuthority("ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
 
                         // 其餘所有請求都需要登入
                         .anyRequest().authenticated())
 
-                // 將 JwtAuthenticationFilter 插在 Spring Security 內建的帳密驗證 Filter 之前
+                // 將 JwtAuthenticationFilter 插在 Spring Security 內建帳密驗證 Filter 之前
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -102,7 +113,6 @@ public class SecurityConfig {
 
     /**
      * 密碼加密器，全系統統一使用 BCrypt。
-     * 宣告在這裡讓 Spring 管理，為 AuthServiceImpl 注入的 PasswordEncoder 。
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
