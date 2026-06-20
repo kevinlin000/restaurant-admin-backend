@@ -1,11 +1,13 @@
 <script setup>
 // =========================
 // Vue
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import axios from "axios";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
+import Swal from "sweetalert2";
 //Router
 const router = useRouter();
+const route = useRoute();
 
 // =========================
 // Images
@@ -43,15 +45,29 @@ const activeCategory = ref(1);
 
 // =========================
 // Order Form
+const firstQueryValue = (value) => (Array.isArray(value) ? value[0] : value);
+
+const parsePositiveId = (value, fallback = null) => {
+    const parsed = Number(firstQueryValue(value));
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const normalizeRouteOrderType = (value) => {
+    const normalized = String(firstQueryValue(value) || "TAKEOUT").trim().toUpperCase();
+    if (normalized === "TAKE_OUT") return "TAKEOUT";
+    return normalized === "DINE_IN" ? "DINE_IN" : "TAKEOUT";
+};
 
 const orderForm = ref({
     userId: 1,
-    storeId: 1,
-    tableId: 1,
-    reservationId: null,
-    orderType: "DINE_IN",
+    storeId: parsePositiveId(route.query.storeId, 1),
+    tableId: parsePositiveId(route.query.tableId),
+    reservationId: parsePositiveId(route.query.reservationId),
+    orderType: normalizeRouteOrderType(route.query.orderType),
     pointsUsed: 0,
 });
+
+const selectedStoreName = computed(() => firstQueryValue(route.query.storeName) || `門市 ${orderForm.value.storeId}`);
 
 const step = ref("MENU");
 // MENU = 點餐畫面
@@ -68,22 +84,15 @@ const customerForm = ref({
     carrierNumber: "",
 });
 
-watch(
-    () => customerForm.value.invoiceType,
-    (newValue) => {
-        if (
-            newValue === "MOBILE_BARCODE" &&
-            !customerForm.value.carrierNumber
-        ) {
-            customerForm.value.carrierNumber = "/";
-        }
-    }
-);
+const touched = ref({
+    customerName: false,
+    phone: false,
+});
+
 
 // =========================
 // Menu Data
-// 之後改成 Menu API
-const menuItems = ref([
+const fallbackMenuItems = [
     {
         id: 1,
         categoryId: 1,
@@ -224,7 +233,8 @@ const menuItems = ref([
         status: "AVAILABLE",
         allergenInfo: "無",
     },
-]);
+];
+const menuItems = ref([...fallbackMenuItems]);
 // =========================
 // Cart
 // 之後可搬到 Pinia
@@ -255,6 +265,137 @@ const totalAmount = computed(() => {
         return sum + item.price * item.quantity;
     }, 0);
 });
+
+const isCarrierValid = computed(() => {
+    return /^\/(?=.*[A-Z])(?=.*\d)[0-9A-Z.+-]{7}$/.test(
+        customerForm.value.carrierNumber
+    );
+});
+const isTaxIdValid = computed(() => {
+    return /^\d{8}$/.test(customerForm.value.carrierNumber)
+});
+const isLoveCodeValid = computed(() => {
+    return /^\d{3,7}$/.test(customerForm.value.carrierNumber)
+});
+const isNameValid = computed(() => {
+    const name = customerForm.value.customerName.trim();
+    return name.length >= 2 && name.length <= 20;
+});
+
+const isPhoneValid = computed(() => {
+    return /^09\d{8}$/.test(customerForm.value.phone);
+});
+function showError(message) {
+    Swal.fire({
+        icon: "warning",
+        title: "提醒",
+        text: message,
+        confirmButtonText: "知道了",
+        confirmButtonColor: "#e8ad78",
+    });
+}
+
+function showSuccess(message) {
+    return Swal.fire({
+        icon: "success",
+        title: message,
+        confirmButtonText: "確認",
+        confirmButtonColor: "#e8ad78",
+    });
+}
+
+
+const phoneInput = ref(null);
+const agreePolicyInput = ref(null);
+const carrierInput = ref(null);
+const nameInput = ref(null);
+
+const getMenuItemImage = (item) => {
+    const imageUrl = item.imageUrl || "";
+    if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+        return imageUrl;
+    }
+
+    const name = item.itemName || "";
+    if (name.includes("胡麻")) return tofuImg;
+    if (name.includes("海鮮沙拉")) return seafoodSaladImg;
+    if (name.includes("綜合生魚片")) return sashimiImg;
+    if (name.includes("鮭魚刺身")) return salmonSashimiImg;
+    if (name.includes("握壽司")) return sushiImg;
+    if (name.includes("炙燒鮭魚")) return aburiSalmonSushiImg;
+    if (name.includes("壽喜燒")) return sukiyakiImg;
+    if (name.includes("天婦羅")) return tempuraImg;
+    if (name.includes("抹茶")) return matchaDessertImg;
+    if (name.includes("布丁")) return caramelPuddingImg;
+    if (name.includes("可爾必思")) return calpisImg;
+    if (name.includes("茶")) return japaneseTeaImg;
+    if (name.includes("啤")) return asahiBeerImg;
+    if (name.includes("清酒") || name.includes("吟釀")) return japaneseSakeImg;
+    return tofuImg;
+};
+
+const unwrap = (response) => response.data?.data ?? response.data ?? [];
+
+const normalizeStoreMenuItem = (item) => ({
+    id: item.id ?? item.menuItemId,
+    categoryId: Number(item.categoryId),
+    itemName: item.itemName,
+    description: item.description || "",
+    price: Number(item.finalPrice ?? item.price ?? 0),
+    imageUrl: getMenuItemImage(item),
+    status: item.isSelectable === false ? "SOLD_OUT" : "AVAILABLE",
+    allergenInfo: item.allergenInfo || "無",
+});
+
+const menuLoadError = ref("");
+
+async function loadStoreMenu(storeId) {
+    menuLoadError.value = "";
+
+    try {
+        const response = await axios.get(`/api/menu-items/store/${storeId}`);
+        const items = unwrap(response);
+        if (Array.isArray(items) && items.length > 0) {
+            menuItems.value = items.map(normalizeStoreMenuItem);
+            return;
+        }
+        menuItems.value = [...fallbackMenuItems];
+        menuLoadError.value = "此門市目前沒有可供應菜單，暫時顯示示範菜單";
+    } catch (error) {
+        menuItems.value = [...fallbackMenuItems];
+        menuLoadError.value = "門市菜單暫時無法載入，暫時顯示示範菜單";
+    }
+}
+
+watch(
+    () => route.query.storeId,
+    async (storeId) => {
+        orderForm.value.storeId = parsePositiveId(storeId, 1);
+        cartItems.value = [];
+        await loadStoreMenu(orderForm.value.storeId);
+    }
+);
+
+watch(
+    () => route.query.orderType,
+    (orderType) => {
+        orderForm.value.orderType = normalizeRouteOrderType(orderType);
+    }
+);
+
+watch(
+    () => route.query.tableId,
+    (tableId) => {
+        orderForm.value.tableId = parsePositiveId(tableId);
+    }
+);
+
+watch(
+    () => route.query.reservationId,
+    (reservationId) => {
+        orderForm.value.reservationId = parsePositiveId(reservationId);
+    }
+);
 
 // =========================
 // Cart Functions
@@ -300,7 +441,7 @@ function removeItem(menuItemId) {
 
 function goCheckout() {
     if (cartItems.value.length === 0) {
-        alert("請先加入餐點");
+        showToast("請先加入餐點", "error");
         return;
     }
 
@@ -312,9 +453,7 @@ function backToMenu() {
 }
 
 function formatCarrier() {
-    let value = customerForm.value.carrierNumber;
-
-    value = value.toUpperCase();
+    let value = customerForm.value.carrierNumber.toUpperCase();
 
     if (!value.startsWith("/")) {
         value = "/" + value.replace(/\//g, "");
@@ -330,51 +469,83 @@ function formatCarrier() {
     customerForm.value.carrierNumber = value;
 }
 
+function formatOnlyNumber(maxLength) {
+    customerForm.value.carrierNumber = customerForm.value.carrierNumber
+        .replace(/\D/g, "")
+        .slice(0, maxLength);
+}
+
 async function submitOrder() {
+
     if (
         customerForm.value.invoiceType === "MOBILE_BARCODE" &&
         !/^\/[0-9A-Z.+-]{7}$/.test(customerForm.value.carrierNumber)
     ) {
-        alert("請輸入正確手機條碼載具");
+        showError("請輸入正確手機條碼載具");
         return;
     }
 
+    // 統編
+    if (
+        customerForm.value.invoiceType === 'TAX_ID' &&
+        !/^\d{8}$/.test(customerForm.value.carrierNumber)
+    ) {
+        showError('請輸入正確統一編號')
+        return
+    }
+
+    // 愛心碼
+    if (
+        customerForm.value.invoiceType === 'DONATION' &&
+        !/^\d{3,7}$/.test(customerForm.value.carrierNumber)
+    ) {
+        showError('請輸入正確愛心碼')
+        return
+    }
+
     if (!customerForm.value.customerName) {
-        alert("請輸入姓名");
+        showError("請輸入姓名");
         return;
     }
 
     if (!customerForm.value.customerName?.trim()) {
-        alert("請輸入姓名");
+        touched.value.customerName = true;
+        showError("請輸入姓名");
         return;
     }
 
     if (!customerForm.value.phone) {
-        alert("請輸入電話號碼");
+        touched.value.phone = true;
+        showError("請輸入電話號碼");
         return;
     }
     const namePattern = /^[A-Za-z\u4e00-\u9fa5\s]{2,20}$/;
 
     if (!namePattern.test(customerForm.value.customerName.trim())) {
-        alert("姓名格式不正確");
+        showToast("姓名格式不正確", "error");
         return;
     }
 
     if (!/^09\d{8}$/.test(customerForm.value.phone)) {
-        alert("請輸入正確手機號碼");
+        touched.value.phone = true;
+        showToast("請輸入正確手機號碼", "error");
         return;
     }
 
     if (!customerForm.value.agreePolicy) {
-        alert("請先勾選同意條款");
+        showToast("請先勾選同意條款", "error");
         return;
     }
 
+    if (orderForm.value.orderType === "DINE_IN" && !orderForm.value.tableId) {
+        alert("內用訂單需要桌位資訊，請從訂位或桌邊 QR Code 進入點餐");
+        return;
+    }
 
     const request = {
         userId: orderForm.value.userId,
         storeId: orderForm.value.storeId,
-        tableId: orderForm.value.tableId,
+        tableId: orderForm.value.orderType === "DINE_IN" ? orderForm.value.tableId : null,
         reservationId: orderForm.value.reservationId,
         orderType: orderForm.value.orderType,
         pointsUsed: orderForm.value.pointsUsed,
@@ -394,7 +565,7 @@ async function submitOrder() {
     const orderId = response.data.orderId;
 
     // if (customerForm.value.paymentMethod === "LINE_PAY") {
-    //     router.push(`/payment/linepay/${orderId}`);
+    //     pusrouter.h(`/payment/linepay/${orderId}`);
     //     return;
     // }
 
@@ -402,31 +573,89 @@ async function submitOrder() {
     //     router.push(`/payment/card/${orderId}`);
     //     return;
     // }
-   
-if (customerForm.value.paymentMethod === "CREDIT_CARD") {
-    window.location.href =
-        `http://localhost:8080/api/payments/ecpay/checkout/${orderId}`;
-    return;
+
+    if (customerForm.value.paymentMethod === "CREDIT_CARD") {
+        await Swal.fire({
+            icon: "success",
+            title: "訂單建立成功",
+            text: "即將前往綠界付款頁面",
+            confirmButtonText: "前往付款",
+            confirmButtonColor: "#e8ad78",
+        });
+
+        window.location.href =
+            `http://localhost:8080/api/payments/ecpay/checkout/${orderId}`;
+        return;
+    }
+
+    if (customerForm.value.paymentMethod === "LINE_PAY") {
+        await Swal.fire({
+            icon: "success",
+            title: "訂單建立成功",
+            text: "即將前往 Line Pay 付款頁面",
+            confirmButtonText: "前往付款",
+            confirmButtonColor: "#e8ad78",
+        });
+
+        window.location.href =
+            `http://localhost:8080/api/payments/linepay/request/${orderId}`;
+        return;
+    }
+
+    // 現場付款
+    await Swal.fire({
+        icon: "success",
+        title: "訂單送出成功",
+        text: "請至櫃台完成付款與取餐",
+        confirmButtonText: "確認",
+        timer: 5000,
+        confirmButtonColor: "#e8ad78",
+    });
+
+    cartItems.value = [];
+
+    customerForm.value = {
+        customerName: "",
+        phone: "",
+        title: "小姐",
+        paymentMethod: "CASH",
+        needTableware: false,
+        agreePolicy: false,
+        invoiceType: "NONE",
+        carrierNumber: "",
+    };
+
+    touched.value = {
+        customerName: false,
+        phone: false,
+    };
+
+    step.value = "MENU";
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+    });
 }
 
-if (customerForm.value.paymentMethod === "LINE_PAY") {
-    window.location.href =
-        `http://localhost:8080/api/payments/linepay/request/${orderId}`;
-    return;
-}
-    alert("訂單送出成功");
-}
+onMounted(() => {
+    loadStoreMenu(orderForm.value.storeId);
+});
 // =========================
 </script>
 
 <template>
     <!-- 1. 點餐頁 Header -->
+
     <main class="order-page">
         <div v-if="step === 'MENU'">
             <section class="order-header">
                 <div>
                     <h1>點餐</h1>
                     <p>選擇餐點加入購物車，確認後送出訂單。</p>
+                    <p class="store-context">
+                        目前門市：<strong>{{ selectedStoreName }}</strong>
+                        <span>#{{ orderForm.storeId }}</span>
+                    </p>
                 </div>
 
                 <div class="order-type">
@@ -435,8 +664,8 @@ if (customerForm.value.paymentMethod === "LINE_PAY") {
                         內用
                     </button>
 
-                    <button :class="{ active: orderForm.orderType === 'TAKE_OUT' }"
-                        @click="orderForm.orderType = 'TAKE_OUT'">
+                    <button :class="{ active: orderForm.orderType === 'TAKEOUT' }"
+                        @click="orderForm.orderType = 'TAKEOUT'">
                         外帶
                     </button>
                 </div>
@@ -448,6 +677,10 @@ if (customerForm.value.paymentMethod === "LINE_PAY") {
                     {{ category.name }}
                 </button>
             </section>
+
+            <p v-if="menuLoadError" class="menu-alert">
+                {{ menuLoadError }}
+            </p>
 
             <!-- 3. 菜單列表：之後可拆 MenuList.vue / MenuCard.vue -->
             <section class="content-layout">
@@ -571,44 +804,70 @@ if (customerForm.value.paymentMethod === "LINE_PAY") {
                 <div class="form-card">
                     <h3>付款方式</h3>
 
-                    <div class="payment-tabs">
-                        <button type="button" :class="{ active: customerForm.paymentMethod === 'CASH' }"
+                    <div class="payment-methods">
+
+                        <button type="button" class="payment-method-card"
+                            :class="{ active: customerForm.paymentMethod === 'CASH' }"
                             @click="customerForm.paymentMethod = 'CASH'">
-                            現場付款
+                            <div class="method-icon">💵</div>
+                            <div>
+                                <strong>現場付款</strong>
+                                <p>取餐時付款</p>
+                            </div>
                         </button>
 
-                        <button type="button" :class="{ active: customerForm.paymentMethod === 'LINE_PAY' }"
+                        <button type="button" class="payment-method-card"
+                            :class="{ active: customerForm.paymentMethod === 'LINE_PAY' }"
                             @click="customerForm.paymentMethod = 'LINE_PAY'">
-                            Line Pay
+                            <div class="method-icon">📱</div>
+                            <div>
+                                <strong>Line Pay</strong>
+                                <p>使用行動支付</p>
+                            </div>
                         </button>
 
-                        <button type="button" :class="{ active: customerForm.paymentMethod === 'CREDIT_CARD' }"
+                        <button type="button" class="payment-method-card"
+                            :class="{ active: customerForm.paymentMethod === 'CREDIT_CARD' }"
                             @click="customerForm.paymentMethod = 'CREDIT_CARD'">
-                            信用卡
+                            <div class="method-icon">💳</div>
+                            <div>
+                                <strong>信用卡</strong>
+                                <p>綠界安全付款</p>
+                            </div>
                         </button>
+
                     </div>
 
-                    <div v-if="customerForm.paymentMethod === 'CASH'" class="payment-box">
+                    <div v-if="customerForm.paymentMethod === 'CASH'" class="payment-info-box">
                         現場付款，取餐時付款。
                     </div>
 
-                    <div v-if="customerForm.paymentMethod === 'LINE_PAY'" class="payment-box">
+                    <div v-if="customerForm.paymentMethod === 'LINE_PAY'" class="payment-info-box">
                         <p>Line Pay 掃碼付款</p>
                         <div class="fake-qr">QR</div>
                         <small>Demo 用：正式版會由後端金流 API 產生付款連結或 QR Code。</small>
                     </div>
 
-                    <div v-if="customerForm.paymentMethod === 'CREDIT_CARD'" class="payment-box">
-                        <label>信用卡卡號</label>
-                        <input type="text" placeholder="**** **** **** ****" disabled />
+                    <div v-if="customerForm.paymentMethod === 'CREDIT_CARD'" class="payment-info-box">
+                        <div class="payment-icon">💳</div>
 
-                        <label>有效期限</label>
-                        <input type="text" placeholder="MM / YY" disabled />
+                        <h4>信用卡付款</h4>
 
-                        <label>安全碼</label>
-                        <input type="text" placeholder="CVV" disabled />
+                        <p class="payment-desc">
+                            送出訂單後，系統將導向綠界科技安全付款頁面，
+                            請依照頁面指示完成信用卡付款。
+                        </p>
 
-                        <small>Demo 用：正式版不可自己儲存信用卡資料，應導向綠界 / 藍新 / Line Pay 金流頁。</small>
+                        <div class="card-brands">
+                            <span>VISA</span>
+                            <span>MasterCard</span>
+                            <span>JCB</span>
+                        </div>
+
+                        <div class="payment-notice">
+                            信用卡資料將由綠界科技加密處理，
+                            本網站不會儲存您的信用卡卡號、有效期限或安全碼。
+                        </div>
                     </div>
 
                     <div class="payment-total">
@@ -620,26 +879,98 @@ if (customerForm.value.paymentMethod === "LINE_PAY") {
                 <div class="form-card">
                     <h3>發票 / 載具</h3>
 
-                    <label class="invoice-option">
-                        <input type="radio" value="NONE" v-model="customerForm.invoiceType" />
-                        不使用載具
-                    </label>
+                    <div class="invoice-options">
+                        <label class="invoice-card" :class="{ active: customerForm.invoiceType === 'NONE' }">
+                            <input type="radio" value="NONE" v-model="customerForm.invoiceType" />
+                            <div>
+                                <strong>電子發票</strong>
+                                <p>不使用載具</p>
+                            </div>
+                        </label>
 
-                    <label class="carrier-option">
-                        <input type="radio" value="MOBILE_BARCODE" v-model="customerForm.invoiceType" />
-                        手機條碼載具
+                        <label class="invoice-card" :class="{ active: customerForm.invoiceType === 'MOBILE_BARCODE' }">
+                            <input type="radio" value="MOBILE_BARCODE" v-model="customerForm.invoiceType"
+                                @change="customerForm.carrierNumber = ''" />
+                            <div>
+                                <strong>手機條碼載具</strong>
+                                <p>發票存入手機條碼</p>
+                            </div>
+                        </label>
 
-                        <input v-if="customerForm.invoiceType === 'MOBILE_BARCODE'" v-model="customerForm.carrierNumber"
-                            @input="formatCarrier" type="text" placeholder="/ABC1234" maxlength="8"
-                            class="carrier-input" />
-                    </label>
+                        <label class="invoice-card" :class="{ active: customerForm.invoiceType === 'TAX_ID' }">
+                            <input type="radio" value="TAX_ID" v-model="customerForm.invoiceType"
+                                @change="customerForm.carrierNumber = ''" />
+                            <div>
+                                <strong>公司統編</strong>
+                                <p>開立公司用發票</p>
+                            </div>
+                        </label>
+
+                        <label class="invoice-card" :class="{ active: customerForm.invoiceType === 'DONATION' }">
+                            <input type="radio" value="DONATION" v-model="customerForm.invoiceType"
+                                @change="customerForm.carrierNumber = ''" />
+                            <div>
+                                <strong>愛心碼捐贈</strong>
+                                <p>捐贈電子發票</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div v-if="customerForm.invoiceType === 'MOBILE_BARCODE'" class="invoice-input-box">
+                        <label>手機條碼載具</label>
+                        <small class="input-hint">
+                            格式範例：/ABC1234
+                        </small>
+                        <input v-model="customerForm.carrierNumber" @input="formatCarrier" type="text"
+                            placeholder="/ABC1234" maxlength="8" tabindex="1" :class="{
+                                'input-success': customerForm.carrierNumber && isCarrierValid,
+                                'input-error': customerForm.carrierNumber && !isCarrierValid
+                            }" />
+                        <small v-if="customerForm.carrierNumber" :class="isCarrierValid ? 'success-msg' : 'error-msg'">
+                            {{ isCarrierValid ? '✓ 手機條碼格式正確' : '✕ 格式需為 /ABC1234，且包含英文與數字' }}
+                        </small>
+                    </div>
+
+                    <div v-if="customerForm.invoiceType === 'TAX_ID'" class="invoice-input-box">
+                        <label>公司統一編號</label>
+                        <input @input="formatOnlyNumber(8)" v-model="customerForm.carrierNumber" type="text"
+                            placeholder="請輸入 8 碼統一編號" maxlength="8" :class="{
+                                'input-success': customerForm.carrierNumber && isTaxIdValid,
+                                'input-error': customerForm.carrierNumber && !isTaxIdValid
+                            }" />
+                        <small v-if="customerForm.carrierNumber" :class="isTaxIdValid ? 'success-msg' : 'error-msg'">
+                            {{ isTaxIdValid ? '✓ 統一編號格式正確' : '✕ 請輸入 8 碼數字' }}
+                        </small>
+                    </div>
+
+                    <div v-if="customerForm.invoiceType === 'DONATION'" class="invoice-input-box">
+                        <label>愛心碼</label>
+                        <input @input="formatOnlyNumber(7)" v-model="customerForm.carrierNumber" type="text"
+                            placeholder="例如：919、8888" maxlength="7" :class="{
+                                'input-success': customerForm.carrierNumber && isLoveCodeValid,
+                                'input-error': customerForm.carrierNumber && !isLoveCodeValid
+                            }" />
+                        <small v-if="customerForm.carrierNumber" :class="isLoveCodeValid ? 'success-msg' : 'error-msg'">
+                            {{ isLoveCodeValid ? '✓ 愛心碼格式正確' : '✕ 愛心碼需為 3~7 位數字' }}
+                        </small>
+                    </div>
                 </div>
 
                 <div class="form-card">
                     <h3>聯絡資訊</h3>
 
-                    <label>姓名 *</label>
-                    <input v-model="customerForm.customerName" type="text" />
+                    <label>
+                        姓名 <span class="required">*</span>
+                    </label>
+                    <input ref="nameInput" tabindex="2" v-model="customerForm.customerName" type="text"
+                        @input="touched.customerName = true" @blur="touched.customerName = true"
+                        @keydown.enter.prevent="phoneInput.focus()" :class="{
+                            'input-success': touched.customerName && customerForm.customerName && isNameValid,
+                            'input-error': touched.customerName && !isNameValid
+                        }" />
+                    <small v-if="touched.customerName" :class="isNameValid ? 'success-msg' : 'error-msg'">
+                        {{ isNameValid ? '✓ 姓名格式正確' : '✕ 姓名至少需 2 個字元' }}
+                    </small>
 
                     <div class="radio-group">
                         <label>
@@ -656,9 +987,26 @@ if (customerForm.value.paymentMethod === "LINE_PAY") {
                         </label>
                     </div>
 
-                    <label>電話 *</label>
-                    <input class="phone-input" v-model="customerForm.phone" type="tel" placeholder="0912345678"
-                        maxlength="10" />
+                    <label>
+                        電話 <span class="required">*</span>
+                    </label>
+                    <input ref="phoneInput" tabindex="3" class="phone-input" v-model="customerForm.phone"
+                        @blur="touched.phone = true" @input="
+                            touched.phone = true;
+                        customerForm.phone = customerForm.phone.replace(/\D/g, '').slice(0, 10)"
+                        @keydown.enter.prevent="agreePolicyInput.focus()" type="tel" placeholder="0912345678"
+                        maxlength="10" :class="{
+                            'input-success': touched.phone && customerForm.phone && isPhoneValid,
+                            'input-error': touched.phone && !isPhoneValid
+                        }" />
+
+                    <small v-if="touched.phone" :class="isPhoneValid ? 'success-msg' : 'error-msg'">
+                        {{
+                            isPhoneValid
+                                ? '✓ 電話格式正確'
+                                : '✕ 請輸入正確手機號碼，例如 0912345678'
+                        }}
+                    </small>
                 </div>
 
                 <div class="form-card">
@@ -670,12 +1018,13 @@ if (customerForm.value.paymentMethod === "LINE_PAY") {
 
                 <div class="policy-box">
                     <label>
-                        <input type="checkbox" v-model="customerForm.agreePolicy" />
+                        <input tabindex="4" ref="agreePolicyInput" type="checkbox" v-model="customerForm.agreePolicy"
+                            @keydown.enter.prevent="submitOrder" />
                         我已同意訂單成立後無法任意取消
                     </label>
                 </div>
 
-                <button class="submit-btn" @click="submitOrder">
+                <button :disabled="!customerForm.agreePolicy" class="submit-btn" @click="submitOrder">
                     送訂單
                 </button>
 
@@ -688,6 +1037,186 @@ if (customerForm.value.paymentMethod === "LINE_PAY") {
 </template>
 
 <style scoped>
+.required {
+    color: #d32f2f;
+    font-weight: 700;
+}
+
+.input-hint {
+    display: block;
+    margin-top: 4px;
+    margin-bottom: 8px;
+    color: #888;
+    font-size: 12px;
+}
+
+.input-success {
+    border: 2px solid #4caf50 !important;
+}
+
+.input-error {
+    border: 2px solid #f44336 !important;
+}
+
+.success-msg,
+.error-msg {
+    display: block;
+    margin-top: 4px;
+    margin-bottom: 12px;
+    font-size: 13px;
+}
+
+.success-msg {
+    color: #2e7d32;
+    font-weight: 500;
+}
+
+.error-msg {
+    color: #d32f2f;
+    font-weight: 500;
+}
+
+.invoice-options {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.invoice-card {
+    border: 1px solid #ddd;
+    border-radius: 14px;
+    padding: 14px;
+    display: flex;
+    gap: 10px;
+    cursor: pointer;
+    background: #fff;
+}
+
+.invoice-card.active {
+    border-color: #efb071;
+    background: #fff3e4;
+}
+
+.invoice-card strong {
+    color: #23466b;
+}
+
+.invoice-card p {
+    margin: 4px 0 0;
+    color: #777;
+    font-size: 13px;
+}
+
+.invoice-input-box {
+    margin-top: 18px;
+}
+
+.invoice-input-box label {
+    display: block;
+    margin-bottom: 8px;
+    color: #23466b;
+}
+
+.invoice-input-box input {
+    width: 100%;
+    height: 42px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 0 12px;
+}
+
+.card-brands {
+    margin: 18px 0;
+    display: flex;
+    justify-content: flex-start;
+    gap: 10px;
+}
+
+.card-brands span {
+    padding: 8px 14px;
+    border: 1px solid #d9e2ec;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #23466b;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.payment-methods {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.payment-method-card {
+    border: 1px solid #ddd;
+    background: #fff;
+    border-radius: 14px;
+    padding: 16px;
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: 0.2s;
+}
+
+.payment-method-card:hover {
+    border-color: #efb071;
+    background: #fffaf5;
+}
+
+.payment-method-card.active {
+    border-color: #efb071;
+    background: #fff3e4;
+    box-shadow: 0 8px 20px rgba(239, 176, 113, 0.22);
+}
+
+.method-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #f6eadf;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+}
+
+.payment-method-card strong {
+    color: #23466b;
+    font-size: 15px;
+}
+
+.payment-method-card p {
+    margin: 4px 0 0;
+    color: #777;
+    font-size: 13px;
+}
+
+.payment-info-box {
+    margin-top: 18px;
+    border: 1px solid #eee;
+    background: #fafafa;
+    border-radius: 14px;
+    padding: 18px;
+    color: #23466b;
+}
+
+.payment-info-box p {
+    margin: 8px 0 0;
+    color: #666;
+    line-height: 1.7;
+}
+
+.payment-info-box small {
+    display: block;
+    margin-top: 10px;
+    color: #8c6335;
+}
+
 .payment-tabs {
     display: flex;
     gap: 10px;
@@ -769,6 +1298,25 @@ if (customerForm.value.paymentMethod === "LINE_PAY") {
     margin-bottom: 8px;
 }
 
+.store-context {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 8px 12px;
+    border: 1px solid #ead7c5;
+    border-radius: 999px;
+    background: #fff8f1;
+    color: #8f623e;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.store-context span {
+    color: #9ca8b5;
+    font-weight: 600;
+}
+
 .order-type {
     display: flex;
     gap: 12px;
@@ -796,6 +1344,16 @@ if (customerForm.value.paymentMethod === "LINE_PAY") {
     gap: 12px;
     margin-bottom: 32px;
     flex-wrap: wrap;
+}
+
+.menu-alert {
+    margin: -12px 0 24px;
+    padding: 12px 16px;
+    border: 1px solid #ead7c5;
+    border-radius: 12px;
+    background: #fff8f1;
+    color: #8f623e;
+    font-weight: 700;
 }
 
 .content-layout {

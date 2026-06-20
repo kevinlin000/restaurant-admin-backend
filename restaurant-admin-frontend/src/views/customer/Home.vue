@@ -49,10 +49,13 @@ onMounted(loadFeaturedStores);
   <section class="introduction-section">
     <div class="introduction-overlay">
       <div class="introduction-content">
-        <h1 class="introduction-title">標題</h1>
-        <p class="introduction-desc">介紹</p>
-
-        <div class="introduction-buttons">
+        <h1 class="introduction-title yuji-boku-regular">敘日和食</h1>
+        <small class="introduction-desc new-tegomin-regular">
+          「敘」是敘舊，是放下手機後的深度對談
+          <br>
+          「日」是時光，是歲月淬鍊出的滋味
+        </small>
+        <div class="introduction-buttons py-5">
         <RouterLink class="primary-btn" to="/reservation">立即訂位</RouterLink>
         <RouterLink class="secondary-btn" to="/menu">瀏覽菜單</RouterLink>
         </div>
@@ -183,6 +186,21 @@ onMounted(loadFeaturedStores);
 
 <style scoped>
 
+/* 字型 */
+@import url('https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=New+Tegomin&display=swap');
+
+.yuji-boku-regular {
+  font-family: "Yuji Boku", serif;
+  font-weight: 400;
+  font-style: normal;
+}
+.new-tegomin-regular {
+  font-family: "New Tegomin", serif;
+  font-weight: 400 bold;
+  font-style: normal;
+}
+
 /* sections */
 
 .section-container {
@@ -221,7 +239,7 @@ onMounted(loadFeaturedStores);
   height: 100vh;
   background:
     linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)),
-    url('../assets/images/bg-introduction.jpg');
+    url('../../assets/images/Home.jpg');
   background-size: cover;
   background-position: center;
   display: flex;

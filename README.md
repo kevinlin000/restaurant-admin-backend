@@ -108,7 +108,8 @@ mysql -u root -p restaurant_db < sql/02_insert_test_data.sql
 cd backend
 # 複製設定檔範本
 cp src/main/resources/application-dev.properties.example src/main/resources/application-dev.properties
-# 修改資料庫連線資訊
+# 修改資料庫連線資訊與 Gmail 驗證信設定
+# spring.mail.password 請填 Gmail App Password，不是 Gmail 登入密碼
 # 啟動
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ```

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import Swal from "sweetalert2";
 
@@ -10,6 +10,74 @@ const loadUserInfo = () => {
   const data = localStorage.getItem("userInfo");
   userInfo.value = data ? JSON.parse(data) : null;
 };
+
+const roleName = computed(() => userInfo.value?.roleName || "");
+
+const dropdownItems = computed(() => {
+  if (!userInfo.value) {
+    return [];
+  }
+
+  const profileItem = {
+    label: "個人資料",
+    path: "/profile",
+    icon: "bi-person",
+  };
+
+  if (roleName.value === "CUSTOMER") {
+    return [profileItem];
+  }
+
+  const items = [
+    ...(roleName.value === "ADMIN" ? [] : [profileItem]),
+    {
+      label: "後台首頁",
+      path: "/admin/home",
+      icon: "bi-house",
+      roles: ["STAFF", "MANAGER", "ADMIN"],
+    },
+    {
+      label: "訂位管理",
+      path: "/admin/reservation",
+      icon: "bi-calendar-check",
+      roles: ["STAFF", "MANAGER", "ADMIN"],
+    },
+    {
+      label: "訂單管理",
+      path: "/admin/order-manage",
+      icon: "bi-receipt",
+      roles: ["STAFF", "MANAGER", "ADMIN"],
+    },
+    {
+      label: "菜單管理",
+      path: "/admin/menu-setting",
+      icon: "bi-menu-button-wide",
+      roles: ["MANAGER", "ADMIN"],
+    },
+    {
+      label: "店家檔案設定",
+      path: "/admin/profile",
+      icon: "bi-shop",
+      roles: ["MANAGER", "ADMIN"],
+    },
+    {
+      label: "員工管理",
+      path: "/admin/member",
+      icon: "bi-people",
+      roles: ["ADMIN"],
+    },
+    {
+      label: "門市管理",
+      path: "/admin/store",
+      icon: "bi-buildings",
+      roles: ["ADMIN"],
+    },
+  ];
+
+  return items.filter(
+    (item) => !item.roles || item.roles.includes(roleName.value),
+  );
+});
 
 onMounted(() => {
   loadUserInfo();
@@ -41,7 +109,7 @@ const logout = async () => {
 
 <template>
   <div class="layout-wrapper">
-    <!-- Navbar (視窗縮小 navbar-expand-lg)-->
+    <!-- Navbar -->
     <nav class="landing-navbar">
       <div class="container">
         <div class="navbar navbar-expand-lg">
@@ -108,11 +176,17 @@ const logout = async () => {
                 </a>
 
                 <ul class="dropdown-menu dropdown-menu-end">
-                  <li>
-                    <RouterLink class="dropdown-item" to="/profile">
-                      個人資料
+                  <li v-for="item in dropdownItems" :key="item.label">
+                    <RouterLink class="dropdown-item" :to="item.path">
+                      <i
+                        v-if="item.icon"
+                        :class="['bi', item.icon, 'me-2']"
+                      ></i>
+                      {{ item.label }}
                     </RouterLink>
                   </li>
+
+                  <li><hr class="dropdown-divider" /></li>
 
                   <li>
                     <button
@@ -120,6 +194,7 @@ const logout = async () => {
                       type="button"
                       @click="logout"
                     >
+                      <i class="bi bi-box-arrow-right me-2"></i>
                       登出
                     </button>
                   </li>
@@ -146,12 +221,8 @@ const logout = async () => {
       </div>
     </footer>
 
-    <!-- Overlay -->
     <div class="layout-overlay layout-menu-toggle"></div>
-
-    <!-- Drag Target Area To SlideIn Menu On Small Screens -->
     <div class="drag-target"></div>
-    <!-- / Layout wrapper -->
   </div>
 </template>
 
@@ -228,7 +299,7 @@ const logout = async () => {
   color: #e3ac7f;
 }
 
-/* 點到目前所在頁面 */
+/* 點到目前所選頁面 */
 .navbar-nav .nav-link.router-link-exact-active:not(.login-btn) {
   color: #e3ac7f;
   font-weight: bold;
@@ -277,7 +348,8 @@ const logout = async () => {
   flex: 1;
   min-height: calc(100vh - 160px);
   background-attachment: scroll;
-  background-color: #f8f3ed;
+  /* background-color:#f8f3ed; */
+  background: url("../assets/images/background.png");
 }
 
 /* footer */
@@ -293,15 +365,12 @@ const logout = async () => {
   .landing-navbar .navbar {
     border-radius: 16px;
   }
-
   .navbar-collapse {
     padding-top: 20px;
   }
-
   .navbar-nav {
     margin-bottom: 20px;
   }
-
   .navbar-nav .nav-link {
     margin: 10px 0;
   }

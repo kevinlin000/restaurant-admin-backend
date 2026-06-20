@@ -8,8 +8,7 @@ import lombok.Data;
 @Data
 @Builder
 public class OrderItemResponse {
-
-    private Long menuItemId;
+     private Long menuItemId;
 
     private String itemName;
 

@@ -22,7 +22,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 || error.response?.status === 403) {
+    const status = error.response?.status;
+
+    // 401：沒有登入或 token 失效，才清除登入狀態。
+    if (status === 401) {
       localStorage.removeItem("accessToken");
       localStorage.removeItem("userInfo");
 
@@ -36,6 +39,7 @@ api.interceptors.response.use(
       }
     }
 
+    // 403：代表有登入但權限不足，不應該把使用者登出。
     return Promise.reject(error);
   },
 );
