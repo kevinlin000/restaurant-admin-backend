@@ -24,5 +24,14 @@ logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
 jwt.secret=dev-secret-key-please-change-in-production
 jwt.expiration=86400000
 
+# Email 驗證信發送端
+# 使用 Gmail App Password，不是 Gmail 登入密碼
+spring.mail.host=smtp.gmail.com
+spring.mail.port=587
+spring.mail.username=你的Gmail信箱
+spring.mail.password=你的Gmail應用程式密碼
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+
 # Server
 server.port=8080
