@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue' // 💡 完美引入動態計算屬性
 import { useRouter } from 'vue-router' // 🚀 1. 引入 Vue Router 的導航推手
-import axios from 'axios'
+import axios from '@/api/axios';
 
 // 🚀 2. 啟動導航推手
 const router = useRouter()

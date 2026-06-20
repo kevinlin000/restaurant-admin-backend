@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router' // 1. 導入 Vue Router 的捕手手套
-import axios from 'axios'
+import axios from '@/api/axios';
 
 // 2. 啟動手套
 const route = useRoute()

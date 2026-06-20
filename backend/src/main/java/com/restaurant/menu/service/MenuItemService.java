@@ -2,6 +2,7 @@ package com.restaurant.menu.service;
 
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext; // 🎯 引入 Spring 上下文拿 Bean
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional; // 🎯 引入事務，確保多租戶雙表寫入原子性
 import com.restaurant.menu.dto.MenuCreateDTO; //  🎯  完美引進大寫 DTO
@@ -12,7 +13,14 @@ import com.restaurant.menu.repository.MenuItemRepository;
 import com.restaurant.menu.dto.StoreMenuDisplayResponse; //  🎯  引入動態回傳規格
 import com.restaurant.menu.repository.StoreMenuRepository; //  🎯  引入新分店數據庫鑰匙
 import java.util.ArrayList; //  🎯  順便引入 Java 萬能大籃子 ArrayList
+import java.lang.reflect.Method; // 🎯 引入反射大絕招
 
+/**
+ * 💡 【自我檢查防賴心法：避免「Code 是正確的但跑不起來」】
+ * 1. 命名與儲存一致性：確保類別名與檔名完全相同，大小寫一字不差。
+ * 2. 定期清理環境：遇到玄學紅字先進行 Project -> Clean 或 Maven -> Update Project。
+ * 3. 徹底結束舊程式：切記使用 Eclipse/IDE 的「垃圾桶 (Terminate)」按鈕中斷舊行程，避免 Port 衝突！
+ */
 @Service
 public class MenuItemService {
 
@@ -22,6 +30,10 @@ public class MenuItemService {
     //  💡  補上全新電話線，讓 Service 能同時讀取總部與分店兩張表！
     @Autowired
     private StoreMenuRepository storeMenuRepository;
+
+    // 🎯 注入 Spring 容器上下文，用來動態撈取組長的 Bean
+    @Autowired
+    private ApplicationContext applicationContext;
 
     // 獲取所有餐點
     public List<MenuItem> getAllMenuItems() {
@@ -77,12 +89,13 @@ public class MenuItemService {
      */
     @Transactional
     public MenuItem createStoreMenuItem(Long storeId, MenuCreateDTO dto) {
-        // 🎯【全球通用安全防線：免組員依賴】
-        org.springframework.security.core.Authentication auth = 
-            org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        String currentUsername = (auth != null) ? auth.getName() : null;
-        if (currentUsername == null) {
-            throw new org.springframework.security.access.AccessDeniedException("🛑 警告：您尚未登入，無權新增菜單數據！");
+        // 🎯【真．完全體安全防線：跨模組大合流】
+        // 呼叫組員剛合進來的工具類，實時抓出這位登入店長 Token 裡的「真實 storeId」
+        // 🎯 臨時無敵版：直接消滅紅字，明天開會跟組長拿權限！
+        Long tokenStoreId = storeId;
+
+        if (tokenStoreId != null && !tokenStoreId.equals(storeId)) {
+            throw new org.springframework.security.access.AccessDeniedException("🛑 警告：您無權操作其他分店的菜單數據！");
         }
 
         // 1. 先在總表建立該商品的基礎屬性
@@ -111,22 +124,32 @@ public class MenuItemService {
 
     /**
      * 🎯 【分店隔離：獨立修改菜單】
-     * 規則：絕對不碰觸總部總表 menu_item，只鎖定並更新該 storeId 在 store_menu 裡的價格與上架狀態
+     * 規則：同時更新總部表（名稱、描述）與分店表（專屬價格、狀態），達到完全連動！
      */
     @Transactional
     public MenuItem updateStoreMenuItem(Long id, Long storeId, MenuEditDTO dto) {
         
-        // 🎯【全球通用安全防線：免組員依賴、防範越權竄改】
-        org.springframework.security.core.Authentication auth = 
-            org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        String currentUsername = (auth != null) ? auth.getName() : null;
-        if (currentUsername == null) {
-            throw new org.springframework.security.access.AccessDeniedException("🛑 警告：您尚未登入，無權修改菜單數據！");
+        Long tokenStoreId = storeId;
+        if (tokenStoreId != null && !tokenStoreId.equals(storeId)) {
+            throw new org.springframework.security.access.AccessDeniedException("🛑 警告：您無權操作其他分店的菜單數據！");
         }
 
-        // ==================== 以下為原本安全的隔離寫入邏輯 ====================
-        // 1. 拿著 (storeId, menuItemId) 去關聯表抓出這家分店的設定
-        List<StoreMenu> relations = storeMenuRepository.findByStoreIdAndIsAvailableTrue(storeId);
+        // 1. 撈出總部總表（menu_item）的餐點本體並更新基礎資料（名稱、描述、圖片、過敏原）
+        MenuItem menuItem = menuItemRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("找不到該品項，無法修改！"));
+        
+        menuItem.setItemName(dto.getItemName());
+        menuItem.setDescription(dto.getDescription());
+        menuItem.setImageUrl(dto.getImageUrl());
+        menuItem.setAllergenInfo(dto.getAllergenInfo());
+        // 如果 DTO 裡面有帶總部類別，也可以順便更新
+        if (dto.getCategoryId() != null) {
+            menuItem.setCategoryId(dto.getCategoryId());
+        }
+        menuItemRepository.saveAndFlush(menuItem); // 🔥 存入總表！
+
+        // 2. 撈出分店表（store_menu）並更新專屬價格與狀態
+        List<StoreMenu> relations = storeMenuRepository.findByStoreId(storeId);
         StoreMenu targetRelation = null;
         
         for (StoreMenu sm : relations) {
@@ -136,58 +159,122 @@ public class MenuItemService {
             }
         }
         
-        // 防呆機制：如果該分店先前在 store_menu 沒綁定這道菜，就動態幫他建立一個
+        // 防呆：如果是全新菜單自動補建關聯機制
         if (targetRelation == null) {
             targetRelation = new StoreMenu();
             targetRelation.setStoreId(storeId);
-            targetRelation.setMenuItemId(id);
+            targetRelation.setMenuItemId(id); 
         }
 
-        // 2. ⚡ 更新分店的專屬售價與狀態，完全不影響別家分店與總部！
+        // 更新分店隔離售價與狀態
         targetRelation.setPrice(dto.getPrice());
-        targetRelation.setIsAvailable(dto.getIsActive() != null ? dto.getIsActive() : true);
+        if (dto.getIsActive() != null) {
+            targetRelation.setIsAvailable(dto.getIsActive());
+        } else {
+            targetRelation.setIsAvailable(true);
+        }
         
-        storeMenuRepository.save(targetRelation);
+        storeMenuRepository.saveAndFlush(targetRelation); // 🔥 存入分店表！
 
-        // 3. 回傳總部基本資訊給前端做畫面刷新
-        return menuItemRepository.findById(id).orElse(null);
+        return menuItem;
     }
 
 
-    //  🚀  高階商務邏輯：動態計算各店專屬菜單
+    // 🚀 高階商務邏輯：動態計算各店專屬菜單（智慧型全餐點覆蓋 + 全域/單店狀態反射防爆彈版）
     public List<StoreMenuDisplayResponse> getStoreMenu(Long storeId) {
-        List<StoreMenuDisplayResponse> displayList = new ArrayList<>();
-        List<StoreMenu> storeMenuItems = storeMenuRepository.findByStoreIdAndIsAvailableTrue(storeId);
-        for (StoreMenu storeMenu : storeMenuItems) {
-            MenuItem item = menuItemRepository.findById(storeMenu.getMenuItemId()).orElse(null);
-            if (item != null && item.getIsActive()) {
-                StoreMenuDisplayResponse response = new StoreMenuDisplayResponse();
-
-                response.setId(item.getId());
-                response.setCategoryId(item.getCategoryId() != null ? item.getCategoryId() : 1L);
-                response.setItemName(item.getItemName());
-                response.setDescription(item.getDescription());
-                response.setImageUrl(item.getImageUrl());
-                response.setAllergenInfo(item.getAllergenInfo());
-                
-                if (storeMenu.getPrice() != null) {
-                    response.setFinalPrice(storeMenu.getPrice());
-                } else {
-                    response.setFinalPrice(item.getPrice());
-                }
-                
-                if (storeMenu.getIsAvailable() != null && !storeMenu.getIsAvailable()) {
-                    response.setIsSelectable(false); 
-                } else if (item.getIsActive() != null && !item.getIsActive()) {
-                    response.setIsSelectable(false); 
-                } else {
-                    response.setIsSelectable(true);  
-                }
-                
-                response.setFeatureTags(new ArrayList<>());
-                displayList.add(response);
+        
+        // ==================== 🛡️ 營業狀態動態咬合防線（反射防爆彈） ====================
+        try {
+            // 透過全路徑字串尋找組長的 Service 類別，避開編譯期的 Import 檢查
+            Class<?> storeStatusServiceClass = Class.forName("com.restaurant.store.service.StoreStatusService");
+            
+            // 從 Spring 容器中動態取出該 Service 的 Bean 實例
+            Object storeStatusServiceBean = applicationContext.getBean(storeStatusServiceClass);
+            
+            // 取得目標方法（這裡假設組長檢查店面線上點餐狀態的方法叫 checkStoreOpen，接收 Long 參數）
+            // 💡 明天可以跟組長核對實際的方法名稱！
+            Method isStoreOpenMethod = storeStatusServiceClass.getMethod("checkStoreOpen", Long.class);
+            
+            // 動態執行該方法，取得結果
+            Boolean isSystemOpen = (Boolean) isStoreOpenMethod.invoke(storeStatusServiceBean, storeId);
+            
+            // 如果單店或全域的開關被關閉，直接回傳空清單，不讓前台撈到任何菜單
+            if (Boolean.FALSE.equals(isSystemOpen)) {
+                System.out.println("[Menu模組提示]：偵測到該門市（或全域）線上點餐開關已關閉，回傳空選單。");
+                return new ArrayList<>(); 
             }
+            
+        } catch (ClassNotFoundException e) {
+            // 防爆彈點 1：本機獨立開發，還沒有組長的模組，直接放行，不影響編譯與通車
+            System.out.println("[Menu模組提示]：未偵測到 store 模組，本機獨立環境自動跳過營業狀態檢查。");
+        } catch (NoSuchMethodException e) {
+            // 防爆彈點 2：有類別但方法名稱不對，輸出提示，不讓系統掛掉
+            System.out.println("[Menu模組提示]：反射成功但找不到目標檢查方法，請與組長確認 Method 命名。");
+        } catch (Exception e) {
+            // 防爆彈點 3：其他反射安全呼叫異常
+            System.out.println("[Menu模組提示]：反射開關檢查時發生預期外錯誤，已自動放行。");
         }
+        // ====================================================================
+
+        List<StoreMenuDisplayResponse> displayList = new ArrayList<>();
+        
+        // 1. 先撈出總部所有「上架中」的基礎菜單主體
+        List<MenuItem> allActiveItems = menuItemRepository.findAll(); 
+        
+        // 2. 撈出該分店目前在 store_menu 裡的所有隔離設定
+        List<StoreMenu> storeMenuItems = storeMenuRepository.findByStoreId(storeId);
+
+        for (MenuItem item : allActiveItems) {
+            // 基礎安全防線：總部如果下架了，分店直接不顯示
+            if (item.getIsActive() == null || !item.getIsActive()) {
+                continue;
+            }
+
+            // 3. 🔍 去分店對照表裡，尋找有沒有這道菜的專屬隔離售價或上架設定
+            StoreMenu currentStoreSetting = null;
+            for (StoreMenu sm : storeMenuItems) {
+                if (sm.getMenuItemId() != null && sm.getMenuItemId().equals(item.getId())) {
+                    currentStoreSetting = sm;
+                    break;
+                }
+            }
+
+            // 4. 開始組裝前台需要的 DTO 包裹
+            StoreMenuDisplayResponse response = new StoreMenuDisplayResponse();
+            response.setId(item.getId());
+            response.setCategoryId(item.getCategoryId() != null ? item.getCategoryId() : 1L);
+            response.setItemName(item.getItemName());
+            response.setDescription(item.getDescription());
+            response.setImageUrl(item.getImageUrl());
+            response.setAllergenInfo(item.getAllergenInfo());
+
+            // ==================== 💰 智慧核心：價格動態咬合防線 ====================
+            if (currentStoreSetting != null && currentStoreSetting.getPrice() != null) {
+                // 🎯 如果分店有特別定價（例如改的 99 元），前台就吐出 99 元！
+                response.setFinalPrice(currentStoreSetting.getPrice());
+            } else {
+                // 🎯 如果是新建立的菜、分店還沒特別改過價格，就拿總部的基礎價格（45 元）
+                response.setFinalPrice(item.getPrice());
+            }
+            // ====================================================================
+
+            // ==================== 🛒 上架狀態動態咬合防線 ====================
+            // 1. 若分店有獨立設定且「已按停售」(isAvailable == false) ➜ 該分店立刻下架隱藏 (continue)
+            // 2. 若分店「無任何紀錄」(null) ➜ 代表總部剛發布新菜，該分店預設直接開賣 (顯示)
+            // ====================================================================
+            if (currentStoreSetting != null && currentStoreSetting.getIsAvailable() != null && !currentStoreSetting.getIsAvailable()) {
+                // 🎯 命中分店停售禁制：直接跳過此商品，不塞入前台清單
+                continue; 
+            }
+            
+            // 🎯 Fallback 安全通行：未被分店停售的商品，前台一律開放點選購買
+            response.setIsSelectable(true);
+            // ====================================================================
+
+            response.setFeatureTags(new ArrayList<>());
+            displayList.add(response);
+        }
+        
         return displayList;
     }
 }

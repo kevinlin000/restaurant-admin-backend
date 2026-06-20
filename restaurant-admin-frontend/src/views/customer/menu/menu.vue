@@ -128,11 +128,24 @@ const fetchCategories = async () => {
 }
 
 // 🍜 根據選擇的分店 ID，拉取專屬動態菜單
+// 🎯 修改後的完美洗滌管線：讓 item.categoryId 絕對不可能為 undefined！
 const fetchMenuData = async (storeId) => {
   if (!storeId) return
   try {
     const response = await axios.get(`/api/menu-items/store/${storeId}`)
-    menuItems.value = response.data.data || response.data
+    const rawData = response.data.data || response.data
+    
+    if (Array.isArray(rawData)) {
+      // 🛠️ 資料清洗：每一道菜進來，如果發現沒有 categoryId，就用 category_id 頂替！
+      menuItems.value = rawData.map(item => {
+        if (item.categoryId === undefined || item.categoryId === null) {
+          item.categoryId = item.category_id; // 強制讓它成功變出 categoryId！
+        }
+        return item;
+      })
+    } else {
+      menuItems.value = []
+    }
   } catch (error) {
     console.error(`⚠️ 拉取分店菜單失敗！`, error)
     menuItems.value = [] 
@@ -143,12 +156,15 @@ const handleStoreChange = () => { fetchMenuData(currentStoreId.value) }
 
 watch(currentStoreId, (newStoreId) => { if (newStoreId) { fetchMenuData(newStoreId) } })
 
-// 🔍 演算核心：現在完全與資料庫 ID 咬合，過濾絕對精準
+// 🎯 升級版演算核心：增加「駝峰命名與底線命名」雙重保底，徹底防止新餐點漏勾！
 const filteredMenu = vueComputed(() => {
   if (!Array.isArray(menuItems.value)) return []
-  return menuItems.value.filter(item => Number(item.categoryId) === Number(currentCategory.value))
+  return menuItems.value.filter(item => {
+    // 💡 智慧識別：不管是傳 categoryId 還是 category_id，通通抓進來比對！
+    const itemCatId = item.categoryId !== undefined ? item.categoryId : item.category_id;
+    return Number(itemCatId) === Number(currentCategory.value)
+  })
 })
-
 const addToCart = (item) => { alert(`🎉 成功將【${item.itemName}】加入購物車！`) }
 
 onMounted(async () => {
@@ -198,7 +214,7 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
-
+    
     <div class="main-content-wrapper position-relative" style="z-index: 10; background-color: #fafafa; margin-top: 420px; padding-top: 40px; padding-bottom: 100px;">
       <div class="container px-2">
         <div class="row g-4">
