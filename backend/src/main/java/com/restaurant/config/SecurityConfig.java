@@ -54,10 +54,15 @@ public class SecurityConfig {
                         // ===== 前台門市查詢（公開）=====
                         .requestMatchers("/api/stores/**").permitAll()
 
+                        // ===== 前台菜單、菜單分類、分店菜單查詢 (公開) =====
+                        .requestMatchers("/api/menu-component/**").permitAll()  
+                        .requestMatchers("/api/menu-categories").permitAll()    
+                        .requestMatchers("/api/menu-items/store/**").permitAll() 
+                        
+
                         // ===== 訂單（Demo 測試先公開）=====
                         .requestMatchers(HttpMethod.POST, "/api/orders").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/orders/**").permitAll()
-
                         .requestMatchers("/api/payments/**").permitAll()
 
                         // ===== 會員路由（需要登入，CUSTOMER 角色）=====
@@ -66,6 +71,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/members/me").hasAuthority("ROLE_CUSTOMER")
                         .requestMatchers(HttpMethod.PUT, "/api/members/me/password").hasAuthority("ROLE_CUSTOMER")
                         .requestMatchers(HttpMethod.DELETE, "/api/members/me").hasAuthority("ROLE_CUSTOMER")
+
+                        // ===== 後台菜單管理（需要後台權限，並支援多層級分店隔離路由）=====
+                        // 🎯【權限設定全面擴充】
+                        // 為什麼改用 /** 為了讓「信義店、南港店等分店隔離路由」能正常通車。
+                        // 原本單星號 /* 只能管到一層（例如：/api/menu-items/1）
+                        // 改成雙星號 /** 才能管到多層路徑（例如：/api/menu-items/1/store/1），避免分店店長修改菜單時被系統擋下(噴403)。
+                        .requestMatchers("/api/menu-items/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER", "ROLE_STAFF")
 
                         // ===== 員工管理路由（需要 ADMIN 角色）=====
                         .requestMatchers(HttpMethod.POST, "/api/members/staff").hasAuthority("ROLE_ADMIN")

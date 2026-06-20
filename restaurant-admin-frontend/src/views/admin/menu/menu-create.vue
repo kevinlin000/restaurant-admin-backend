@@ -6,6 +6,9 @@ import axios from 'axios'
 // 🚀 2. 啟動導航推手
 const router = useRouter()
 
+// 🏪 多租戶防禦點火線：獲取當前店長專屬的 storeId (可根據你們組內的 localStorage 鍵名調整，如 'storeId' 或 'user')
+const currentStoreId = ref(localStorage.getItem('storeId') || 1) 
+
 // 🚀 3. 後端大寫 MenuCreateDTO 規格變數
 const newItem = ref({
   itemName: '',
@@ -19,7 +22,6 @@ const newItem = ref({
 
 // 🚀 4. 初始化為空籃子，準備裝真實數據
 const menuItems = ref([])
-
 // 🚀 5. 搜尋欄位的響應式變數
 const searchQuery = ref('')
 
@@ -33,10 +35,12 @@ const filteredMenuItems = computed(() => {
   })
 })
 
-// 🚀 7. 去資料庫撈真數據的方法
+// 🚀 7. 去資料庫撈真數據的方法 —— ⚡ 史詩級升級：只撈取該店長所屬分店的菜單，達成多租戶隔離！
 const fetchMenuItems = async () => {
   try {
-    const response = await axios.get('/api/menu-items')
+    // 🎯 完美咬合後端 MenuItemController.java 第 68 行的專屬菜單 displayList 路由！
+    const response = await axios.get(`/api/menu-items/store/${currentStoreId.value}`)
+    // 由於後端 getStoreMenu 回傳的是 StoreMenuDisplayResponse 自訂結構，資料在外層的 .data 內
     menuItems.value = response.data.data || response.data
   } catch (error) {
     console.error('後端發電廠傳輸大塞車：', error)
@@ -51,22 +55,22 @@ onMounted(() => {
 // 🚀 9. 點擊「編輯此項」跨頁面轉跳方法（對齊 /admin/menu-edit/:id 路由）
 const selectItem = (item) => {
   if (!item.id) {
-    alert('⚠️ 這道餐點沒有 ID 數據，無法進行編輯！')
+    alert(' ⚠️ 這道餐點沒有 ID 數據，無法進行編輯！')
     return
   }
   // 帶著 ID 絲滑轉跳到修改頁面
   router.push(`/admin/menu-edit/${item.id}`)
 }
 
-// 🚀 10. 新增菜單連通點火方法
+// 🚀 10. 新增菜單連通點火方法 —— ⚡ 史詩級升級：對齊後端獨立分店寫入管線
 const handleAddItemMenu = async () => {
   if (!newItem.value.itemName || !newItem.value.price) {
     alert('請填寫完整餐點名稱與價格！')
     return
   }
-
   try {
-    const response = await axios.post('/api/menu-items', {
+    // 🎯 完美咬合後端最新 POST /api/menu-items/store/{storeId} 隔離管線，精準寫入 store_menu！
+    const response = await axios.post(`/api/menu-items/store/${currentStoreId.value}`, {
       categoryId: Number(newItem.value.categoryId),
       itemName: newItem.value.itemName,
       price: Number(newItem.value.price),
@@ -75,17 +79,17 @@ const handleAddItemMenu = async () => {
       allergenInfo: newItem.value.allergenInfo || "無特殊過敏原提示。",
       isActive: true
     })
-
+    
     if (response.data.success) {
-      alert('🎉成功新增一筆定食專賣店餐點到資料庫！')
-      fetchMenuItems() // 重新刷新資料庫列表
+      alert(` 🎉 成功新增一筆定食餐點，並精準綁定至第 ${currentStoreId.value} 號分店資料庫！`)
+      fetchMenuItems() // 重新刷新該店專屬資料列表
       newItem.value = { itemName: '', price: '', description: '', imageUrl: '', categoryId: 1, status: 'AVAILABLE', allergenInfo: '' }
     } else {
       alert('上架失敗：' + response.data.message)
     }
   } catch (error) {
     console.error('後端發電廠拒收包裹：', error)
-    alert('⚠️ Code is correct but not running！請檢查後端控制台！')
+    alert(' ⚠️ 請檢查後端控制台是否已完全啟動！')
   }
 }
 </script>

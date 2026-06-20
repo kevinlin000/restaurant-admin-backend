@@ -1,12 +1,14 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-// 1. 導入 Vue Router 的捕手手套
-import { useRoute } from 'vue-router'
+import { useRoute } from 'vue-router' // 1. 導入 Vue Router 的捕手手套
 import axios from 'axios'
 
 // 2. 啟動手套
 const route = useRoute()
 const menuItemId = ref(null)
+
+// 🏪 多租戶防禦點火線：獲取當前店長專屬的 storeId 
+const currentStoreId = ref(localStorage.getItem('storeId') || 1)
 
 // 3. 🎯 完美對齊 Java MenuItem.java 的屬性規格！
 const formData = ref({
@@ -34,13 +36,20 @@ const filteredMenuItems = computed(() => {
   })
 })
 
-// 撈取所有菜單供下方列表點選
+// 撈取所有菜單 —— ⚡ 史詩級升級：改為只顯示自己店裡的餐點列表，避開隔壁店家！
 const fetchAllMenuItems = async () => {
   try {
-    const response = await axios.get('http://localhost:8080/api/menu-items')
-    menuItems.value = response.data.data || response.data
+    // 🎯 移除硬編碼，使用分店隔離查詢 API
+    const response = await axios.get(`/api/menu-items/store/${currentStoreId.value}`)
+    
+    // 將後端多表動態計算出來的 finalPrice 對齊前端表單的 price 變數名
+    const formattedData = (response.data.data || response.data).map(item => ({
+      ...item,
+      price: item.finalPrice // 讓分店修改時，預設帶出的是該分店的專屬定價
+    }))
+    menuItems.value = formattedData
   } catch (error) {
-    console.error('撈取菜單列表失敗：', error)
+    console.error('撈取分店菜單列表失敗：', error)
   }
 }
 
@@ -48,13 +57,13 @@ const fetchAllMenuItems = async () => {
 const selectItem = (item) => {
   formData.value = { ...item }
   menuItemId.value = item.id
-
+  
   // 🎯 絲滑滾動大絕招
   window.scrollTo({
     top: 0,
     behavior: 'smooth'
   })
-
+  
   // 🎯 自動聚焦餐點名稱輸入框
   setTimeout(() => {
     const nameInput = document.getElementById('itemNameInput')
@@ -66,54 +75,75 @@ const selectItem = (item) => {
 onMounted(async () => {
   menuItemId.value = route.params.id
   fetchAllMenuItems()
-
   if (menuItemId.value) {
     try {
-      const res = await axios.get(`http://localhost:8080/api/menu-items/${menuItemId.value}`)
-      formData.value = res.data.data || res.data
+      // 🎯 移除硬編碼，回歸相對路徑
+      const res = await axios.get(`/api/menu-items/${menuItemId.value}`)
+      const rawData = res.data.data || res.data
+      formData.value = {
+        ...rawData,
+        // 如果是點進來的，由於是從總表撈單一品項，若分店有客製價則優先沿用，沒有就用總部的
+        price: rawData.price || rawData.basePrice 
+      }
     } catch (error) {
       console.error('撈取單一菜單資料失敗：', error)
     }
   }
 })
 
-// 5. 儲存修改
+// 5. 儲存修改 —— ⚡ 史詩級升級：走分店隔離更新 API，絕對不污染總表
 const handleUpdateMenu = async () => {
   try {
-    await axios.put(`http://localhost:8080/api/menu-items/${menuItemId.value}`, formData.value)
-    alert('🎉定食餐點布林真數據修改成功，已寫入資料庫！')
-    fetchAllMenuItems()
+    // 🎯 完美對齊後端 PUT /api/menu-items/{id}/store/{storeId} 隔離管線！
+    await axios.put(`/api/menu-items/${menuItemId.value}/store/${currentStoreId.value}`, {
+      categoryId: Number(formData.value.categoryId),
+      itemName: formData.value.itemName,
+      price: Number(formData.value.price), // 這是修改後的店家客製售價
+      description: formData.value.description,
+      imageUrl: formData.value.imageUrl,
+      allergenInfo: formData.value.allergenInfo,
+      isActive: formData.value.isActive // 作為分店上架狀態傳入 store_menu
+    })
+    
+    alert(` 🎉 第 ${currentStoreId.value} 號分店餐點數據客製修改成功，已安全隔離寫入關聯表！`)
+    fetchAllMenuItems() // 即時重刷該店專屬列表
   } catch (error) {
-    console.error('更新餐點失敗：', error)
-    alert('❌ 更新失敗，請檢查後端控制台！')
+    console.error('分店更新餐點失敗：', error)
+    alert(' ❌ 更新失敗，請檢查後端控制台！')
   }
 }
 
-// 🚀 6. 雙向開關邏輯：純布林值取反切換（true 變 false，false 變 true）
+// 🚀 6. 雙向開關邏輯：分店專屬狀態取反切換（上架/下架）
 const handleToggleStatus = async () => {
   if (!formData.value.id) {
     alert('請先在下方列表選擇一個餐點才能進行操作唷！')
     return
   }
-
   const isCurrentlyAvailable = formData.value.isActive === true || formData.value.isActive === 'true'
-  const actionText = isCurrentlyAvailable ? '下架移出菜單' : '重新上架還原'
-
+  const actionText = isCurrentlyAvailable ? '下架移出分店菜單' : '分店重新上架還原'
   const confirmAction = confirm(`確定要將【${formData.value.itemName}】進行${actionText}嗎？`)
   if (!confirmAction) return
-
+  
   try {
     // 布林值大翻轉
     formData.value.isActive = !isCurrentlyAvailable
-
-    // 送回 Java 後端 MySQL 資料庫
-    await axios.put(`http://localhost:8080/api/menu-items/${menuItemId.value}`, formData.value)
-
-    alert(`🎉【${formData.value.itemName}】${actionText}成功！`)
+    
+    // 🎯 完美咬合後端 PUT /api/menu-items/{id}/store/{storeId} 隔離管線
+    await axios.put(`/api/menu-items/${menuItemId.value}/store/${currentStoreId.value}`, {
+      categoryId: Number(formData.value.categoryId),
+      itemName: formData.value.itemName,
+      price: Number(formData.value.price),
+      description: formData.value.description,
+      imageUrl: formData.value.imageUrl,
+      allergenInfo: formData.value.allergenInfo,
+      isActive: formData.value.isActive // 翻轉後的布林狀態
+    })
+    
+    alert(` 🎉 【${formData.value.itemName}】${actionText}成功！`)
     fetchAllMenuItems() // 即時重刷列表
   } catch (error) {
     console.error('狀態切換失敗：', error)
-    alert('❌ 操作失敗，請檢查後端控制台！')
+    alert(' ❌ 操作失敗，請檢查後端控制台！')
   }
 }
 </script>
