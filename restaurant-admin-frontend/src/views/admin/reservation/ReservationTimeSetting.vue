@@ -10,11 +10,15 @@ const storeHolidays = ref([])
 const capacitiesBySlot = reactive({})
 
 const selectedStoreId = ref('')
-const selectedStartDate = ref('')
+const selectedStartDate = ref(formatDateInput(new Date()))
 const selectedEndDate = ref('')
 const selectedWeekdays = ref([])
 const selectedStartTime = ref('00:00')
 const selectedEndTime = ref('00:00')
+const listMode = ref('date')
+const pageSizeOptions = [5, 10, 15, 20, 25, 30]
+const pageSize = ref(10)
+const currentPage = ref(1)
 const calendarMonth = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 const reservationOpenDays = ref(30)
 const loading = ref(false)
@@ -31,14 +35,17 @@ const showWeekdayDropdown = ref(false)
 const showRuleDropdown = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+const createModalError = ref('')
+const editModalError = ref('')
 const editingSlotId = ref(null)
+const editingSlots = ref([])
 const openSlotDetails = reactive({})
 
 // 新增時段 modal 表單
 const form = reactive({
   storeId: '',
-  startDate: formatDateInput(new Date()),
-  endDate: formatDateInput(addDays(new Date(), 30)),
+  startDate: '',
+  endDate: '',
   ruleSelections: [],
   customDate: '',
   customDates: [],
@@ -56,7 +63,7 @@ const editForm = reactive({
   isOpen: true,
 })
 
-// 新增時段的日期規則
+// 新增時段的日期規則(多選下拉選單)
 const ruleOptions = [
   { label: '星期一', value: 'WEEKDAY_1' },
   { label: '星期二', value: 'WEEKDAY_2' },
@@ -67,7 +74,7 @@ const ruleOptions = [
   { label: '星期日', value: 'WEEKDAY_7' },
 ]
 
-// 查詢、顯示的星期選項
+// 查詢、顯示的星期選項(多選下拉選單)
 const weekdayOptions = [
   { label: '星期一', value: '1' },
   { label: '星期二', value: '2' },
@@ -154,13 +161,15 @@ const selectedRuleText = computed(() => {
 // 日期轉星期文字
 const weekdayLabel = (date) => {
   if (!date) return ''
-  const weekday = new Date(`${date}T00:00:00`).getDay()
+  const weekday = new Date(`${date}T00:00:00`).getDay() || 7
   return weekdayOptions.find((item) => item.value === String(weekday))?.label || ''
 }
+const slotDayOfWeek = (slot) => String(slot.dayOfWeek || (new Date(`${slot.reservationDate}T00:00:00`).getDay() || 7))
+const slotWeekdayLabel = (slot) => weekdayOptions.find((item) => item.value === slotDayOfWeek(slot))?.label || weekdayLabel(slot.reservationDate)
 
 // 依查詢條件過濾時段資料
 const filteredSlots = computed(() => slots.value.filter((slot) => {
-  const slotWeekday = String(new Date(`${slot.reservationDate}T00:00:00`).getDay())
+  const slotWeekday = slotDayOfWeek(slot)
   const hasStartTimeFilter = selectedStartTime.value && selectedStartTime.value !== '00:00'
   const hasEndTimeFilter = selectedEndTime.value && selectedEndTime.value !== '00:00'
   const matchDateRange = !selectedStartDate.value
@@ -174,8 +183,40 @@ const filteredSlots = computed(() => slots.value.filter((slot) => {
   return matchDateRange && matchWeekday && matchStart && matchEnd
 }))
 
-// 依「分店 + 日期」分組顯示名單
-const slotGroups = computed(() => {
+// 把多個日期同時段的 slot 合併成「星期列表的顯示資料」
+// sourceSlots 保留資料庫中原本的 slot，之後容量明細、統一修改、統一刪除依照他處理原本每筆單日的資料
+const buildAggregateSlots = (dateGroups) => {
+  const slotsByTime = dateGroups
+    .flatMap((group) => group.slots)
+    .reduce((items, slot) => {
+      const key = `${slot.startTime?.slice(0, 5)}-${slot.endTime?.slice(0, 5)}-${slot.isOpen ? 1 : 0}`
+      if (!items[key]) {
+        items[key] = {
+          ...slot,
+          aggregateKey: key,
+          sourceSlots: [],
+          sourceDates: [],
+          isAggregate: true,
+        }
+      }
+      items[key].sourceSlots.push(slot)
+      if (!items[key].sourceDates.includes(slot.reservationDate)) {
+        items[key].sourceDates.push(slot.reservationDate)
+      }
+      return items
+    }, {})
+
+  return Object.values(slotsByTime)
+    .map((slot) => ({
+      ...slot,
+      sourceDates: slot.sourceDates.sort(),
+      sourceSlots: slot.sourceSlots.sort((a, b) => `${a.reservationDate} ${a.startTime}`.localeCompare(`${b.reservationDate} ${b.startTime}`)),
+    }))
+    .sort((a, b) => a.startTime.localeCompare(b.startTime))
+}
+
+// 依「日期」分組顯示名單
+const dateSlotGroups = computed(() => {
   const groups = filteredSlots.value.reduce((items, slot) => {
     const key = `${slot.storeId}-${slot.reservationDate}`
     if (!items[key]) {
@@ -183,7 +224,8 @@ const slotGroups = computed(() => {
         key,
         storeId: slot.storeId,
         reservationDate: slot.reservationDate,
-        weekday: weekdayLabel(slot.reservationDate),
+        dayOfWeek: slotDayOfWeek(slot),
+        weekday: slotWeekdayLabel(slot),
         slots: [],
       }
     }
@@ -201,6 +243,89 @@ const slotGroups = computed(() => {
       return String(a.storeId).localeCompare(String(b.storeId))
     })
 })
+
+// 依「星期」分組顯示名單
+const weekdaySlotGroups = computed(() => {
+  const groupsByWeekday = filteredSlots.value.reduce((items, slot) => {
+    if (!slot.ruleGenerated) return items
+    const key = `${slot.storeId}-${slotDayOfWeek(slot)}`
+    if (!items[key]) {
+      items[key] = {
+        storeId: slot.storeId,
+        dayOfWeek: slotDayOfWeek(slot),
+        weekday: slotWeekdayLabel(slot),
+        slots: [],
+      }
+    }
+    items[key].slots.push(slot)
+    return items
+  }, {})
+
+  const weekdayGroups = Object.values(groupsByWeekday).map((group) => {
+    const dateGroups = Object.values(group.slots.reduce((items, slot) => {
+      if (!items[slot.reservationDate]) {
+        items[slot.reservationDate] = {
+          key: `${slot.storeId}-${slot.reservationDate}`,
+          storeId: slot.storeId,
+          reservationDate: slot.reservationDate,
+          dayOfWeek: slotDayOfWeek(slot),
+          weekday: slotWeekdayLabel(slot),
+          slots: [],
+        }
+      }
+      items[slot.reservationDate].slots.push(slot)
+      return items
+    }, {}))
+    return {
+      key: `weekday-${group.storeId}-${group.dayOfWeek}`,
+      storeId: group.storeId,
+      dayOfWeek: group.dayOfWeek,
+      weekday: group.weekday,
+      reservationDate: '',
+      dates: dateGroups.map((dateGroup) => dateGroup.reservationDate).sort(),
+      dateCount: dateGroups.length,
+      isWeekdayGroup: true,
+      slots: buildAggregateSlots(dateGroups),
+    }
+  })
+
+  const exceptionGroups = dateSlotGroups.value
+    .filter((group) => group.slots.some((slot) => !slot.ruleGenerated))
+    .map((group) => ({
+      ...group,
+      isException: true,
+      slots: group.slots.filter((slot) => !slot.ruleGenerated),
+    }))
+
+  return [...weekdayGroups, ...exceptionGroups]
+    .sort((a, b) => {
+      const storeOrder = String(a.storeId).localeCompare(String(b.storeId))
+      if (storeOrder !== 0) return storeOrder
+      const weekdayOrder = Number(a.dayOfWeek || 0) - Number(b.dayOfWeek || 0)
+      if (weekdayOrder !== 0) return weekdayOrder
+      return String(a.reservationDate || '').localeCompare(String(b.reservationDate || ''))
+    })
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(dateSlotGroups.value.length / pageSize.value)))
+const pageStart = computed(() => (currentPage.value - 1) * pageSize.value)
+const pagedDateSlotGroups = computed(() => dateSlotGroups.value.slice(pageStart.value, pageStart.value + pageSize.value))
+const slotGroups = computed(() => listMode.value === 'weekday' ? weekdaySlotGroups.value : pagedDateSlotGroups.value)
+
+const paginationText = computed(() => {
+  if (!dateSlotGroups.value.length) return '顯示 0 筆，共 0 筆'
+  const start = pageStart.value + 1
+  const end = Math.min(pageStart.value + pageSize.value, dateSlotGroups.value.length)
+  return `顯示 ${start}-${end} 筆，共 ${dateSlotGroups.value.length} 筆`
+})
+
+const prevPage = () => {
+  currentPage.value = Math.max(1, currentPage.value - 1)
+}
+
+const nextPage = () => {
+  currentPage.value = Math.min(totalPages.value, currentPage.value + 1)
+}
 
 // // 目前查詢分店的桌位摘要，依 table_info 即時計算各桌型數量。
 // const tableSummary = computed(() => {
@@ -230,6 +355,16 @@ const capacityRows = (slotId) => (capacitiesBySlot[slotId] || [])
     remainingCount: Math.max(Number(item.totalCount || 0) - Number(item.reservedCount || 0), 0),
   }))
   .sort((a, b) => Number(a.tableSize) - Number(b.tableSize))
+
+// 日期列表： slotId 當時段收合；星期列表：有多個單一 日期 slotId，所以用 aggregateKey
+const slotDisplayKey = (slot) => slot.isAggregate ? slot.aggregateKey : slot.slotId
+// 判斷修改 modal 是否批次修改星期列表的多筆時段
+const isBulkEditing = computed(() => editingSlots.value.length > 1)
+const editingDateSummary = computed(() => {
+  if (!isBulkEditing.value) return ''
+  const dates = editingSlots.value.map((slot) => slot.reservationDate).sort()
+  return `${dates[0]} ~ ${dates[dates.length - 1]}，共 ${dates.length} 天`
+})
 
 const timeHour = (time) => time?.slice(0, 2) || ''
 const timeMinute = (time) => time?.slice(3, 5) || ''
@@ -283,7 +418,8 @@ const generatedDates = computed(() => {
       .map((rule) => Number(rule.replace('WEEKDAY_', '')))
 
     for (const cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
-      if (selectedWeekdays.includes(cursor.getDay())) {
+      const weekday = cursor.getDay() || 7
+      if (selectedWeekdays.includes(weekday)) {
         dates.add(formatDateInput(cursor))
       }
     }
@@ -297,6 +433,16 @@ const generatedDates = computed(() => {
   }
   return [...dates].sort()
 })
+const isRuleGeneratedDate = (reservationDate) => {
+  return form.ruleSelections.length > 0 && !form.customDates.includes(reservationDate)
+}
+
+const getApiErrorMessage = (error, fallback) => {
+  return error?.response?.data?.message
+    || error?.response?.data?.error
+    || error?.message
+    || fallback
+}
 
 // ＊載入分店後載入頁面資料。＊
 const loadStores = async () => {
@@ -311,9 +457,11 @@ const loadStores = async () => {
 }
 
 // 進入頁面自動重整載入桌位、時段、容量
-const loadPageData = async () => {
+const loadPageData = async ({ silent = false } = {}) => {
   if (!stores.value.length) return
-  loading.value = true
+  if (!silent) {
+    loading.value = true
+  }
   errorMessage.value = ''
   successMessage.value = ''
   try {
@@ -357,22 +505,24 @@ const loadPageData = async () => {
   } catch (error) {
     errorMessage.value = error.response?.data?.message || '讀取訂位時段設定失敗'
   } finally {
-    loading.value = false
+    if (!silent) {
+      loading.value = false
+    }
   }
 }
 
 // 新增訂位日期時段
 const createTimeSlot = async () => {
   if (!form.storeId) {
-    errorMessage.value = '請選擇要新增時段的分店'
+    createModalError.value = '請選擇要新增時段的分店'
     return
   }
   if (!generatedDates.value.length) {
-    errorMessage.value = '請至少選擇一個星期規則、假日，或新增自訂日期'
+    createModalError.value = '請至少選擇一個星期規則、區間，或新增自訂日期'
     return
   }
   saving.value = true
-  errorMessage.value = ''
+  createModalError.value = ''
   successMessage.value = ''
   try {
     const results = await Promise.allSettled(generatedDates.value.map((reservationDate) => reservationSettingApi.createTimeSlot({
@@ -381,56 +531,75 @@ const createTimeSlot = async () => {
       startTime: `${form.startTime}:00`,
       endTime: `${form.endTime}:00`,
       isOpen: form.isOpen,
+      ruleGenerated: isRuleGeneratedDate(reservationDate),
     })))
     const successCount = results.filter((result) => result.status === 'fulfilled').length
     const failedCount = results.length - successCount
-    selectedStartDate.value = ''
+    selectedStartDate.value = formatDateInput(new Date())
     selectedEndDate.value = ''
-    await loadPageData()
-    successMessage.value = failedCount
-      ? `已新增 ${successCount} 筆，${failedCount} 筆略過或失敗`
-      : `已新增 ${successCount} 筆訂位時段`
+    await loadPageData({ silent: true })
+    if (failedCount) {
+      const firstFailed = results.find((result) => result.status === 'rejected')
+      createModalError.value = getApiErrorMessage(firstFailed?.reason, `有 ${failedCount} 筆不在營業時間、重複或新增失敗，請調整後再新增`)
+      if (successCount) {
+        successMessage.value = `已新增 ${successCount} 筆，${failedCount} 筆失敗`
+      }
+      return
+    }
+    successMessage.value = `已新增 ${successCount} 筆訂位時段`
     showCreateModal.value = false
   } catch (error) {
-    errorMessage.value = error.response?.data?.message || '新增訂位時段失敗'
+    createModalError.value = getApiErrorMessage(error, '新增訂位時段失敗')
   } finally {
     saving.value = false
   }
 }
 
-// 開啟修改 modal，資料帶入 editForm。
+// 資料帶入修改 modal editForm；星期列表，會把底下所有 slot 放進 editingSlots 統一修改
 const openEditModal = (slot) => {
-  editingSlotId.value = slot.slotId
-  editForm.storeId = String(slot.storeId)
-  editForm.reservationDate = slot.reservationDate
-  editForm.startTime = slot.startTime?.slice(0, 5) || ''
-  editForm.endTime = slot.endTime?.slice(0, 5) || ''
-  editForm.isOpen = Boolean(slot.isOpen)
+  const sourceSlots = slot.isAggregate ? slot.sourceSlots : [slot]
+  const firstSlot = sourceSlots[0]
+  editingSlots.value = sourceSlots
+  editingSlotId.value = firstSlot.slotId
+  editForm.storeId = String(firstSlot.storeId)
+  editForm.reservationDate = firstSlot.reservationDate
+  editForm.startTime = firstSlot.startTime?.slice(0, 5) || ''
+  editForm.endTime = firstSlot.endTime?.slice(0, 5) || ''
+  editForm.isOpen = Boolean(firstSlot.isOpen)
   errorMessage.value = ''
+  editModalError.value = ''
   successMessage.value = ''
   showEditModal.value = true
 }
 
+const closeEditModal = () => {
+  showEditModal.value = false
+  editingSlotId.value = null
+  editingSlots.value = []
+  editModalError.value = ''
+  showEditDateDropdown.value = false
+}
+
 // 儲存修改訂位時段
 const updateTimeSlot = async () => {
-  if (!editingSlotId.value) return
+  if (!editingSlotId.value || !editingSlots.value.length) return
   updating.value = true
-  errorMessage.value = ''
+  editModalError.value = ''
   successMessage.value = ''
   try {
-    await reservationSettingApi.updateTimeSlot(editingSlotId.value, {
+    await Promise.all(editingSlots.value.map((slot) => reservationSettingApi.updateTimeSlot(slot.slotId, {
       storeId: Number(editForm.storeId),
-      reservationDate: editForm.reservationDate,
+      reservationDate: isBulkEditing.value ? slot.reservationDate : editForm.reservationDate,
       startTime: `${editForm.startTime}:00`,
       endTime: `${editForm.endTime}:00`,
       isOpen: editForm.isOpen,
-    })
+      ruleGenerated: isBulkEditing.value,
+    })))
     await loadPageData()
-    successMessage.value = '訂位時段已更新'
-    showEditModal.value = false
-    editingSlotId.value = null
+    successMessage.value = isBulkEditing.value ? `已統一更新 ${editingSlots.value.length} 筆星期時段` : '訂位時段已更新'
+    closeEditModal()
   } catch (error) {
-    errorMessage.value = error.response?.data?.message || '更新訂位時段失敗'
+    editModalError.value = getApiErrorMessage(error, '更新訂位時段失敗')
   } finally {
     updating.value = false
   }
@@ -438,14 +607,18 @@ const updateTimeSlot = async () => {
 
 // 刪除時段的 confirm 提示視窗
 const deleteTimeSlot = async (slot) => {
-  const confirmed = window.confirm(`確定刪除 ${slot.reservationDate} ${slot.startTime?.slice(0, 5)} - ${slot.endTime?.slice(0, 5)} 的訂位時段？`)
+  const sourceSlots = slot.isAggregate ? slot.sourceSlots : [slot]
+  const label = slot.isAggregate
+    ? `${slot.sourceDates[0]} ~ ${slot.sourceDates[slot.sourceDates.length - 1]} 共 ${slot.sourceDates.length} 天 ${slot.startTime?.slice(0, 5)} - ${slot.endTime?.slice(0, 5)}`
+    : `${slot.reservationDate} ${slot.startTime?.slice(0, 5)} - ${slot.endTime?.slice(0, 5)}`
+  const confirmed = window.confirm(`確定刪除 ${label} 的訂位時段？`)
   if (!confirmed) return
   errorMessage.value = ''
   successMessage.value = ''
   try {
-    await reservationSettingApi.deleteTimeSlot(slot.slotId)
+    await Promise.all(sourceSlots.map((sourceSlot) => reservationSettingApi.deleteTimeSlot(sourceSlot.slotId)))
     await loadPageData()
-    successMessage.value = '訂位時段已刪除'
+    successMessage.value = sourceSlots.length > 1 ? `已刪除 ${sourceSlots.length} 筆星期時段` : '訂位時段已刪除'
   } catch (error) {
     errorMessage.value = error.response?.data?.message || '刪除訂位時段失敗'
   }
@@ -540,7 +713,7 @@ const toggleRule = (rule) => {
     : [...form.ruleSelections, rule]
 }
 
-// 清除查詢條件，顯示全部。
+// 清除查詢條件，顯示全部
 const clearSlotFilters = () => {
   selectedStoreId.value = ''
   selectedStartDate.value = ''
@@ -570,11 +743,14 @@ const loadModalStoreHolidays = () => {
 // ＊開啟新增 modal：預設分店不受最上方查詢分店控制，但若已選分店就先帶入。＊
 const openCreateModal = () => {
   errorMessage.value = ''
+  createModalError.value = ''
   successMessage.value = ''
   form.storeId = selectedStoreId.value || (stores.value[0]?.storeId ? String(stores.value[0].storeId) : '')
-  const openDays = Number(modalStore.value?.reservationOpenDays || reservationOpenDays.value || 30)
-  form.startDate = formatDateInput(new Date())
-  form.endDate = formatDateInput(addDays(new Date(), openDays))
+  form.startDate = ''
+  form.endDate = ''
+  form.ruleSelections = []
+  form.customDate = ''
+  form.customDates = []
   loadModalStoreHolidays()
   showCreateModal.value = true
   showRuleDropdown.value = false
@@ -636,15 +812,20 @@ watch(selectedStoreId, () => {
   storeHolidays.value = []
   loadPageData()
 })
+watch([dateSlotGroups, pageSize, listMode], () => {
+  currentPage.value = 1
+})
+watch(totalPages, () => {
+  if (currentPage.value > totalPages.value) currentPage.value = totalPages.value
+})
 // 新增 modal 分店變更時，重新載入列表
 watch(() => form.storeId, () => {
   if (!showCreateModal.value) return
-  const openDays = Number(modalStore.value?.reservationOpenDays || reservationOpenDays.value || 30)
-  form.endDate = formatDateInput(addDays(new Date(), openDays))
+  createModalError.value = ''
   loadModalStoreHolidays()
 })
 // 掛載時：註冊點擊事件載入資料
-// 離開頁面時：移除事件。
+// 離開頁面時：移除事件
 onMounted(() => {
   document.addEventListener('click', handleOutsideClick)
   loadStores()
@@ -801,11 +982,46 @@ onBeforeUnmount(() => {
 
         <!-- 日期＆時段名單 -->
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-          <h5 class="mb-0">訂位時段列表</h5>
+          <div class="d-flex align-items-center flex-wrap gap-2">
+            <i class="bx bx-time-five"></i>
+            <h5 class="mb-0">訂位時段{{ listMode === 'weekday' ? '星期' : '日期' }}列表</h5>
+            <button
+              type="button"
+              class="btn btn-sm"
+              :class="listMode === 'weekday' ? 'btn-primary' : 'btn-label-primary'"
+              @click="listMode = listMode === 'weekday' ? 'date' : 'weekday'">
+              {{ listMode === 'weekday' ? '切換「日期」列表顯示' : '切換「星期」列表顯示' }}
+            </button>
+          </div>
           <button type="button" class="btn btn-primary" :disabled="loading" @click="openCreateModal">
-            新增訂位時段
+            ＋ 新增訂位時段
           </button>
         </div>
+        <div class="pt-2">
+          <div v-if="listMode === 'date'" class="pagination-toolbar px-1 pb-3">
+            <div class="d-flex align-items-center gap-2">
+              <span class="text-muted small">每頁顯示</span>
+              <select v-model.number="pageSize" class="form-select form-select-sm page-size-select">
+                <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }} 筆</option>
+              </select>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+              <span class="text-muted small">{{ paginationText }}</span>
+              <div class="btn-group">
+                <button type="button" class="btn btn-sm btn-secondary" :disabled="currentPage <= 1" @click="prevPage">
+                  上一頁
+                </button>
+                <button type="button" class="btn btn-sm btn-label-secondary" disabled>
+                  {{ currentPage }} / {{ totalPages }}
+                </button>
+                <button type="button" class="btn btn-sm btn-secondary" :disabled="currentPage >= totalPages" @click="nextPage">
+                  下一頁
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+          
 
         <div class="time-slot-list">
           <div v-if="!loading && slotGroups.length === 0" class="text-center text-muted py-4">尚未設定符合條件的訂位時段</div>
@@ -814,14 +1030,21 @@ onBeforeUnmount(() => {
               <div v-if="!selectedStoreId" class="text-muted small mb-1">
                 {{ storeNameById[String(group.storeId)] || `分店 ${group.storeId}` }}
               </div>
-              <div class="fw-semibold">{{ group.reservationDate }}</div>
-              <span class="badge bg-label-primary">{{ group.weekday }}</span>
+              <template v-if="group.isWeekdayGroup">
+                <div class="fw-semibold">{{ group.weekday }}</div>
+                <span class="badge bg-label-primary">共 {{ group.dateCount }} 天</span>
+              </template>
+              <template v-else>
+                <div class="fw-semibold">{{ group.reservationDate }}</div>
+                <span class="badge bg-label-primary">{{ group.weekday }}</span>
+                <span v-if="group.isException" class="badge bg-label-warning">單日調整</span>
+              </template>
             </div>
             <div class="time-slot-items">
-              <div v-for="slot in group.slots" :key="slot.slotId" class="time-slot-item">
+              <div v-for="slot in group.slots" :key="slotDisplayKey(slot)" class="time-slot-item">
                 <div class="time-slot-item-summary">
-                  <button type="button" class="btn btn-sm btn-label-secondary slot-toggle" @click="toggleSlotDetails(slot.slotId)">
-                    <i :class="openSlotDetails[slot.slotId] ? 'bx bx-chevron-down' : 'bx bx-chevron-right'"></i>
+                  <button type="button" class="btn btn-sm btn-label-secondary slot-toggle" @click="toggleSlotDetails(slotDisplayKey(slot))">
+                    <i :class="openSlotDetails[slotDisplayKey(slot)] ? 'bx bx-chevron-down' : 'bx bx-chevron-right'"></i>
                   </button>
                   <div class="time-slot-item-main">
                     <div class="d-flex align-items-center flex-wrap gap-2">
@@ -829,29 +1052,58 @@ onBeforeUnmount(() => {
                       <span class="badge" :class="slot.isOpen ? 'bg-label-success' : 'bg-label-secondary'">
                         {{ slot.isOpen ? '開放' : '未開放' }}
                       </span>
+                      <span v-if="slot.isAggregate" class="badge bg-label-info">
+                        共 {{ slot.sourceDates.length }} 天
+                      </span>
                     </div>
                   </div>
                 </div>
                 <div class="time-slot-actions">
-                  <button type="button" class="btn btn-sm btn-label-primary" @click="openEditModal(slot)">修改</button>
-                  <button type="button" class="btn btn-sm btn-label-danger" @click="deleteTimeSlot(slot)">刪除</button>
+                  <button type="button" class="btn btn-sm btn-label-primary" @click="openEditModal(slot)">
+                    {{ slot.isAggregate && slot.sourceDates.length > 1 ? '統一修改' : '修改' }}
+                  </button>
+                  <button type="button" class="btn btn-sm btn-label-danger" @click="deleteTimeSlot(slot)">
+                    {{ slot.isAggregate && slot.sourceDates.length > 1 ? '統一刪除' : '刪除' }}
+                  </button>
                 </div>
-                <div v-if="openSlotDetails[slot.slotId]" class="slot-capacity-list">
-                  <div v-if="capacityRows(slot.slotId).length === 0" class="text-muted small">尚未產生容量</div>
-                  <div v-for="capacity in capacityRows(slot.slotId)" :key="`${slot.slotId}-${capacity.tableSize}`" class="slot-capacity-row">
-                    <span>{{ capacity.tableSize }}人桌</span>
-                    <div class="slot-capacity-counts">
-                      <span class="slot-capacity-count">
-                        <span class="count-label">總數: {{ capacity.totalCount }}</span>
-                      </span>
-                      <span class="slot-capacity-count">
-                        <span class="count-label">已訂: {{ capacity.reservedCount }}</span>
-                      </span>
-                      <strong class="slot-capacity-count">
-                        <span class="count-label">剩餘: {{ capacity.remainingCount }}</span>
-                      </strong>
+                <div v-if="openSlotDetails[slotDisplayKey(slot)]" class="slot-capacity-list">
+                  <template v-if="slot.isAggregate">
+                    <div v-for="dateSlot in slot.sourceSlots" :key="dateSlot.slotId" class="slot-capacity-date-group">
+                      <div class="slot-capacity-date">{{ dateSlot.reservationDate }}</div>
+                      <div v-if="capacityRows(dateSlot.slotId).length === 0" class="text-muted small">尚未產生容量</div>
+                      <div v-for="capacity in capacityRows(dateSlot.slotId)" :key="`${dateSlot.slotId}-${capacity.tableSize}`" class="slot-capacity-row">
+                        <span>{{ capacity.tableSize }}人桌</span>
+                        <div class="slot-capacity-counts">
+                          <span class="slot-capacity-count">
+                            <span class="count-label">總數: {{ capacity.totalCount }}</span>
+                          </span>
+                          <span class="slot-capacity-count">
+                            <span class="count-label">已訂: {{ capacity.reservedCount }}</span>
+                          </span>
+                          <strong class="slot-capacity-count">
+                            <span class="count-label">剩餘: {{ capacity.remainingCount }}</span>
+                          </strong>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  </template>
+                  <template v-else>
+                    <div v-if="capacityRows(slot.slotId).length === 0" class="text-muted small">尚未產生容量</div>
+                    <div v-for="capacity in capacityRows(slot.slotId)" :key="`${slot.slotId}-${capacity.tableSize}`" class="slot-capacity-row">
+                      <span>{{ capacity.tableSize }}人桌</span>
+                      <div class="slot-capacity-counts">
+                        <span class="slot-capacity-count">
+                          <span class="count-label">總數: {{ capacity.totalCount }}</span>
+                        </span>
+                        <span class="slot-capacity-count">
+                          <span class="count-label">已訂: {{ capacity.reservedCount }}</span>
+                        </span>
+                        <strong class="slot-capacity-count">
+                          <span class="count-label">剩餘: {{ capacity.remainingCount }}</span>
+                        </strong>
+                      </div>
+                    </div>
+                  </template>
                 </div>
               </div>
             </div>
@@ -1032,13 +1284,16 @@ onBeforeUnmount(() => {
                 <div class="alert alert-info mb-0">
                   預計新增 {{ generatedDates.length }} 個日期時段
                 </div>
+                <div v-if="createModalError" class="alert alert-danger mt-2 mb-0">
+                  {{ createModalError }}
+                </div>
               </div>
             </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-label-secondary" @click="showCreateModal = false">取消</button>
             <button type="submit" class="btn btn-primary" :disabled="saving || !form.storeId">
-              {{ saving ? '新增中...' : '新增' }}
+              新增
             </button>
           </div>
         </form>
@@ -1052,7 +1307,7 @@ onBeforeUnmount(() => {
         <form class="modal-content" @submit.prevent="updateTimeSlot">
           <div class="modal-header">
             <h5 class="modal-title">修改訂位時段</h5>
-            <button type="button" class="btn-close" aria-label="Close" @click="showEditModal = false"></button>
+            <button type="button" class="btn-close" aria-label="Close" @click="closeEditModal"></button>
           </div>
           <div class="modal-body">
             <div class="row g-3">
@@ -1067,11 +1322,18 @@ onBeforeUnmount(() => {
               </div>
               <div class="col-12">
                 <label class="form-label">日期</label>
+                <div v-if="isBulkEditing" class="alert alert-info mb-0">
+                  統一修改 {{ editingDateSummary }} 的此星期時段
+                </div>
                 <div class="multi-select dropdown-closable" @click.stop>
-                  <button type="button" class="form-select text-start" @click="showEditDateDropdown = !showEditDateDropdown">
+                  <button
+                    type="button"
+                    class="form-select text-start"
+                    :disabled="isBulkEditing"
+                    @click="showEditDateDropdown = !showEditDateDropdown">
                     {{ editDateText }}
                   </button>
-                  <div v-if="showEditDateDropdown" class="multi-select-menu date-range-menu">
+                  <div v-if="showEditDateDropdown && !isBulkEditing" class="multi-select-menu date-range-menu">
                     <div class="calendar-header">
                       <button type="button" class="btn btn-sm btn-label-secondary" @click="shiftCalendarMonth(-1)">
                         <i class="bx bx-chevron-left"></i>
@@ -1137,10 +1399,15 @@ onBeforeUnmount(() => {
                   <span class="form-check-label">開放訂位</span>
                 </label>
               </div>
+              <div v-if="editModalError" class="col-12">
+                <div class="alert alert-danger mb-0">
+                  {{ editModalError }}
+                </div>
+              </div>
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-label-secondary" @click="showEditModal = false">取消</button>
+            <button type="button" class="btn btn-label-secondary" @click="closeEditModal">取消</button>
             <button type="submit" class="btn btn-primary" :disabled="updating">
               {{ updating ? '儲存中...' : '儲存修改' }}
             </button>
@@ -1255,6 +1522,18 @@ onBeforeUnmount(() => {
   background: #f8f9fb;
 }
 
+.slot-capacity-date-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.slot-capacity-date {
+  color: #566a7f;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
 .slot-capacity-row {
   display: grid;
   grid-template-columns: minmax(90px, 1fr) auto;
@@ -1327,24 +1606,6 @@ onBeforeUnmount(() => {
   }
 }
 
-.multi-select {
-  position: relative;
-}
-
-.multi-select-menu {
-  position: absolute;
-  z-index: 1090;
-  top: calc(100% + 4px);
-  left: 0;
-  width: 100%;
-  min-width: 180px;
-  padding: 0.5rem;
-  background: #fff;
-  border: 1px solid #d9dee3;
-  border-radius: 0.375rem;
-  box-shadow: 0 0.25rem 1rem rgba(67, 89, 113, 0.12);
-}
-
 .date-range-menu {
   min-width: 320px;
 }
@@ -1372,73 +1633,4 @@ onBeforeUnmount(() => {
   padding: 0.375rem 0.5rem;
 }
 
-.calendar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
-}
-
-.calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.25rem;
-}
-
-.calendar-weekdays {
-  color: #697a8d;
-  font-size: 0.75rem;
-  text-align: center;
-  margin-bottom: 0.25rem;
-}
-
-.calendar-day {
-  width: 100%;
-  aspect-ratio: 1;
-  border: 0;
-  border-radius: 0.375rem;
-  background: transparent;
-  color: #566a7f;
-}
-
-.calendar-day:hover {
-  background: #f5f5f9;
-}
-
-.calendar-day.is-muted {
-  color: #b4bdc6;
-}
-
-.calendar-day.is-in-range {
-  background: #e7e7ff;
-  color: #696cff;
-}
-
-.calendar-day.is-selected {
-  background: #696cff;
-  color: #fff;
-}
-
-.date-range-hint {
-  margin-top: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.375rem;
-  background: #f5f5f9;
-  color: #566a7f;
-  text-align: center;
-}
-
-.multi-select-option {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.375rem 0.25rem;
-  margin: 0;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.multi-select-option:hover {
-  background: #f5f5f9;
-}
 </style>

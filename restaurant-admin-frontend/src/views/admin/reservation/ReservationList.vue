@@ -12,16 +12,20 @@ const loading = ref(false)
 const errorMessage = ref('')
 const selectedStoreId = ref('')
 const showDateRangeDropdown = ref(false)
+const showStatusDropdown = ref(false)
 const calendarMonth = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 const editingReservationId = ref(null)
+const selectedStatuses = ref([])
+const pageSizeOptions = [5, 10, 15, 20, 25, 30]
+const pageSize = ref(10)
+const currentPage = ref(1)
 const filters = reactive({
   name: '',
-  startDate: '',
+  startDate: formatDateInput(new Date()),
   endDate: '',
   time: '',
   partySize: '',
   phone: '',
-  status: '',
 })
 
 // 編輯使用獨立表單
@@ -52,13 +56,27 @@ const statusClass = {
   NO_SHOW: 'bg-label-dark',
 }
 
+const statusOptions = [
+  { value: 'PENDING', label: '未配桌' },
+  { value: 'RESERVED', label: '已保留' },
+  { value: 'ASSIGNED', label: '已配桌' },
+  { value: 'CHECKED_IN', label: '已入座' },
+  { value: 'COMPLETED', label: '已完成' },
+  { value: 'CANCELLED', label: '已取消' },
+  { value: 'NO_SHOW', label: '未到' },
+]
+
 const tableText = (item) => item.tableNumbers?.length ? item.tableNumbers.join('、') : '未分配'
 const formatTime = (time) => time?.slice(0, 5) || ''
 
 // 搜尋手機忽略格式 "-" 也可以搜尋
 const normalizePhone = (phone) => String(phone || '').replace(/\D/g, '')
 const timeLabel = (item) => `${formatTime(item.startTime)} - ${formatTime(item.endTime)}`
-const groupLabel = (item) => `${item.reservationDate}｜${timeLabel(item)}`
+const dateLabel = (date) => {
+  if (!date) return ''
+  const [, month, day] = date.split('-')
+  return `${Number(month)}/${Number(day)}`
+}
 
 // 不能編輯的狀態
 const canEdit = (item) => ['PENDING', 'RESERVED', 'ASSIGNED'].includes(item.status)
@@ -114,6 +132,15 @@ const partySizeOptions = computed(() => {
   return [...options].sort((a, b) => a - b)
 })
 
+// 多選狀態篩選按鈕
+const selectedStatusText = computed(() => {
+  if (!selectedStatuses.value.length || selectedStatuses.value.length === statusOptions.length) return '全部狀態'
+  return statusOptions
+    .filter((option) => selectedStatuses.value.includes(option.value))
+    .map((option) => option.label)
+    .join('、')
+})
+
 // 訂位名單所有查詢條件篩選
 const filteredReservations = computed(() => reservations.value.filter((item) => {
   const matchName = !filters.name || item.customerName?.includes(filters.name)
@@ -125,27 +152,56 @@ const filteredReservations = computed(() => reservations.value.filter((item) => 
   const matchTime = !filters.time || timeLabel(item) === filters.time
   const matchPartySize = !filters.partySize || item.partySize === Number(filters.partySize)
   const matchPhone = !filters.phone || normalizePhone(item.customerPhone).includes(normalizePhone(filters.phone))
-  const matchStatus = !filters.status || item.status === filters.status
+  const matchStatus = !selectedStatuses.value.length || selectedStatuses.value.includes(item.status)
   return matchName && matchDate && matchTime && matchPartySize && matchPhone && matchStatus
 }))
 
-// 訂位名單：排序讓列表以日期時間近～遠顯示
+// 訂位名單：查詢結果依「訂位日期 + 開始時間」排序
 const sortedFilteredReservations = computed(() => {
   return [...filteredReservations.value].sort((a, b) => {
     return `${a.reservationDate} ${a.startTime}`.localeCompare(`${b.reservationDate} ${b.startTime}`)
   })
 })
 
-// 訂位名單：依「日期 + 時段」的標題分組
+const totalPages = computed(() => Math.max(1, Math.ceil(sortedFilteredReservations.value.length / pageSize.value)))
+const pageStart = computed(() => (currentPage.value - 1) * pageSize.value)
+const pagedReservations = computed(() => sortedFilteredReservations.value.slice(pageStart.value, pageStart.value + pageSize.value))
+
+// 訂位名單：先依日期分組，日期底下再依時段分組；同一天只顯示一次日期列
 const groupedReservations = computed(() => {
-  const groups = new Map()
-  sortedFilteredReservations.value.forEach((item) => {
-    const key = groupLabel(item)
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key).push(item)
+  const dateGroups = new Map()
+  pagedReservations.value.forEach((item) => {
+    if (!dateGroups.has(item.reservationDate)) dateGroups.set(item.reservationDate, new Map())
+    const timeGroups = dateGroups.get(item.reservationDate)
+    const time = timeLabel(item)
+    if (!timeGroups.has(time)) timeGroups.set(time, [])
+    timeGroups.get(time).push(item)
   })
-  return [...groups.entries()].map(([label, items]) => ({ label, items }))
+  return [...dateGroups.entries()].map(([date, timeGroups]) => ({
+    date,
+    dateLabel: dateLabel(date),
+    slots: [...timeGroups.entries()].map(([time, items]) => ({
+      label: `${date}-${time}`,
+      timeLabel: time,
+      items,
+    })),
+  }))
 })
+
+const paginationText = computed(() => {
+  if (!sortedFilteredReservations.value.length) return '顯示 0 筆，共 0 筆'
+  const start = pageStart.value + 1
+  const end = Math.min(pageStart.value + pageSize.value, sortedFilteredReservations.value.length)
+  return `顯示 ${start}-${end} 筆，共 ${sortedFilteredReservations.value.length} 筆`
+})
+
+const prevPage = () => {
+  currentPage.value = Math.max(1, currentPage.value - 1)
+}
+
+const nextPage = () => {
+  currentPage.value = Math.min(totalPages.value, currentPage.value + 1)
+}
 
 // 切換日曆月份
 const shiftCalendarMonth = (offset) => {
@@ -178,10 +234,20 @@ const isRangeStart = (date) => date === filters.startDate
 const isRangeEnd = (date) => date === filters.endDate
 const isInRange = (date) => filters.startDate && filters.endDate && date > filters.startDate && date < filters.endDate
 
+// 切換多選狀態篩選
+const toggleStatus = (status) => {
+  if (selectedStatuses.value.includes(status)) {
+    selectedStatuses.value = selectedStatuses.value.filter((item) => item !== status)
+  } else {
+    selectedStatuses.value = [...selectedStatuses.value, status]
+  }
+}
+
 // 點空白處關閉下拉選單
 const handleOutsideClick = (event) => {
   if (event.target.closest('.dropdown-closable')) return
   showDateRangeDropdown.value = false
+  showStatusDropdown.value = false
 }
 
 // ＊載入可管理分店後再載入訂位資料。＊
@@ -255,13 +321,20 @@ const saveEdit = async (item) => {
 
 // ＊切換分店時重查；頁面掛載時也會讀取 query 參數設定預設篩選。＊
 watch(selectedStoreId, loadReservations)
+watch([filteredReservations, pageSize], () => {
+  currentPage.value = 1
+})
+watch(totalPages, () => {
+  if (currentPage.value > totalPages.value) currentPage.value = totalPages.value
+})
 onMounted(() => {
   document.addEventListener('click', handleOutsideClick)
   if (route.query.storeId) {
     selectedStoreId.value = String(route.query.storeId)
   }
   if (route.query.status) {
-    filters.status = String(route.query.status) === 'ACTIVE' ? 'RESERVED' : String(route.query.status)
+    const status = String(route.query.status) === 'ACTIVE' ? 'RESERVED' : String(route.query.status)
+    selectedStatuses.value = statusOptions.some((option) => option.value === status) ? [status] : []
   }
   if (route.query.time) {
     filters.time = String(route.query.time)
@@ -278,7 +351,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="container-xxl flex-grow-1 container-p-y">
-    <h2 class="py-3 mb-4">訂位名單<span class="text-muted fw-light"> / Reservation List</span></h2>
+    <h2 class="py-3 mb-4">訂位查詢<span class="text-muted fw-light"> / Reservation Search</span></h2>
 
     <div class="content-wrapper">
       <div class="card">
@@ -373,14 +446,21 @@ onBeforeUnmount(() => {
             </div>
             <div class="col-12 col-sm-6 col-lg-4">
               <label class="form-label">訂位狀態 Status</label>
-              <select v-model="filters.status" class="form-select">
-                <option value="">全部</option>
-                <option value="PENDING">未配桌</option>
-                <option value="RESERVED">已保留</option>
-                <option value="ASSIGNED">已配桌</option>
-                <option value="CHECKED_IN">已入座</option>
-                <option value="CANCELLED">已取消</option>
-              </select>
+              <div class="multi-select dropdown-closable" @click.stop>
+                <button type="button" class="form-select text-start" @click="showStatusDropdown = !showStatusDropdown">
+                  {{ selectedStatusText }}
+                </button>
+                <div v-if="showStatusDropdown" class="multi-select-menu status-select-menu">
+                  <label v-for="option in statusOptions" :key="option.value" class="multi-select-option">
+                    <input
+                      type="checkbox"
+                      class="form-check-input"
+                      :checked="selectedStatuses.includes(option.value)"
+                      @change="toggleStatus(option.value)"/>
+                    <span>{{ option.label }}</span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -390,23 +470,55 @@ onBeforeUnmount(() => {
         <div v-if="errorMessage" class="alert alert-danger mx-4">{{ errorMessage }}</div>
         <div v-if="loading" class="alert alert-info mx-4">讀取訂位名單中...</div>
 
+        <div class="pagination-toolbar px-4 pb-3">
+          <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small">每頁顯示</span>
+            <select v-model.number="pageSize" class="form-select form-select-sm page-size-select">
+              <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }} 筆</option>
+            </select>
+          </div>
+          <div class="d-flex align-items-center gap-3">
+            <span class="text-muted small">{{ paginationText }}</span>
+            <div class="btn-group">
+              <button type="button" class="btn btn-sm btn-secondary" :disabled="currentPage <= 1" @click="prevPage">
+                上一頁
+              </button>
+              <button type="button" class="btn btn-sm btn-label-secondary" disabled>
+                {{ currentPage }} / {{ totalPages }}
+              </button>
+              <button type="button" class="btn btn-sm btn-secondary" :disabled="currentPage >= totalPages" @click="nextPage">
+                下一頁
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div class="card-datatable table-responsive">
           <table class="dt-advanced-search table border-top">
             <template v-if="!loading && groupedReservations.length">
-              <template v-for="group in groupedReservations" :key="group.label">
-                <thead class="table-dark reservation-group-header">
+              <template v-for="dateGroup in groupedReservations" :key="dateGroup.date">
+                <tbody class="reservation-date-header">
                   <tr>
-                    <th>{{ group.label }}</th>
-                    <th>Phone</th>
-                    <th>Email</th>
-                    <th>Persons</th>
-                    <th>Table</th>
-                    <th>Status</th>
-                    <th></th>
+                    <td colspan="8">
+                      <i class="bx bx-calendar"></i>&nbsp;
+                      {{ dateGroup.dateLabel }}</td>
                   </tr>
-                </thead>
-                <tbody class="table-border-bottom-0">
-                  <tr v-for="item in group.items" :key="item.reservationId">
+                </tbody>
+                <template v-for="slot in dateGroup.slots" :key="slot.label">
+                  <tbody class="reservation-group-header">
+                    <tr>
+                      <th>{{ slot.timeLabel }}&nbsp; |</th>
+                      <th>Phone</th>
+                      <th>Email</th>
+                      <th>Persons</th>
+                      <th>Table</th>
+                      <th>Status</th>
+                      <th>note</th>
+                      <th></th>
+                    </tr>
+                  </tbody>
+                  <tbody class="table-border-bottom-0">
+                    <tr v-for="item in slot.items" :key="item.reservationId">
                     <td>
                       <input
                         v-if="editingReservationId === item.reservationId"
@@ -442,6 +554,7 @@ onBeforeUnmount(() => {
                     </td>
                     <td>{{ tableText(item) }}</td>
                     <td><span class="badge me-1" :class="statusClass[item.status]">{{ statusText[item.status] || item.status }}</span></td>
+                    <td class="special-request-cell">{{ item.specialRequest || '-' }}</td>
                     <td>
                       <div class="d-flex gap-2">
                         <template v-if="editingReservationId === item.reservationId">
@@ -466,13 +579,14 @@ onBeforeUnmount(() => {
                         </template>
                       </div>
                     </td>
-                  </tr>
-                </tbody>
+                    </tr>
+                  </tbody>
+                </template>
               </template>
             </template>
             <tbody v-else-if="!loading">
               <tr>
-                <td colspan="7" class="text-center text-muted py-4">目前沒有符合條件的訂位</td>
+                <td colspan="8" class="text-center text-muted py-4">目前沒有符合條件的訂位</td>
               </tr>
             </tbody>
           </table>
@@ -487,82 +601,16 @@ onBeforeUnmount(() => {
   max-width: 243px;
 }
 
-.multi-select {
-  position: relative;
-}
-
-.multi-select-menu {
-  position: absolute;
-  z-index: 1090;
-  top: calc(100% + 4px);
-  left: 0;
-  width: 100%;
-  min-width: 300px;
-  padding: 0.5rem;
-  background: #fff;
-  border: 1px solid #d9dee3;
-  border-radius: 0.375rem;
-  box-shadow: 0 0.25rem 1rem rgba(67, 89, 113, 0.12);
-}
-
-.calendar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
-}
-
-.calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.25rem;
-}
-
-.calendar-weekdays {
+.special-request-cell {
+  max-width: 220px;
+  white-space: normal;
+  word-break: break-word;
   color: #697a8d;
-  font-size: 0.75rem;
-  text-align: center;
-  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
 }
 
-.calendar-day {
-  width: 100%;
-  aspect-ratio: 1;
-  border: 0;
-  border-radius: 0.375rem;
-  background: transparent;
-  color: #566a7f;
-}
-
-.calendar-day:hover {
-  background: #f5f5f9;
-}
-
-.calendar-day.is-muted {
-  color: #b4bdc6;
-}
-
-.calendar-day.is-in-range {
-  background: #e7e7ff;
-  color: #696cff;
-}
-
-.calendar-day.is-selected {
-  background: #696cff;
-  color: #fff;
-}
-
-.date-range-hint {
-  margin-top: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.375rem;
-  background: #f5f5f9;
-  color: #566a7f;
-  text-align: center;
-}
-
-.reservation-group-header th {
-  color: #fff !important;
+.status-select-menu {
+  min-width: 190px;
 }
 
 </style>

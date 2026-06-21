@@ -23,4 +23,7 @@ public class TimeSlotRequest {
 
     // 是否開放預訂；預設開放。
     private Boolean isOpen = true;
+
+    // 是否由星期規則批次產生；自訂日期或單日修改會是 false。
+    private Boolean ruleGenerated = false;
 }

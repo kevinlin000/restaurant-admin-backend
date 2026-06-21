@@ -142,8 +142,7 @@ const logout = () => {
             type="button"
             class="menu-title menu-button"
             :class="{ active: isActive('/admin/home') }"
-            @click="goTo('/admin/home', ['STAFF', 'MANAGER', 'ADMIN'])"
-          >
+            @click="goTo('/admin/home', ['STAFF', 'MANAGER', 'ADMIN'])">
             <div>
               <i class="bx bx-home-circle"></i>
               系統總覽
@@ -165,18 +164,14 @@ const logout = () => {
             <li>
               <a
                 href="#"
-                @click.prevent="goTo('/admin/profile', ['MANAGER', 'ADMIN'])"
-              >
+                @click.prevent="goTo('/admin/profile', ['MANAGER', 'ADMIN'])">
                 分店管理
               </a>
             </li>
             <li>
               <a
                 href="#"
-                @click.prevent="
-                  goTo('/admin/system-setting', ['MANAGER', 'ADMIN'])
-                "
-              >
+                @click.prevent="goTo('/admin/system-setting', ['MANAGER', 'ADMIN'])">
                 設定
               </a>
             </li>
@@ -198,34 +193,22 @@ const logout = () => {
             <li>
               <a
                 href="#"
-                @click.prevent="
-                  goTo('/admin/reservation', ['STAFF', 'MANAGER', 'ADMIN'])
-                "
-              >
+                @click.prevent="goTo('/admin/reservation', ['STAFF', 'MANAGER', 'ADMIN'])">
                 訂位總覽
               </a>
             </li>
             <li>
               <a
                 href="#"
-                @click.prevent="
-                  goTo('/admin/reservation-list', ['STAFF', 'MANAGER', 'ADMIN'])
-                "
-              >
-                訂位名單
+                @click.prevent="goTo('/admin/reservation-list', ['STAFF', 'MANAGER', 'ADMIN'])">
+                訂位名單查詢
               </a>
             </li>
             <li>
               <a
                 href="#"
                 @click.prevent="
-                  goTo('/admin/reservation-table', [
-                    'STAFF',
-                    'MANAGER',
-                    'ADMIN',
-                  ])
-                "
-              >
+                  goTo('/admin/reservation-table', ['STAFF','MANAGER','ADMIN',])">
                 分配桌位
               </a>
             </li>
@@ -233,14 +216,8 @@ const logout = () => {
               <a
                 href="#"
                 @click.prevent="
-                  goTo('/admin/reservation-time-setting', [
-                    'STAFF',
-                    'MANAGER',
-                    'ADMIN',
-                  ])
-                "
-              >
-                訂位日期＆時段
+                  goTo('/admin/reservation-time-setting', ['STAFF','MANAGER','ADMIN',])">
+                日期時段＆剩餘桌位
               </a>
             </li>
             <hr />

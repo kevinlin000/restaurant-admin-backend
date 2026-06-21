@@ -11,9 +11,9 @@ const http = axios.create({
 
 // 請求攔截器：自動帶 JWT（會員登入後存 localStorage）
 http.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("accessToken");
   if (token) {
-    config.headers.Authorization = `Bearer ${accessToken}`;
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });

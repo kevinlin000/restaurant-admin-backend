@@ -20,6 +20,9 @@ const showDateRangeDropdown = ref(false)
 const showStatusDropdown = ref(false)
 const loading = ref(false)
 const errorMessage = ref('')
+const pageSizeOptions = [5, 10, 15, 20, 25, 30]
+const pageSize = ref(10)
+const currentPage = ref(1)
 
 const statusOptions = [
   { value: 'PENDING', label: '未配桌' },
@@ -78,15 +81,57 @@ const filteredReservations = computed(() => reservations.value.filter((item) => 
   return matchDate && matchStatus
 }))
 
-// 訂位名單：依「日期 + 時段」的標題分組
-const groupedReservations = computed(() => {
-  return filteredReservations.value.reduce((groups, item) => {
-    const key = `${item.reservationDate}｜${formatTime(item.startTime)} - ${formatTime(item.endTime)}`
-    groups[key] = groups[key] || []
-    groups[key].push(item)
-    return groups
-  }, {})
+// 桌位分配名單：依「訂位日期 + 開始時間」排序，由近到遠排列
+const sortedFilteredReservations = computed(() => {
+  return [...filteredReservations.value].sort((a, b) => {
+    return `${a.reservationDate} ${a.startTime}`.localeCompare(`${b.reservationDate} ${b.startTime}`)
+  })
 })
+
+const totalPages = computed(() => Math.max(1, Math.ceil(sortedFilteredReservations.value.length / pageSize.value)))
+const pageStart = computed(() => (currentPage.value - 1) * pageSize.value)
+const pagedReservations = computed(() => sortedFilteredReservations.value.slice(pageStart.value, pageStart.value + pageSize.value))
+const dateLabel = (date) => {
+  if (!date) return ''
+  const [, month, day] = date.split('-')
+  return `${Number(month)}/${Number(day)}`
+}
+
+// 桌位分配名單：先依日期分組，日期底下再依時段分組；同一天只顯示一次日期列
+const groupedReservations = computed(() => {
+  const dateGroups = new Map()
+  pagedReservations.value.forEach((item) => {
+    if (!dateGroups.has(item.reservationDate)) dateGroups.set(item.reservationDate, new Map())
+    const timeGroups = dateGroups.get(item.reservationDate)
+    const time = `${formatTime(item.startTime)} - ${formatTime(item.endTime)}`
+    if (!timeGroups.has(time)) timeGroups.set(time, [])
+    timeGroups.get(time).push(item)
+  })
+  return [...dateGroups.entries()].map(([date, timeGroups]) => ({
+    date,
+    dateLabel: dateLabel(date),
+    slots: [...timeGroups.entries()].map(([time, items]) => ({
+      label: `${date}-${time}`,
+      timeLabel: time,
+      items,
+    })),
+  }))
+})
+
+const paginationText = computed(() => {
+  if (!sortedFilteredReservations.value.length) return '顯示 0 筆，共 0 筆'
+  const start = pageStart.value + 1
+  const end = Math.min(pageStart.value + pageSize.value, sortedFilteredReservations.value.length)
+  return `顯示 ${start}-${end} 筆，共 ${sortedFilteredReservations.value.length} 筆`
+})
+
+const prevPage = () => {
+  currentPage.value = Math.max(1, currentPage.value - 1)
+}
+
+const nextPage = () => {
+  currentPage.value = Math.min(totalPages.value, currentPage.value + 1)
+}
 
 const statusText = {
   PENDING: '未配桌',
@@ -100,10 +145,34 @@ const statusClass = {
   ASSIGNED: 'bg-label-info',
 }
 
-// ＊只列出該訂位分店的桌位，避免跨店分配。＊
-const tablesForReservation = (item) => tables.value.filter((table) => String(table.storeId) === String(item.storeId))
 const formatTime = (time) => time?.slice(0, 5) || ''
 const tableText = (item) => item.tableNumbers?.length ? item.tableNumbers.join('、') : '未分配'
+
+// 同一日期時段已經被其他訂位選走的桌位，不再出現在下拉選單
+const isSameDateTimeSlot = (source, target) => {
+  return source.reservationDate === target.reservationDate
+    && formatTime(source.startTime) === formatTime(target.startTime)
+    && formatTime(source.endTime) === formatTime(target.endTime)
+}
+
+const usedTableIdsForReservation = (item) => {
+  return new Set(reservations.value
+    .filter((reservation) => reservation.reservationId !== item.reservationId)
+    .filter((reservation) => String(reservation.storeId) === String(item.storeId))
+    .filter((reservation) => reservation.status !== 'CANCELLED')
+    .filter((reservation) => isSameDateTimeSlot(reservation, item))
+    .flatMap((reservation) => reservation.tableIds || [])
+    .map(String))
+}
+
+// ＊只列出該訂位分店的桌位，並扣掉同時段其他訂位已使用桌位。＊
+const tablesForReservation = (item) => {
+  const usedTableIds = usedTableIdsForReservation(item)
+  return tables.value.filter((table) => {
+    return String(table.storeId) === String(item.storeId)
+      && !usedTableIds.has(String(table.tableId))
+  })
+}
 
 // 已配桌後 -> 只顯示桌號 ; 按重新配桌後 -> 打開下拉選單
 const canSelectTable = (item) => item.status !== 'ASSIGNED' || reassigningReservations[item.reservationId]
@@ -243,6 +312,12 @@ const cancelReassign = (reservationId) => {
 
 // ＊切換分店時重查；掛載時讀取 query 預設分店與狀態。＊
 watch(selectedStoreId, loadPageData)
+watch([filteredReservations, pageSize], () => {
+  currentPage.value = 1
+})
+watch(totalPages, () => {
+  if (currentPage.value > totalPages.value) currentPage.value = totalPages.value
+})
 
 onMounted(() => {
   document.addEventListener('click', handleOutsideClick)
@@ -346,58 +421,90 @@ onBeforeUnmount(() => {
         <div v-if="loading" class="alert alert-info mx-4">讀取未配桌名單中...</div>
 
         <!-- 配桌名單 -->
+        <div class="pagination-toolbar px-4 pb-3">
+          <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small">每頁顯示</span>
+            <select v-model.number="pageSize" class="form-select form-select-sm page-size-select">
+              <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }} 筆</option>
+            </select>
+          </div>
+          <div class="d-flex align-items-center gap-3">
+            <span class="text-muted small">{{ paginationText }}</span>
+            <div class="btn-group">
+              <button type="button" class="btn btn-sm btn-secondary" :disabled="currentPage <= 1" @click="prevPage">
+                上一頁
+              </button>
+              <button type="button" class="btn btn-sm btn-label-secondary" disabled>
+                {{ currentPage }} / {{ totalPages }}
+              </button>
+              <button type="button" class="btn btn-sm btn-secondary" :disabled="currentPage >= totalPages" @click="nextPage">
+                下一頁
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div class="table-responsive text-nowrap">
           <table class="table">
             <template v-if="!loading && filteredReservations.length">
-              <template v-for="(items, timeLabel) in groupedReservations" :key="timeLabel">
-                <thead class="table-dark reservation-group-header">
+              <template v-for="dateGroup in groupedReservations" :key="dateGroup.date">
+                <tbody class="reservation-date-header">
                   <tr>
-                    <th>{{ timeLabel }}</th>
-                    <th>Phone</th>
-                    <th>Email</th>
-                    <th>Persons</th>
-                    <th>Status</th>
-                    <th>Table</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody class="table-border-bottom-0">
-                  <tr v-for="item in items" :key="item.reservationId">
-                    <td><span class="fw-medium">{{ item.customerName }}</span></td>
-                    <td>{{ item.customerPhone }}</td>
-                    <td>{{ item.customerEmail || '-' }}</td>
-                    <td>{{ item.partySize }} 位</td>
-                    <td><span class="badge" :class="statusClass[item.status]">{{ statusText[item.status] || item.status }}</span></td>
-                    <td>
-                      <span v-if="!canSelectTable(item)" class="fw-medium">{{ tableText(item) }}</span>
-                      <select v-else v-model="selectedTables[item.reservationId]" class="form-select">
-                        <option value="">請選擇</option>
-                        <option v-for="table in tablesForReservation(item)" :key="table.tableId" :value="String(table.tableId)">
-                          {{ table.tableNumber }}（{{ table.tableSize }}人桌）
-                        </option>
-                      </select>
-                    </td>
-                    <td>
-                      <button
-                        v-if="item.status === 'ASSIGNED' && !reassigningReservations[item.reservationId]"
-                        type="button"
-                        class="btn btn-sm btn-label-primary"
-                        @click="startReassign(item)">
-                        重新配桌
-                      </button>
-                      <button v-else type="button" class="btn btn-sm btn-primary" @click="assignTable(item.reservationId)">
-                        分配
-                      </button>
-                      <button
-                        v-if="reassigningReservations[item.reservationId]"
-                        type="button"
-                        class="btn btn-sm btn-label-secondary ms-2"
-                        @click="cancelReassign(item.reservationId)">
-                        取消
-                      </button>
-                    </td>
+                    <td colspan="7">
+                      <i class="bx bx-calendar"></i>&nbsp;
+                      {{ dateGroup.dateLabel }}</td>
                   </tr>
                 </tbody>
+                <template v-for="slot in dateGroup.slots" :key="slot.label">
+                  <tbody class="reservation-group-header">
+                    <tr>
+                      <th>{{ slot.timeLabel }}</th>
+                      <th>Phone</th>
+                      <th>Email</th>
+                      <th>Persons</th>
+                      <th>Status</th>
+                      <th>Table</th>
+                      <th></th>
+                    </tr>
+                  </tbody>
+                  <tbody class="table-border-bottom-0">
+                    <tr v-for="item in slot.items" :key="item.reservationId">
+                      <td><span class="fw-medium">{{ item.customerName }}</span></td>
+                      <td>{{ item.customerPhone }}</td>
+                      <td>{{ item.customerEmail || '-' }}</td>
+                      <td>{{ item.partySize }} 位</td>
+                      <td><span class="badge" :class="statusClass[item.status]">{{ statusText[item.status] || item.status }}</span></td>
+                      <td>
+                        <span v-if="!canSelectTable(item)" class="fw-medium">{{ tableText(item) }}</span>
+                        <select v-else v-model="selectedTables[item.reservationId]" class="form-select">
+                          <option value="">請選擇</option>
+                          <option v-for="table in tablesForReservation(item)" :key="table.tableId" :value="String(table.tableId)">
+                            {{ table.tableNumber }}（{{ table.tableSize }}人桌）
+                          </option>
+                        </select>
+                      </td>
+                      <td>
+                        <button
+                          v-if="item.status === 'ASSIGNED' && !reassigningReservations[item.reservationId]"
+                          type="button"
+                          class="btn btn-sm btn-label-primary"
+                          @click="startReassign(item)">
+                          重新配桌
+                        </button>
+                        <button v-else type="button" class="btn btn-sm btn-primary" @click="assignTable(item.reservationId)">
+                          分配
+                        </button>
+                        <button
+                          v-if="reassigningReservations[item.reservationId]"
+                          type="button"
+                          class="btn btn-sm btn-label-secondary ms-2"
+                          @click="cancelReassign(item.reservationId)">
+                          取消
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </template>
               </template>
             </template>
             <tbody v-else-if="!loading">
@@ -427,102 +534,8 @@ onBeforeUnmount(() => {
   max-width: 100%;
 }
 
-.multi-select {
-  position: relative;
-}
-
-.multi-select-menu {
-  position: absolute;
-  z-index: 1090;
-  top: calc(100% + 4px);
-  right: 0;
-  width: 300px;
-  padding: 0.5rem;
-  background: #fff;
-  border: 1px solid #d9dee3;
-  border-radius: 0.375rem;
-  box-shadow: 0 0.25rem 1rem rgba(67, 89, 113, 0.12);
-}
-
-/* 多選狀態下拉選單 */
-
 .status-select-menu {
   width: 190px;
   min-width: 190px;
-}
-
-.status-option {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.45rem 0.5rem;
-  margin: 0;
-  border-radius: 0.375rem;
-  color: #566a7f;
-  cursor: pointer;
-}
-
-.status-option:hover {
-  background: #f5f5f9;
-}
-
-.calendar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
-}
-
-.calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.25rem;
-}
-
-.calendar-weekdays {
-  color: #697a8d;
-  font-size: 0.75rem;
-  text-align: center;
-  margin-bottom: 0.25rem;
-}
-
-.calendar-day {
-  width: 100%;
-  aspect-ratio: 1;
-  border: 0;
-  border-radius: 0.375rem;
-  background: transparent;
-  color: #566a7f;
-}
-
-.calendar-day:hover {
-  background: #f5f5f9;
-}
-
-.calendar-day.is-muted {
-  color: #b4bdc6;
-}
-
-.calendar-day.is-in-range {
-  background: #e7e7ff;
-  color: #696cff;
-}
-
-.calendar-day.is-selected {
-  background: #696cff;
-  color: #fff;
-}
-
-.date-range-hint {
-  margin-top: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.375rem;
-  background: #f5f5f9;
-  color: #566a7f;
-  text-align: center;
-}
-
-.reservation-group-header th {
-  color: #fff !important;
 }
 </style>

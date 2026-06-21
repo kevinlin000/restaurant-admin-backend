@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { getProfile } from '@/api/member'
 import { reservationApi } from '@/api/reservation'
 import { storeApi } from '@/api/store'
 import reservationHeroImage from '@/assets/images/reservation.jpg'
@@ -13,12 +14,16 @@ const selectedRegion = ref('')
 const selectedStoreDetail = ref(null)
 const slots = ref([])
 const capacity = ref([])
+const slotCapacities = ref({})
 const loading = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 const successReservation = ref(null)
+const currentMember = ref(null)
 const editingReservationId = ref(null)
+const editingOriginalSlotId = ref(null)
+const editingOriginalPartySize = ref(null)
 const showDateDropdown = ref(false)
 const calendarMonth = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 
@@ -62,10 +67,50 @@ const filteredStores = computed(() => {
   return stores.value.filter((store) => region.cities.includes(store.city))
 })
 
-// 顧客訂位可選的日期（依據設定的 time_slot）
-const availableDates = computed(() => [...new Set(slots.value.map((slot) => slot.reservationDate))])
+const capacityRowsForSlot = (slotId) => slotCapacities.value[String(slotId)] || []
+
+// 依目前人數判斷該時段還剩多少可訂桌位；桌型需大於等於訂位人數
+const remainingCapacityForSlot = (slot) => {
+  return capacityRowsForSlot(slot.slotId)
+    .filter((item) => Number(item.tableSize) >= Number(form.partySize))
+    .reduce((sum, item) => sum + Math.max(Number(item.totalCount || 0) - Number(item.reservedCount || 0), 0), 0)
+}
+
+const isSlotFull = (slot) => {
+  const rows = capacityRowsForSlot(slot.slotId)
+  return !rows.length || remainingCapacityForSlot(slot) <= 0
+}
+
+const availableSlots = computed(() => slots.value.filter((slot) => !isSlotFull(slot)))
+
+// 顧客訂位可選的日期（依據設定的 time_slot + 剩餘容量）
+const availableDates = computed(() => [...new Set(availableSlots.value.map((slot) => slot.reservationDate))])
 const availableDateSet = computed(() => new Set(availableDates.value))
+const fullDateSet = computed(() => {
+  const dateMap = slots.value.reduce((groups, slot) => {
+    groups[slot.reservationDate] = groups[slot.reservationDate] || []
+    groups[slot.reservationDate].push(slot)
+    return groups
+  }, {})
+  return new Set(Object.entries(dateMap)
+    .filter(([, dateSlots]) => dateSlots.length > 0 && dateSlots.every((slot) => isSlotFull(slot)))
+    .map(([date]) => date))
+})
 const slotsForDate = computed(() => slots.value.filter((slot) => slot.reservationDate === form.reservationDate))
+const availableSlotsForDate = computed(() => slotsForDate.value.filter((slot) => !isSlotFull(slot)))
+const selectedSlot = computed(() => slots.value.find((slot) => String(slot.slotId) === String(form.slotId)))
+const selectedSlotIsFull = computed(() => {
+  const isOriginalEditingSlot = editingReservationId.value
+    && String(form.slotId) === String(editingOriginalSlotId.value)
+    && Number(form.partySize) === Number(editingOriginalPartySize.value)
+  return selectedSlot.value && !isOriginalEditingSlot ? isSlotFull(selectedSlot.value) : false
+})
+const isSlotDisabled = (slot) => {
+  const isOriginalEditingSlot = editingReservationId.value
+    && String(slot.slotId) === String(editingOriginalSlotId.value)
+    && Number(form.partySize) === Number(editingOriginalPartySize.value)
+  return isSlotFull(slot) && !isOriginalEditingSlot
+}
 const selectedDateText = computed(() => form.reservationDate || '請選擇日期')
 
 // 日曆版面。
@@ -88,6 +133,7 @@ const calendarDays = computed(() => {
       day: date.getDate(),
       currentMonth: date.getMonth() === month,
       isAvailable: availableDateSet.value.has(formatDateInput(date)),
+      isFull: fullDateSet.value.has(formatDateInput(date)),
     }
   })
 })
@@ -180,6 +226,35 @@ const loadStoreDetail = async () => {
   selectedStoreDetail.value = res.data?.store || res.data || null
 }
 
+// 一次讀取頁面上所有可訂時段的容量，讓日期與時段一進頁面就能顯示滿額狀態
+const loadSlotCapacities = async (slotList) => {
+  slotCapacities.value = {}
+  await Promise.all(slotList.map(async (slot) => {
+    try {
+      const res = await reservationApi.getSlotCapacity(slot.slotId)
+      slotCapacities.value = {
+        ...slotCapacities.value,
+        [String(slot.slotId)]: res.data || [],
+      }
+    } catch {
+      slotCapacities.value = {
+        ...slotCapacities.value,
+        [String(slot.slotId)]: [],
+      }
+    }
+  }))
+}
+
+// 根據目前容量自動挑一個還能訂的日期與時段
+const syncReservationSelection = () => {
+  if (!availableDateSet.value.has(form.reservationDate)) {
+    form.reservationDate = availableDates.value[0] || form.reservationDate || formatDateInput(tomorrow)
+  }
+  if (!availableSlotsForDate.value.some((slot) => String(slot.slotId) === String(form.slotId))) {
+    form.slotId = availableSlotsForDate.value[0]?.slotId ? String(availableSlotsForDate.value[0].slotId) : ''
+  }
+}
+
 // 依分店查可訂時段
 const loadSlots = async () => {
   if (!form.storeId) return
@@ -195,11 +270,9 @@ const loadSlots = async () => {
       endDate: formatDateInput(endDate),
     })
     slots.value = res.data || []
-    if (!availableDates.value.includes(form.reservationDate)) {
-      form.reservationDate = availableDates.value[0] || formatDateInput(tomorrow)
-    }
+    await loadSlotCapacities(slots.value)
+    syncReservationSelection()
     setCalendarMonthByDate(form.reservationDate)
-    form.slotId = slotsForDate.value[0]?.slotId ? String(slotsForDate.value[0].slotId) : ''
   } catch (error) {
     errorMessage.value = error.response?.data?.message || '讀取可訂位時段失敗'
   } finally {
@@ -211,16 +284,86 @@ const loadSlots = async () => {
 const loadCapacity = async () => {
   capacity.value = []
   if (!form.slotId) return
+  if (slotCapacities.value[String(form.slotId)]) {
+    capacity.value = slotCapacities.value[String(form.slotId)]
+    return
+  }
   const res = await reservationApi.getSlotCapacity(form.slotId)
   capacity.value = res.data || []
+  slotCapacities.value = {
+    ...slotCapacities.value,
+    [String(form.slotId)]: capacity.value,
+  }
+}
+
+const getStoredUserInfo = () => {
+  try {
+    return JSON.parse(localStorage.getItem('userInfo') || '{}')
+  } catch {
+    return {}
+  }
+}
+
+const fillMemberInfo = (member) => {
+  if (!member || route.query.editId) return
+  form.customerName = member.name || form.customerName
+  form.customerPhone = formatPhoneNumber(member.phone || form.customerPhone)
+  form.customerEmail = member.email || form.customerEmail
+}
+
+// 若會員已登入，進入訂位頁時自動帶入姓名、手機、Email
+const loadCurrentMember = async () => {
+  if (!localStorage.getItem('accessToken')) return
+  const storedUser = getStoredUserInfo()
+  try {
+    const res = await getProfile()
+    const profile = res.data?.data || {}
+    currentMember.value = { ...storedUser, ...profile }
+  } catch {
+    currentMember.value = storedUser?.userId ? storedUser : null
+  }
+  fillMemberInfo(currentMember.value)
+}
+
+// 登入會員查詢自己的最新有效訂位，切到訂位成功頁但顯示「查詢成功」
+const queryMyReservation = async () => {
+  errorMessage.value = ''
+  const userId = currentMember.value?.userId || getStoredUserInfo().userId
+  if (!localStorage.getItem('accessToken') || !userId) {
+    errorMessage.value = '需註冊並登入會員才能查詢訂位'
+    return
+  }
+
+  try {
+    const res = await reservationApi.getMyReservations()
+    const reservations = (res.data || []).filter((item) => item.status !== 'CANCELLED')
+    if (!reservations.length) {
+      errorMessage.value = '目前沒有可查詢的訂位'
+      return
+    }
+    router.push({
+      name: 'CustomerReservationSuccess',
+      query: {
+        id: reservations[0].reservationId,
+        mode: 'query',
+      },
+    })
+  } catch (error) {
+    errorMessage.value = error.response?.data?.message || '查詢訂位失敗，請稍後再試'
+  }
 }
 
 // 送出訂位、修改訂位：成功後切到訂位成功頁
 const submitReservation = async () => {
+  if (!form.slotId || selectedSlotIsFull.value) {
+    errorMessage.value = '此日期時段已額滿，請重新選擇'
+    return
+  }
   submitting.value = true
   errorMessage.value = ''
   successMessage.value = ''
   const payload = {
+    userId: currentMember.value?.userId || getStoredUserInfo().userId || null,
     storeId: Number(form.storeId),
     slotId: Number(form.slotId),
     customerName: form.customerName,
@@ -256,6 +399,8 @@ const loadReservationForEdit = async () => {
     const res = await reservationApi.getReservation(editId)
     const item = res.data
     editingReservationId.value = item.reservationId
+    editingOriginalSlotId.value = item.slotId
+    editingOriginalPartySize.value = item.partySize
     form.customerName = item.customerName || ''
     form.customerPhone = formatPhoneNumber(item.customerPhone || '')
     form.customerEmail = item.customerEmail || ''
@@ -289,16 +434,21 @@ watch(selectedRegion, () => {
 // ＊日期更改：切換日曆月份並預設選該日第一個時段＊
 watch(() => form.reservationDate, () => {
   setCalendarMonthByDate(form.reservationDate)
-  form.slotId = slotsForDate.value[0]?.slotId ? String(slotsForDate.value[0].slotId) : ''
+  form.slotId = availableSlotsForDate.value[0]?.slotId ? String(availableSlotsForDate.value[0].slotId) : ''
 })
 
 // 時段更改：重新查容量
 watch(() => form.slotId, loadCapacity)
 
+// 人數更改後，可訂桌型可能不同，需重新確認目前日期/時段是否仍可訂
+watch(() => form.partySize, syncReservationSelection)
+
 // 掛載時：綁定全頁點擊事件，並載入分店
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('click', handleOutsideClick)
-  loadStores().then(loadReservationForEdit)
+  await loadCurrentMember()
+  await loadStores()
+  await loadReservationForEdit()
 })
 // 卸載時：移除事件避免記憶體洩漏
 onBeforeUnmount(() => {
@@ -395,9 +545,9 @@ onBeforeUnmount(() => {
                 id="reservation-date"
                 type="button"
                 class="form-select text-start"
-                :disabled="loading || !availableDates.length"
+                :disabled="loading || !slots.length"
                 @click="showDateDropdown = !showDateDropdown">
-                {{ availableDates.length ? selectedDateText : '目前沒有可訂日期' }}
+                {{ availableDates.length ? selectedDateText : (slots.length ? '目前時段已額滿' : '目前沒有可訂日期') }}
               </button>
               <div v-if="showDateDropdown" class="reservation-calendar-menu">
                 <div class="calendar-header">
@@ -427,11 +577,13 @@ onBeforeUnmount(() => {
                     :class="{
                       'is-muted': !day.currentMonth,
                       'is-available': day.isAvailable,
+                      'is-full': day.isFull,
                       'is-selected': isSelectedDate(day.value),
                     }"
                     :disabled="!day.isAvailable"
                     @click="selectReservationDate(day.value)">
-                    {{ day.day }}
+                    <span>{{ day.day }}</span>
+                    <small v-if="day.isFull" class="calendar-full-label">滿</small>
                   </button>
                 </div>
               </div>
@@ -441,8 +593,8 @@ onBeforeUnmount(() => {
             <label class="form-label" for="reservation-slot">時段</label>
             <select id="reservation-slot" v-model="form.slotId" class="form-select" required>
               <option value="">請選擇</option>
-              <option v-for="slot in slotsForDate" :key="slot.slotId" :value="String(slot.slotId)">
-                {{ formatTime(slot.startTime) }} - {{ formatTime(slot.endTime) }}
+              <option v-for="slot in slotsForDate" :key="slot.slotId" :value="String(slot.slotId)" :disabled="isSlotDisabled(slot)">
+                {{ formatTime(slot.startTime) }} - {{ formatTime(slot.endTime) }}{{ isSlotFull(slot) ? '（已額滿）' : '' }}
               </option>
             </select>
           </div>
@@ -452,11 +604,16 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div class="pt-4">
-          <button type="submit" class="btn btn-primary me-sm-3 me-1" :disabled="submitting || !form.slotId">
-            {{ submitting ? '送出中...' : (editingReservationId ? '修改訂位' : '確認訂位') }}
+        <div class="reservation-form-actions pt-4">
+          <div class="d-flex flex-wrap gap-2">
+            <button type="submit" class="btn btn-reservation-light" :disabled="submitting || !form.slotId || selectedSlotIsFull">
+              {{ submitting ? '送出中...' : (editingReservationId ? '修改訂位' : '確認訂位') }}
+            </button>
+            <button type="reset" class="btn btn-label-secondary" @click="errorMessage = ''">取消</button>
+          </div>
+          <button type="button" class="btn btn-reservation-dark gap-1" @click="queryMyReservation">
+            <i class="bx bx-search"></i>查詢訂位
           </button>
-          <button type="reset" class="btn btn-label-secondary" @click="errorMessage = ''">取消</button>
         </div>
       </form>
     </div>
@@ -536,6 +693,13 @@ onBeforeUnmount(() => {
   margin: 0 auto;
 }
 
+.reservation-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 /* 自訂日曆樣式 */
 
 .reservation-date-picker {
@@ -577,6 +741,10 @@ onBeforeUnmount(() => {
 }
 
 .calendar-day {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   aspect-ratio: 1;
   border: 0;
@@ -600,9 +768,23 @@ onBeforeUnmount(() => {
   background: #f1dac7;
 }
 
+.calendar-day.is-full {
+  background: #f1f1f4;
+  color: #9aa3af;
+}
+
 .calendar-day.is-selected {
   background: #b1642f;
   color: #ffffff;
+}
+
+.calendar-full-label {
+  position: absolute;
+  right: 4px;
+  bottom: 3px;
+  font-size: 0.62rem;
+  line-height: 1;
+  color: #c65f5f;
 }
 
 .calendar-day:disabled {
@@ -617,6 +799,15 @@ onBeforeUnmount(() => {
 
   .reservation-hero-content h1 {
     font-size: 40px;
+  }
+
+  .reservation-form-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .reservation-form-actions .btn {
+    width: 100%;
   }
 }
 </style>

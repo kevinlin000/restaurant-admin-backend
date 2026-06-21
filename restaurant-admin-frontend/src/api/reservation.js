@@ -1,6 +1,6 @@
 import http from './http'
 
-// 顧客端訂位 API
+// ========== 顧客端訂位 API ==========
 export const reservationApi = {
   
   // 顯示可訂日期時段
@@ -33,13 +33,23 @@ export const reservationApi = {
     return http.get(`/reservations/${reservationId}`)
   },
 
+  // 登入會員依 JWT 查詢自己的訂位
+  getMyReservations() {
+    return http.get('/reservations/me')
+  },
+
+  // 依 userId 查訂位
+  getUserReservations(userId) {
+    return http.get(`/reservations/user/${userId}`)
+  },
+
   // 取消訂位，恢復容量、移除已配桌資料
   cancelReservation(reservationId) {
     return http.delete(`/reservations/${reservationId}`)
   },
 }
 
-// 後台訂位管理 API (訂位總覽、訂位名單、分配桌位)
+// ========== 後台訂位管理 API (訂位總覽、訂位名單、分配桌位) ==========
 export const reservationAdminApi = {
 
   // 查全部訂位 (訂位名單、總數統計)
@@ -83,7 +93,7 @@ export const reservationAdminApi = {
   },
 }
 
-// 後台訂位設定 API （可訂日期＆時段、時段的容量）
+// ========== 後台訂位設定 API （可訂日期＆時段、時段的容量）==========
 export const reservationSettingApi = {
 
   // 查詢已設定的時段

@@ -8,12 +8,16 @@ import com.restaurant.reservation.entity.TimeSlot;
 import com.restaurant.reservation.repository.ReservationCapacityRepository;
 import com.restaurant.reservation.repository.ReservationRepository;
 import com.restaurant.reservation.repository.TimeSlotRepository;
+import com.restaurant.store.entity.StoreHour;
 import com.restaurant.store.entity.TableInfo;
+import com.restaurant.store.repository.StoreHourRepository;
 import com.restaurant.store.repository.TableInfoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -26,6 +30,7 @@ public class ReservationSettingService {
     private final TimeSlotRepository timeSlotRepository;
     private final ReservationCapacityRepository capacityRepository;
     private final ReservationRepository reservationRepository;
+    private final StoreHourRepository storeHourRepository;
 
     public Long getTimeSlotStoreId(Long slotId) {
         return findTimeSlot(slotId).getStoreId();
@@ -42,6 +47,14 @@ public class ReservationSettingService {
     // 新增訂位日期時段
     @Transactional
     public TimeSlot createTimeSlot(TimeSlotRequest request) {
+        validateTimeRange(request.getStartTime(), request.getEndTime());
+        validateWithinBusinessHours(
+                request.getStoreId(),
+                request.getReservationDate(),
+                request.getStartTime(),
+                request.getEndTime()
+        );
+
         timeSlotRepository.findByStoreIdAndReservationDateAndStartTime(
                 request.getStoreId(),
                 request.getReservationDate(),
@@ -53,9 +66,11 @@ public class ReservationSettingService {
         TimeSlot slot = timeSlotRepository.save(TimeSlot.builder()
                 .storeId(request.getStoreId())
                 .reservationDate(request.getReservationDate())
+                .dayOfWeek(resolveDayOfWeek(request.getReservationDate()))
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
                 .isOpen(request.getIsOpen() == null || request.getIsOpen())
+                .ruleGenerated(Boolean.TRUE.equals(request.getRuleGenerated()))
                 .build());
         rebuildCapacity(slot.getSlotId());
         return slot;
@@ -64,7 +79,15 @@ public class ReservationSettingService {
     // 修改訂位時段
     @Transactional
     public TimeSlot updateTimeSlot(Long slotId, TimeSlotRequest request) {
-        TimeSlot slot = findTimeSlot(slotId);
+        TimeSlot slot = timeSlotRepository.findById(slotId)
+                .orElseThrow(() -> new ResourceNotFoundException("訂位時段", slotId));
+        validateTimeRange(request.getStartTime(), request.getEndTime());
+        validateWithinBusinessHours(
+                request.getStoreId(),
+                request.getReservationDate(),
+                request.getStartTime(),
+                request.getEndTime()
+        );
 
         timeSlotRepository.findByStoreIdAndReservationDateAndStartTime(
                 request.getStoreId(),
@@ -79,9 +102,11 @@ public class ReservationSettingService {
         boolean storeChanged = !slot.getStoreId().equals(request.getStoreId());
         slot.setStoreId(request.getStoreId());
         slot.setReservationDate(request.getReservationDate());
+        slot.setDayOfWeek(resolveDayOfWeek(request.getReservationDate()));
         slot.setStartTime(request.getStartTime());
         slot.setEndTime(request.getEndTime());
         slot.setIsOpen(request.getIsOpen() == null || request.getIsOpen());
+        slot.setRuleGenerated(Boolean.TRUE.equals(request.getRuleGenerated()));
 
         TimeSlot saved = timeSlotRepository.save(slot);
         if (storeChanged) {
@@ -140,8 +165,38 @@ public class ReservationSettingService {
         return capacityRepository.findBySlotIdOrderByTableSizeAsc(slotId);
     }
 
+    private void validateTimeRange(LocalTime startTime, LocalTime endTime) {
+        if (startTime == null || endTime == null || !startTime.isBefore(endTime)) {
+            throw new BusinessException("結束時間必須晚於開始時間");
+        }
+    }
+
+    private Integer resolveDayOfWeek(LocalDate reservationDate) {
+        return reservationDate == null ? null : reservationDate.getDayOfWeek().getValue();
+    }
+
     private TimeSlot findTimeSlot(Long slotId) {
         return timeSlotRepository.findById(slotId)
                 .orElseThrow(() -> new ResourceNotFoundException("訂位時段", slotId));
+    }
+
+    private void validateWithinBusinessHours(Long storeId, LocalDate reservationDate, LocalTime startTime, LocalTime endTime) {
+        if (storeId == null || reservationDate == null || startTime == null || endTime == null) {
+            throw new BusinessException("分店、日期、開始時間與結束時間皆必填");
+        }
+
+        Integer dayOfWeek = reservationDate.getDayOfWeek().getValue();
+        List<StoreHour> openHours = storeHourRepository
+                .findByStoreIdAndDayOfWeekAndIsClosedFalseOrderByOpenTimeAsc(storeId, dayOfWeek);
+        boolean withinBusinessHours = openHours.stream().anyMatch(hour ->
+                hour.getOpenTime() != null
+                        && hour.getCloseTime() != null
+                        && !startTime.isBefore(hour.getOpenTime())
+                        && !endTime.isAfter(hour.getCloseTime())
+        );
+
+        if (!withinBusinessHours) {
+            throw new BusinessException("此日期時段不在分店營業時間內，無法新增訂位時段");
+        }
     }
 }

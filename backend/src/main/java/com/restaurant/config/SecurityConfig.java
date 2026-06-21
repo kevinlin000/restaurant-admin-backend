@@ -60,6 +60,7 @@ public class SecurityConfig {
 
                         // ===== 前台訂位（允許未登入訂位）=====
                         .requestMatchers(HttpMethod.GET, "/api/reservations/slots/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/reservations/me").hasAuthority("ROLE_CUSTOMER")
                         .requestMatchers(HttpMethod.POST, "/api/reservations").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/reservations/*").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/api/reservations/*").permitAll()

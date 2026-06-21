@@ -21,6 +21,7 @@ const formatTime = (time) => time?.slice(0, 5) || ''
 // 訂位成功顯示名字、分店
 const displayName = computed(() => reservation.value?.customerName || cachedReservation.value.customerName || '訂位顧客')
 const displayStoreName = computed(() => storeName.value || cachedReservation.value.storeName || '未指定分店')
+const pageTitle = computed(() => route.query.mode === 'query' ? '查詢成功' : '訂位成功')
 
 // 讀取訂位頁送出暫存顧客資訊（避免重新整理或後端欄位差）
 const loadCachedReservation = (reservationId) => {
@@ -155,7 +156,7 @@ onMounted(loadReservation)
           <i class="bx bx-check-double bx-sm" style="color: green;"></i>
         </span>
       </div>
-      <h3 class="card-header">訂位成功</h3>
+      <h3 class="card-header">{{ pageTitle }}</h3>
 
       <div class="card-body text-center w-100">
         <div v-if="loading" class="alert alert-info">讀取訂位資料中...</div>
@@ -198,14 +199,14 @@ onMounted(loadReservation)
     </div>
     <!-- 導覽到其他頁面 -->
     <div v-if="reservation && !loading && !errorMessage" class="success-footer-actions">
-      <button type="button" class="btn btn-success-back" @click="goReservationPage">
+      <button type="button" class="btn btn-reservation-dark" @click="goReservationPage">
         <i class="bx bx-chevron-left"></i>
         回訂位頁面
       </button>
-      <RouterLink class="btn btn-success-main" to="/menu">
+      <RouterLink class="btn btn-reservation-light" to="/menu">
         瀏覽菜單 <i class="bx bx-food-menu"></i>
       </RouterLink>
-      <RouterLink class="btn btn-success-main" to="/store">
+      <RouterLink class="btn btn-reservation-light" to="/store">
         店舖位置 <i class="bx bx-map"></i>
       </RouterLink>
     </div>
@@ -245,32 +246,6 @@ onMounted(loadReservation)
   justify-content: center;
   gap: 0.25rem;
   min-width: 126px;
-}
-
-.btn-success-back {
-  background: #4c4332b8;
-  border-color: #4c4332b8;
-  color: #ffffff;
-}
-
-.btn-success-back:hover,
-.btn-success-back:focus {
-  background: #3f3729;
-  border-color: #3f3729;
-  color: #ffffff;
-}
-
-.btn-success-main {
-  background: #e3ac7f;
-  border-color: #e3ac7f;
-  color: #ffffff;
-}
-
-.btn-success-main:hover,
-.btn-success-main:focus {
-  background: #d49a68;
-  border-color: #d49a68;
-  color: #ffffff;
 }
 
 @media (max-width: 576px) {

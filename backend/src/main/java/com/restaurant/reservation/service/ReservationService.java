@@ -13,8 +13,10 @@ import com.restaurant.reservation.repository.ReservationRepository;
 import com.restaurant.reservation.repository.ReservationTableRepository;
 import com.restaurant.reservation.repository.TimeSlotRepository;
 import com.restaurant.store.entity.Store;
+import com.restaurant.store.entity.StoreHour;
 import com.restaurant.store.entity.TableInfo;
 import com.restaurant.store.repository.StoreHolidayRepository;
+import com.restaurant.store.repository.StoreHourRepository;
 import com.restaurant.store.repository.StoreRepository;
 import com.restaurant.store.repository.TableInfoRepository;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +40,7 @@ public class ReservationService {
     private final TableInfoRepository tableInfoRepository;
     private final StoreRepository storeRepository;
     private final StoreHolidayRepository storeHolidayRepository;
+    private final StoreHourRepository storeHourRepository;
 
     // 顧客端查可訂時段
     public List<TimeSlot> getAvailableSlots(Long storeId, LocalDate startDate, LocalDate endDate) {
@@ -57,6 +60,7 @@ public class ReservationService {
                 effectiveEnd
         ).stream()
                 .filter(slot -> !holidays.contains(slot.getReservationDate()))
+                .filter(this::isWithinBusinessHours)
                 .toList();
     }
 
@@ -76,6 +80,7 @@ public class ReservationService {
         if (!slot.getStoreId().equals(request.getStoreId())) {
             throw new BusinessException("訂位分店與時段分店不一致");
         }
+        validateWithinBusinessHours(slot);
 
         ReservationCapacity selected = capacityRepository
                 .findFirstBySlotIdAndTableSizeGreaterThanEqualOrderByTableSizeAsc(slot.getSlotId(), request.getPartySize())
@@ -111,6 +116,13 @@ public class ReservationService {
                 .orElseThrow(() -> new ResourceNotFoundException("訂位", reservationId)));
     }
 
+    // 顧客登入後查詢自己的訂位
+    public List<ReservationResponse> getReservationsByUserId(Long userId) {
+        return reservationRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     // 顧客編輯訂位：只有 PENDING 能改
     @Transactional
     public ReservationResponse updateReservation(Long reservationId, CreateReservationRequest request) {
@@ -128,6 +140,7 @@ public class ReservationService {
         if (!slot.getStoreId().equals(request.getStoreId())) {
             throw new BusinessException("訂位分店與時段分店不一致");
         }
+        validateWithinBusinessHours(slot);
 
         boolean capacityChanged = !reservation.getSlotId().equals(request.getSlotId())
                 || !reservation.getPartySize().equals(request.getPartySize());
@@ -207,6 +220,29 @@ public class ReservationService {
                     capacity.setReservedCount(Math.max(0, capacity.getReservedCount() - 1));
                     capacityRepository.save(capacity);
                 });
+    }
+
+    // 分店營業時間判斷
+    private boolean isWithinBusinessHours(TimeSlot slot) {
+        if (slot == null || slot.getReservationDate() == null || slot.getStartTime() == null || slot.getEndTime() == null) {
+            return false;
+        }
+        Integer dayOfWeek = slot.getReservationDate().getDayOfWeek().getValue();
+        List<StoreHour> openHours = storeHourRepository
+                .findByStoreIdAndDayOfWeekAndIsClosedFalseOrderByOpenTimeAsc(slot.getStoreId(), dayOfWeek);
+
+        return openHours.stream().anyMatch(hour ->
+                hour.getOpenTime() != null
+                        && hour.getCloseTime() != null
+                        && !slot.getStartTime().isBefore(hour.getOpenTime())
+                        && !slot.getEndTime().isAfter(hour.getCloseTime())
+        );
+    }
+
+    private void validateWithinBusinessHours(TimeSlot slot) {
+        if (!isWithinBusinessHours(slot)) {
+            throw new BusinessException("此時段不在分店營業時間內");
+        }
     }
 
     // Entity 轉 DTO 補上時段日期、開始結束時間、已配桌桌號 -> 前端不用再分別查多張表

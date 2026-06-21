@@ -5,7 +5,6 @@ import App from './App.vue'
 import router from './router'
 
 // 樣式
-import '../src/assets/css/main.css'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 
@@ -31,6 +30,9 @@ import '../src/assets/vendor/libs/bootstrap-select/bootstrap-select.css'
 
 // Page CSS
 import '../src/assets/vendor/css/pages/app-calendar.css'
+
+// 自訂樣式
+import '../src/assets/css/main.css'
 
 const app = createApp(App)
 
