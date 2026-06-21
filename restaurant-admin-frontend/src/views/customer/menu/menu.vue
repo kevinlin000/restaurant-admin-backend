@@ -102,22 +102,18 @@ const fetchStores = async () => {
   }
 }
 
-// 🗂️ 抓取所有真實分類 —— ⚡ 100% 自動對應並抓取資料庫 8 大分類
+// 🗂️ 抓取所有真實分類
 const fetchCategories = async () => {
   try {
-    // 🎯 呼叫我們在後端蓋好的統一分類 API 管線
     const response = await axios.get('/api/menu-categories')
-    
-    // 🔍 自動解析組長規定封裝的 ApiResponse { success, message, data } 格式
     const rawCategories = response.data.data || response.data
     
     if (Array.isArray(rawCategories) && rawCategories.length > 0) {
       categoryList.value = rawCategories.map(cat => ({
         id: cat.id || cat.categoryId,
-        name: cat.categoryName || cat.name  // 🎯 精準對齊資料庫對應的實體屬性名稱
+        name: cat.categoryName || cat.name
       }))
       
-      // 預設選中資料庫跑出來的第一個分類 ID
       if (categoryList.value.length > 0 && !currentCategory.value) {
         currentCategory.value = categoryList.value[0].id
       }
@@ -128,7 +124,6 @@ const fetchCategories = async () => {
 }
 
 // 🍜 根據選擇的分店 ID，拉取專屬動態菜單
-// 🎯 修改後的完美洗滌管線：讓 item.categoryId 絕對不可能為 undefined！
 const fetchMenuData = async (storeId) => {
   if (!storeId) return
   try {
@@ -136,10 +131,9 @@ const fetchMenuData = async (storeId) => {
     const rawData = response.data.data || response.data
     
     if (Array.isArray(rawData)) {
-      // 🛠️ 資料清洗：每一道菜進來，如果發現沒有 categoryId，就用 category_id 頂替！
       menuItems.value = rawData.map(item => {
         if (item.categoryId === undefined || item.categoryId === null) {
-          item.categoryId = item.category_id; // 強制讓它成功變出 categoryId！
+          item.categoryId = item.category_id;
         }
         return item;
       })
@@ -156,11 +150,10 @@ const handleStoreChange = () => { fetchMenuData(currentStoreId.value) }
 
 watch(currentStoreId, (newStoreId) => { if (newStoreId) { fetchMenuData(newStoreId) } })
 
-// 🎯 升級版演算核心：增加「駝峰命名與底線命名」雙重保底，徹底防止新餐點漏勾！
+// 🎯 升級版演算核心
 const filteredMenu = vueComputed(() => {
   if (!Array.isArray(menuItems.value)) return []
   return menuItems.value.filter(item => {
-    // 💡 智慧識別：不管是傳 categoryId 還是 category_id，通通抓進來比對！
     const itemCatId = item.categoryId !== undefined ? item.categoryId : item.category_id;
     return Number(itemCatId) === Number(currentCategory.value)
   })
@@ -169,7 +162,7 @@ const addToCart = (item) => { alert(`🎉 成功將【${item.itemName}】加入�
 
 onMounted(async () => {
   await fetchStores()
-  await fetchCategories() // ⚡ 啟動全自動分類追蹤
+  await fetchCategories()
   if (currentStoreId.value) { await fetchMenuData(currentStoreId.value) }
 
   window.addEventListener('scroll', handleScroll)
@@ -235,7 +228,7 @@ onUnmounted(() => {
                   v-for="cat in categoryList" 
                   :key="cat.id"
                   @click="currentCategory = cat.id" 
-                  :class="['list-group-item list-group-item-action py-3 px-4 fw-bold border-0 border-bottom border-light-subtle d-flex align-items-center transition-all category-btn', currentCategory === cat.id ? 'yayoi-active' : 'text-secondary bg-white']"
+                  :class="['list-group-item list-group-item-action py-3 px-4 fw-bold border-0 border-bottom border-light-subtle d-flex align-items-center category-btn', currentCategory === cat.id ? 'yayoi-active' : 'text-secondary bg-white']"
                 >
                   <span class="fs-5 me-3 icon-wrapper">{{ getCategoryIcon(cat.name) }}</span>
                   <span class="category-text-label">{{ cat.name }}</span>
@@ -291,9 +284,46 @@ onUnmounted(() => {
 .transition-scale { transition: transform 0.5s ease; }
 .hover-shadow:hover { transform: translateY(-6px); box-shadow: 0 12px 20px rgba(0,0,0,0.06) !important; }
 .hover-shadow:hover .transition-scale { transform: scale(1.04); }
-.category-btn { letter-spacing: 0.8px; color: #4b5563 !important; font-weight: 650 !important; transition: all 0.25s ease-in-out; }
-.category-btn:hover:not(.yayoi-active) { background-color: #fff7ed !important; color: #b45309 !important; }
-.yayoi-active { background-color: #b45309 !important; background-image: linear-gradient(135deg, #cc7d24 0%, #b45309 100%) !important; color: #ffffff !important; font-weight: 700 !important; }
+
+/* ==========================================================================
+   左側分類選單字體與質感優化（極速硬體加速版）
+   ========================================================================== */
+.category-btn { 
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft JhengHei", sans-serif;
+  font-size: 15px;
+  font-weight: 650 !important; /* 🌟 保持厚實有質感的分量 */
+  color: #374151 !important; 
+  letter-spacing: 0.06em; 
+  line-height: 1.5;
+  
+  /* 預告瀏覽器開啟硬體加速，大幅減少點擊時的渲染重繪延遲 */
+  will-change: padding, background-color, color;
+  transition: all 0.12s ease-out; 
+}
+
+/* 滑鼠游標移入（未選取狀態） */
+.category-btn:hover:not(.yayoi-active) { 
+  background-color: #fff7ed !important; 
+  color: #b45309 !important; 
+  font-weight: 700 !important; 
+  padding-left: 1.25rem !important; 
+}
+
+/* 當前選中的分類（Active 狀態）：點擊瞬間雷厲風行！ */
+.yayoi-active { 
+  transition: none !important; /* 🌟 強制扼殺全域繼承而來的任何黏滯動畫 */
+  
+  background-color: #b45309 !important; 
+  background-image: linear-gradient(135deg, #cc7d24 0%, #b45309 100%) !important; 
+  color: #ffffff !important; 
+  font-weight: 700 !important; 
+  padding-left: 1.25rem !important;
+  box-shadow: 0 4px 12px rgba(180, 83, 9, 0.35) !important;
+}
+
+/* ==========================================================================
+   其餘既有核心樣式
+   ========================================================================== */
 .category-text-label { color: inherit; }
 .icon-wrapper { display: inline-block; transition: transform 0.2s ease; }
 .category-btn:hover .icon-wrapper { transform: scale(1.15) rotate(5deg); }
