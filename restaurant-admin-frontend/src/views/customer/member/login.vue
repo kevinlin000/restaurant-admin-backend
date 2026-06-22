@@ -362,11 +362,11 @@ const handleResetPassword = async () => {
 };
 
 const getDefaultPathByRole = (roleName) => {
-  if (["CUSTOMER", "STAFF", "MANAGER"].includes(roleName)) {
-    return "/home";
+  if (roleName === "CUSTOMER") {
+    return "/profile";
   }
 
-  if (roleName === "ADMIN") {
+  if (["STAFF", "MANAGER", "ADMIN"].includes(roleName)) {
     return "/admin/home";
   }
 
@@ -400,7 +400,7 @@ const handleLogin = async () => {
       confirmButtonColor: "#d9a372",
     });
 
-    router.push("/");
+    router.push(getDefaultPathByRole(data.roleName));
   } catch (err) {
     errorMsg.value = err.response?.data?.message || "登入失敗，請稍後再試";
   } finally {

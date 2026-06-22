@@ -18,5 +18,7 @@ public interface StaffRepository extends JpaRepository<Staff, Long> {
 
     List<Staff> findByStatus(Staff.StaffStatus status);
 
+    long countByStatus(Staff.StaffStatus status);
+
     List<Staff> findByStore_StoreIdAndStatus(Long storeId, Staff.StaffStatus status);
 }

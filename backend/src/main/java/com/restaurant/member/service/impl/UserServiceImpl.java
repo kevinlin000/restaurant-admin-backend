@@ -13,6 +13,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -89,6 +91,33 @@ public class UserServiceImpl implements UserService {
 
         // 再軟刪除 User（@SQLDelete 會自動轉成 UPDATE SET is_deleted = true）
         userRepository.deleteById(userId);
+    }
+
+
+    /**
+     * 後台首頁會員 / 員工摘要。
+     * 只使用 member 模組內資料，避免依賴 order / reservation。
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public MemberAdminSummaryResponse getAdminSummary() {
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        LocalDateTime tomorrowStart = todayStart.plusDays(1);
+
+        return MemberAdminSummaryResponse.builder()
+                .totalMembers(userRepository.countByRole_RoleName("CUSTOMER"))
+                .todayNewMembers(userRepository.countByRole_RoleNameAndCreatedAtBetween(
+                        "CUSTOMER", todayStart, tomorrowStart))
+                .bronzeCount(memberProfileRepository.countByMemberLevelAndUser_Role_RoleName(
+                        MemberProfile.MemberLevel.BRONZE, "CUSTOMER"))
+                .silverCount(memberProfileRepository.countByMemberLevelAndUser_Role_RoleName(
+                        MemberProfile.MemberLevel.SILVER, "CUSTOMER"))
+                .goldCount(memberProfileRepository.countByMemberLevelAndUser_Role_RoleName(
+                        MemberProfile.MemberLevel.GOLD, "CUSTOMER"))
+                .diamondCount(memberProfileRepository.countByMemberLevelAndUser_Role_RoleName(
+                        MemberProfile.MemberLevel.DIAMOND, "CUSTOMER"))
+                .activeStaffCount(staffRepository.countByStatus(StaffStatus.ACTIVE))
+                .build();
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.restaurant.member.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -19,6 +20,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByPhone(String phone);
 
     List<User> findByRole_RoleName(String roleName);
+
+    long countByRole_RoleName(String roleName);
+
+    long countByRole_RoleNameAndCreatedAtBetween(String roleName, LocalDateTime start, LocalDateTime end);
 
     Page<User> findAll(Pageable pageable);
 

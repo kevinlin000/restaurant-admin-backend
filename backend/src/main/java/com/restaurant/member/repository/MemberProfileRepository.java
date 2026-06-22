@@ -14,4 +14,6 @@ public interface MemberProfileRepository extends JpaRepository<MemberProfile, Lo
     Optional<MemberProfile> findByUserUserId(Long userId);
 
     List<MemberProfile> findByMemberLevel(MemberProfile.MemberLevel level);
+
+    long countByMemberLevelAndUser_Role_RoleName(MemberProfile.MemberLevel level, String roleName);
 }

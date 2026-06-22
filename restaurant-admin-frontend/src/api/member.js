@@ -42,3 +42,12 @@ export const getPointBalance = () => api.get("/api/members/me/points");
 
 // 查詢會員點數紀錄
 export const getPointHistory = () => api.get("/api/members/me/points/history");
+
+// 後台：會員/員工統計摘要
+export const getMemberAdminSummary = () => api.get("/api/admin/members/summary");
+
+// 後台：員工管理
+export const getStaffList = () => api.get("/api/members/staff");
+export const createStaff = (data) => api.post("/api/members/staff", data);
+export const resignStaff = (staffId) =>
+  api.put(`/api/members/staff/${staffId}/resign`);

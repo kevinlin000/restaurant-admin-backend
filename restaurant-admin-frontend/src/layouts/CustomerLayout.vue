@@ -24,18 +24,66 @@ const dropdownItems = computed(() => {
     icon: "bi-person",
   };
 
-  if (roleName.value === "CUSTOMER") {
-    return [profileItem];
+  const reservationRecordItem = {
+    label: "訂位紀錄",
+    path: { path: "/profile", query: { tab: "reservations" } },
+    icon: "bi-calendar-check",
+  };
+
+  const orderRecordItem = {
+    label: "消費紀錄",
+    path: { path: "/profile", query: { tab: "orders" } },
+    icon: "bi-receipt",
+  };
+
+  const adminHomeItem = {
+    label: "後台首頁",
+    subtitle: "返回工作總覽",
+    path: "/admin/home",
+    icon: "bi-speedometer2",
+    roles: ["STAFF", "MANAGER", "ADMIN"],
+    menuClass: "dropdown-admin-home",
+  };
+
+  if (["CUSTOMER", "STAFF", "MANAGER"].includes(roleName.value)) {
+    const memberItems = [profileItem, reservationRecordItem, orderRecordItem];
+
+    if (roleName.value === "CUSTOMER") {
+      return memberItems;
+    }
+
+    return [
+      adminHomeItem,
+      ...memberItems,
+      {
+        label: "訂位管理",
+        path: "/admin/reservation",
+        icon: "bi-calendar-check",
+        roles: ["STAFF", "MANAGER", "ADMIN"],
+      },
+      {
+        label: "訂單管理",
+        path: "/admin/order-manage",
+        icon: "bi-receipt",
+        roles: ["STAFF", "MANAGER", "ADMIN"],
+      },
+      {
+        label: "菜單管理",
+        path: "/admin/menu-setting",
+        icon: "bi-menu-button-wide",
+        roles: ["MANAGER", "ADMIN"],
+      },
+      {
+        label: "店家檔案設定",
+        path: "/admin/profile",
+        icon: "bi-shop",
+        roles: ["MANAGER", "ADMIN"],
+      },
+    ].filter((item) => !item.roles || item.roles.includes(roleName.value));
   }
 
   const items = [
-    ...(roleName.value === "ADMIN" ? [] : [profileItem]),
-    {
-      label: "後台首頁",
-      path: "/admin/home",
-      icon: "bi-house",
-      roles: ["STAFF", "MANAGER", "ADMIN"],
-    },
+    adminHomeItem,
     {
       label: "訂位管理",
       path: "/admin/reservation",
@@ -177,12 +225,15 @@ const logout = async () => {
 
                 <ul class="dropdown-menu dropdown-menu-end">
                   <li v-for="item in dropdownItems" :key="item.label">
-                    <RouterLink class="dropdown-item" :to="item.path">
-                      <i
-                        v-if="item.icon"
-                        :class="['bi', item.icon, 'me-2']"
-                      ></i>
-                      {{ item.label }}
+                    <RouterLink
+                      :class="['dropdown-item', item.menuClass]"
+                      :to="item.path"
+                    >
+                      <i v-if="item.icon" :class="['bi', item.icon]"></i>
+                      <span class="dropdown-text">
+                        <span>{{ item.label }}</span>
+                        <small v-if="item.subtitle">{{ item.subtitle }}</small>
+                      </span>
                     </RouterLink>
                   </li>
 
@@ -339,6 +390,74 @@ const logout = async () => {
 
 .login-btn:hover {
   background: #e3ac7f;
+  transform: translateY(-1px);
+}
+
+
+/* dropdown */
+
+.dropdown-menu {
+  min-width: 230px;
+  padding: 8px;
+  border: 0;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(86, 106, 127, 0.18);
+}
+
+.dropdown-menu .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  color: #566a7f;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.dropdown-menu .dropdown-item i {
+  width: 18px;
+  color: #7a8ca1;
+  font-size: 17px;
+}
+
+.dropdown-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.dropdown-text small {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.dropdown-menu .dropdown-item:hover {
+  background: #f8f3ed;
+  color: #d5905f;
+}
+
+.dropdown-menu .dropdown-item:hover i {
+  color: #d5905f;
+}
+
+.dropdown-menu .dropdown-admin-home {
+  margin-bottom: 8px;
+  background: linear-gradient(135deg, #e3ac7f 0%, #d5905f 100%);
+  color: #fff !important;
+  box-shadow: 0 8px 18px rgba(227, 172, 127, 0.36);
+}
+
+.dropdown-menu .dropdown-admin-home i,
+.dropdown-menu .dropdown-admin-home small {
+  color: #fff !important;
+}
+
+.dropdown-menu .dropdown-admin-home:hover {
+  background: linear-gradient(135deg, #df9f6d 0%, #c98250 100%);
+  color: #fff !important;
   transform: translateY(-1px);
 }
 

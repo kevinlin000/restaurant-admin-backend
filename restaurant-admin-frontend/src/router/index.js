@@ -15,6 +15,7 @@ import AdminMenuCreate from "@/views/admin/menu/menu-create.vue";
 import AdminMenuEdit from "@/views/admin/menu/menu-edit.vue";
 import AdminMenuSetting from "@/views/admin/menu/menu-setting.vue";
 import AdminStore from "@/views/admin/store/store.vue";
+import AdminMember from "@/views/admin/member/member.vue";
 import CustomerMenu from "@/views/customer/menu/menu.vue";
 import CustomerOrder from "@/views/customer/order/order.vue";
 import CustomerStore from "@/views/customer/store/store.vue";
@@ -121,6 +122,11 @@ const routers = [
         component: AdminMenuSetting,
       },
       {
+        path: "member",
+        name: "AdminMember",
+        component: AdminMember,
+      },
+      {
         path: "store",
         name: "AdminStore",
         component: AdminStore,
@@ -135,11 +141,11 @@ const router = createRouter({
 });
 
 const getDefaultPathByRole = (roleName) => {
-  if (["CUSTOMER", "STAFF", "MANAGER"].includes(roleName)) {
-    return "/home";
+  if (roleName === "CUSTOMER") {
+    return "/profile";
   }
 
-  if (roleName === "ADMIN") {
+  if (["STAFF", "MANAGER", "ADMIN"].includes(roleName)) {
     return "/admin/home";
   }
 
@@ -161,10 +167,10 @@ router.beforeEach((to, from, next) => {
   const roleName = userInfo.roleName;
 
   const isAdminPage = to.path.startsWith("/admin");
-  const isCustomerProfilePage = to.path === "/profile";
+  const isProfilePage = to.path === "/profile";
 
   // 未登入不能進會員中心或後台
-  if (!token && (isAdminPage || isCustomerProfilePage)) {
+  if (!token && (isAdminPage || isProfilePage)) {
     next("/login");
     return;
   }
@@ -180,6 +186,16 @@ router.beforeEach((to, from, next) => {
     next("/profile");
     return;
   }
-next();
+
+  // ADMIN 是共同管理帳號，沒有個人資料頁，直接回後台首頁。
+  if (isProfilePage && roleName === "ADMIN") {
+    next("/admin/home");
+    return;
+  }
+
+  // STAFF / MANAGER 可以查看自己的個人資料頁，
+  // 因此 /profile 不會導回 /admin/home。
+
+  next();
 });
 export default router;

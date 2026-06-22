@@ -71,50 +71,76 @@ const isActive = (path) => {
   return route.path === path || route.path.startsWith(`${path}/`);
 };
 
-const adminDropdownItems = computed(() => [
-  {
+const adminDropdownItems = computed(() => {
+  const adminHomeItem = {
     label: "後台首頁",
+    subtitle: "返回工作總覽",
     path: "/admin/home",
-    icon: "bx bx-home",
+    icon: "bx bx-tachometer",
     roles: ["STAFF", "MANAGER", "ADMIN"],
-  },
-  {
-    label: "訂位管理",
-    path: "/admin/reservation",
-    icon: "bx bx-calendar-check",
-    roles: ["STAFF", "MANAGER", "ADMIN"],
-  },
-  {
-    label: "訂單管理",
-    path: "/admin/order-manage",
-    icon: "bx bx-receipt",
-    roles: ["STAFF", "MANAGER", "ADMIN"],
-  },
-  {
-    label: "菜單管理",
-    path: "/admin/menu-setting",
-    icon: "bx bx-food-menu",
-    roles: ["MANAGER", "ADMIN"],
-  },
-  {
-    label: "分店管理",
-    path: "/admin/profile",
-    icon: "bx bx-store",
-    roles: ["MANAGER", "ADMIN"],
-  },
-  {
-    label: "員工管理",
-    path: "/admin/member",
-    icon: "bx bx-group",
-    roles: ["ADMIN"],
-  },
-  {
-    label: "門市管理",
-    path: "/admin/store",
-    icon: "bx bx-buildings",
-    roles: ["ADMIN"],
-  },
-]);
+    menuClass: "admin-home-entry",
+  };
+
+  const items = [
+    adminHomeItem,
+    {
+      label: "個人資料",
+      path: "/profile",
+      icon: "bx bx-user-circle",
+      roles: ["STAFF", "MANAGER"],
+    },
+    {
+      label: "我的訂位紀錄",
+      path: { path: "/profile", query: { tab: "reservations" } },
+      icon: "bx bx-calendar-check",
+      roles: ["STAFF", "MANAGER"],
+    },
+    {
+      label: "我的消費紀錄",
+      path: { path: "/profile", query: { tab: "orders" } },
+      icon: "bx bx-receipt",
+      roles: ["STAFF", "MANAGER"],
+    },
+    {
+      label: "訂位管理",
+      path: "/admin/reservation",
+      icon: "bx bx-calendar-check",
+      roles: ["STAFF", "MANAGER", "ADMIN"],
+    },
+    {
+      label: "訂單管理",
+      path: "/admin/order-manage",
+      icon: "bx bx-receipt",
+      roles: ["STAFF", "MANAGER", "ADMIN"],
+    },
+    {
+      label: "菜單管理",
+      path: "/admin/menu-setting",
+      icon: "bx bx-food-menu",
+      roles: ["MANAGER", "ADMIN"],
+    },
+    {
+      label: "分店管理",
+      path: "/admin/store",
+      icon: "bx bx-store",
+      roles: ["MANAGER", "ADMIN"],
+    },
+    {
+      label: "員工管理",
+      path: "/admin/member",
+      icon: "bx bx-group",
+      roles: ["ADMIN"],
+    },
+    {
+      label: "門市管理",
+      path: "/admin/store",
+      icon: "bx bx-buildings",
+      roles: ["ADMIN"],
+    },
+  ];
+
+  return items.filter((item) => item.roles.includes(roleName.value));
+});
 
 const logout = () => {
   localStorage.removeItem("accessToken");
@@ -165,7 +191,7 @@ const logout = () => {
             <li>
               <a
                 href="#"
-                @click.prevent="goTo('/admin/profile', ['MANAGER', 'ADMIN'])"
+                @click.prevent="goTo('/admin/store', ['MANAGER', 'ADMIN'])"
               >
                 分店管理
               </a>
@@ -347,6 +373,22 @@ const logout = () => {
           </ul>
         </li>
 
+
+        <!-- 會員 / 員工管理：管理員 -->
+        <li class="menu-group">
+          <button
+            type="button"
+            class="menu-title menu-button"
+            :class="{ active: isActive('/admin/member') }"
+            @click="goTo('/admin/member', ['ADMIN'])"
+          >
+            <div>
+              <i class="bx bx-group"></i>
+              員工管理
+            </div>
+          </button>
+        </li>
+
         <!-- 分店管理：管理員 -->
         <li class="menu-group">
           <div class="menu-title" @click="toggleMenu('store')">
@@ -398,11 +440,14 @@ const logout = () => {
             <li v-for="item in adminDropdownItems" :key="item.label">
               <a
                 href="#"
-                class="dropdown-item"
+                :class="['dropdown-item', item.menuClass]"
                 @click.prevent="goTo(item.path, item.roles)"
               >
                 <i :class="item.icon"></i>
-                <span>{{ item.label }}</span>
+                <span class="dropdown-text">
+                  <span>{{ item.label }}</span>
+                  <small v-if="item.subtitle">{{ item.subtitle }}</small>
+                </span>
               </a>
             </li>
 
@@ -608,6 +653,40 @@ const logout = () => {
 
 .admin-user-menu .dropdown-item:hover i {
   color: white;
+}
+
+
+.admin-user-menu .dropdown-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.admin-user-menu .dropdown-text small {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.78;
+}
+
+.admin-user-menu .admin-home-entry {
+  margin: 0 8px 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #e3ac7f 0%, #d5905f 100%);
+  color: #fff !important;
+  box-shadow: 0 8px 18px rgba(227, 172, 127, 0.32);
+}
+
+.admin-user-menu .admin-home-entry i,
+.admin-user-menu .admin-home-entry small {
+  color: #fff !important;
+}
+
+.admin-user-menu .admin-home-entry:hover {
+  background: linear-gradient(135deg, #df9f6d 0%, #c98250 100%);
+  color: #fff !important;
+  transform: translateY(-1px);
 }
 
 .admin-user-menu .dropdown-divider {
