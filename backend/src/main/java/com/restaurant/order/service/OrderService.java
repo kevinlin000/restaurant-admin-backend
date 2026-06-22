@@ -122,7 +122,7 @@ public class OrderService {
                                 .pointsUsed(request.getPointsUsed() != null ? request.getPointsUsed() : 0)
                                 .invoiceType(request.getInvoiceType())
                                 .carrierNumber(request.getCarrierNumber())
-                                .status("UNPAID")
+                                .status("PENDING")
                                 .build();
 
                 // 11. 儲存 Order
@@ -163,6 +163,58 @@ public class OrderService {
                 return convertToResponse(order);
         }
 
+        public List<OrderResponse> getAllOrdersForAdmin() {
+                return orderRepository.findAll()
+                                .stream()
+                                .map(this::convertToResponse)
+                                .toList();
+        }
+
+        public OrderResponse updateOrderStatusForAdmin(Long orderId, String status) {
+                if (status == null || status.isBlank()) {
+                        throw new BusinessException("訂單狀態不可為空");
+                }
+
+                String newStatus = status.trim().toUpperCase();
+
+                if (!newStatus.equals("PENDING")
+                                && !newStatus.equals("CONFIRMED")
+                                && !newStatus.equals("PREPARING")
+                                && !newStatus.equals("READY")
+                                && !newStatus.equals("COMPLETED")
+                                && !newStatus.equals("CANCELLED")) {
+                        throw new BusinessException("不支援的訂單狀態");
+                }
+
+                Order order = orderRepository.findById(orderId)
+                                .orElseThrow(() -> new BusinessException("找不到訂單"));
+
+                Payment payment = paymentRepository.findByOrder(order);
+
+                String currentStatus = order.getStatus();
+
+                if ("COMPLETED".equals(currentStatus) || "CANCELLED".equals(currentStatus)) {
+                        throw new BusinessException("已完成或已取消的訂單不可再修改");
+                }
+
+                if ("COMPLETED".equals(newStatus)) {
+                        if (payment == null || !"PAID".equals(payment.getPaymentStatus())) {
+                                throw new BusinessException("訂單尚未付款，不能設為已完成");
+                        }
+                }
+
+                // 狀態流程防呆
+                if (!isValidStatusTransition(currentStatus, newStatus)) {
+                        throw new BusinessException("訂單狀態必須依流程更新");
+                }
+
+                order.setStatus(newStatus);
+
+                Order savedOrder = orderRepository.save(order);
+
+                return convertToResponse(savedOrder);
+        }
+
         private OrderResponse convertToResponse(Order order) {
 
                 Payment payment = paymentRepository.findByOrder(order);
@@ -189,6 +241,7 @@ public class OrderService {
                                 .pointsUsed(order.getPointsUsed())
                                 .pointsEarned(order.getPointsEarned())
                                 .paymentMethod(payment != null ? payment.getPaymentMethod() : null)
+                                .paymentStatus(payment != null ? payment.getPaymentStatus() : null)
                                 .invoiceType(order.getInvoiceType())
                                 .carrierNumber(order.getCarrierNumber())
                                 .status(order.getStatus())
@@ -218,6 +271,7 @@ public class OrderService {
                                 .totalAmount(order.getTotalAmount())
                                 .finalAmount(order.getFinalAmount())
                                 .paymentMethod(payment != null ? payment.getPaymentMethod() : null)
+                                .paymentStatus(payment != null ? payment.getPaymentStatus() : null)
                                 .invoiceType(order.getInvoiceType())
                                 .carrierNumber(order.getCarrierNumber())
                                 .status(order.getStatus())
@@ -253,7 +307,8 @@ public class OrderService {
                         }
 
                         StoreMenu storeMenu = storeMenuRepository
-                                        .findByStoreIdAndMenuItemIdAndIsAvailableTrue(storeId, itemRequest.getMenuItemId())
+                                        .findByStoreIdAndMenuItemIdAndIsAvailableTrue(storeId,
+                                                        itemRequest.getMenuItemId())
                                         .orElseThrow(() -> new BusinessException("此門市未供應部分餐點"));
                         MenuItem menuItem = menuItemRepository.findById(itemRequest.getMenuItemId())
                                         .orElseThrow(() -> new BusinessException("找不到餐點"));
@@ -261,7 +316,8 @@ public class OrderService {
                                 throw new BusinessException("餐點已下架");
                         }
 
-                        BigDecimal unitPrice = storeMenu.getPrice() != null ? storeMenu.getPrice() : menuItem.getPrice();
+                        BigDecimal unitPrice = storeMenu.getPrice() != null ? storeMenu.getPrice()
+                                        : menuItem.getPrice();
                         if (unitPrice == null) {
                                 throw new BusinessException("餐點價格未設定");
                         }
@@ -291,6 +347,35 @@ public class OrderService {
         }
 
         private record OrderLine(MenuItem menuItem, Integer quantity, BigDecimal unitPrice, BigDecimal subtotal) {
+        }
+
+        private boolean isValidStatusTransition(String currentStatus, String newStatus) {
+
+                if (currentStatus.equals(newStatus)) {
+                        return true;
+                }
+
+                if ("CANCELLED".equals(newStatus)) {
+                        return true;
+                }
+
+                if ("PENDING".equals(currentStatus)) {
+                        return "CONFIRMED".equals(newStatus);
+                }
+
+                if ("CONFIRMED".equals(currentStatus)) {
+                        return "PREPARING".equals(newStatus);
+                }
+
+                if ("PREPARING".equals(currentStatus)) {
+                        return "READY".equals(newStatus);
+                }
+
+                if ("READY".equals(currentStatus)) {
+                        return "COMPLETED".equals(newStatus);
+                }
+
+                return false;
         }
 
 }

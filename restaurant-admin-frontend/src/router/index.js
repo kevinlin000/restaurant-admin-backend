@@ -18,6 +18,7 @@ import AdminStore from "@/views/admin/store/store.vue";
 import CustomerMenu from "@/views/customer/menu/menu.vue";
 import CustomerOrder from "@/views/customer/order/order.vue";
 import CustomerStore from "@/views/customer/store/store.vue";
+import AdminOrderManage from "@/views/admin/order/AdminOrderManage.vue";
 // 開發時測試用，正式
 
 const routers = [
@@ -121,6 +122,11 @@ const routers = [
         component: AdminMenuSetting,
       },
       {
+        path: "order-manage",
+        name: "AdminOrderManage",
+        component: AdminOrderManage,
+      },
+      {
         path: "store",
         name: "AdminStore",
         component: AdminStore,
@@ -180,6 +186,6 @@ router.beforeEach((to, from, next) => {
     next("/profile");
     return;
   }
-next();
+  next();
 });
 export default router;

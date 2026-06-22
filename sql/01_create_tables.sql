@@ -298,7 +298,7 @@ CREATE TABLE orders (
     points_used     INT NOT NULL DEFAULT 0 COMMENT '本次折抵點數',
     points_earned   INT NOT NULL DEFAULT 0 COMMENT '本次累積點數',
     status          VARCHAR(20) NOT NULL DEFAULT 'PENDING'
-                    COMMENT 'PENDING / PREPARING / SERVED / PAID / CANCELLED',
+                   COMMENT 'PENDING / CONFIRMED / PREPARING / READY / COMPLETED / CANCELLED',
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user(user_id),
@@ -331,8 +331,8 @@ CREATE TABLE payment (
     reservation_id  BIGINT COMMENT '關聯訂位（付訂金時填）',
     amount          DECIMAL(10, 2) NOT NULL COMMENT '付款金額',
     payment_method  VARCHAR(20) COMMENT 'CREDIT_CARD / LINE_PAY / CASH',
-    payment_status  VARCHAR(20) NOT NULL DEFAULT 'PENDING'
-                    COMMENT 'PENDING / SUCCESS / FAILED / REFUNDED',
+    payment_status  VARCHAR(20) NOT NULL DEFAULT 'UNPAID'
+                    COMMENT 'UNPAID / PAID / REFUNDED',
     transaction_no  VARCHAR(100) COMMENT '金流服務商交易序號',
     paid_at         DATETIME COMMENT '實際付款成功時間',
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
