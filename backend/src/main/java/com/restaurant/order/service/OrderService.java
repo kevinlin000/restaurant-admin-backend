@@ -164,7 +164,7 @@ public class OrderService {
         }
 
         public List<OrderResponse> getAllOrdersForAdmin() {
-                return orderRepository.findAll()
+                 return orderRepository.findAllByOrderByCreatedAtDesc()
                                 .stream()
                                 .map(this::convertToResponse)
                                 .toList();
