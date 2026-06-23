@@ -1,23 +1,10 @@
 <script setup>
 import { ref, computed } from "vue";
-import { useRouter, useRoute } from "vue-router";
+import { useRouter, useRoute, RouterView, RouterLink } from "vue-router";
 import Swal from "sweetalert2";
 
 const router = useRouter();
 const route = useRoute();
-
-const openMenu = ref({
-  dashboard: false,
-  reservation: false,
-  menu: false,
-  order: false,
-  store: false,
-  member: false,
-});
-
-const toggleMenu = (menu) => {
-  openMenu.value[menu] = !openMenu.value[menu];
-};
 
 const getUserInfo = () => {
   try {
@@ -44,8 +31,10 @@ const roleText = computed(() => {
   return roleMap[roleName.value] || "使用者";
 });
 
-const hasPermission = (roles) => {
-  return roles.includes(roleName.value);
+const hasPermission = (roles = []) => roles.includes(roleName.value);
+
+const hasVisibleChild = (children = []) => {
+  return children.some((child) => hasPermission(child.roles));
 };
 
 const showNoPermission = () => {
@@ -58,7 +47,7 @@ const showNoPermission = () => {
   });
 };
 
-const goTo = (path, roles) => {
+const goTo = (path, roles = []) => {
   if (!hasPermission(roles)) {
     showNoPermission();
     return;
@@ -68,21 +57,148 @@ const goTo = (path, roles) => {
 };
 
 const isActive = (path) => {
+  if (typeof path !== "string") return false;
   return route.path === path || route.path.startsWith(`${path}/`);
 };
 
-const adminDropdownItems = computed(() => {
-  const adminHomeItem = {
-    label: "後台首頁",
-    subtitle: "返回工作總覽",
-    path: "/admin/home",
-    icon: "bx bx-tachometer",
-    roles: ["STAFF", "MANAGER", "ADMIN"],
-    menuClass: "admin-home-entry",
-  };
+const currentPageTitle = computed(() => {
+  const path = route.path;
 
+  if (path.startsWith("/admin/reservation")) return "訂位管理";
+  if (path.startsWith("/admin/order")) return "訂單管理";
+  if (path.startsWith("/admin/store")) return "分店管理";
+  if (path.startsWith("/admin/menu")) return "菜單管理";
+  if (path.startsWith("/admin/member")) return "員工管理";
+  if (path.startsWith("/admin/home")) return "後台管理首頁";
+
+  return "後台管理首頁";
+});
+
+const sidebarGroups = computed(() => [
+  {
+    key: "dashboard",
+    type: "single",
+    label: "系統總覽",
+    icon: "bx bx-home-circle",
+    path: "/admin/home",
+    roles: ["STAFF", "MANAGER", "ADMIN"],
+  },
+  {
+    key: "reservation",
+    label: "訂位管理",
+    icon: "bx bx-calendar",
+    roles: ["STAFF", "MANAGER", "ADMIN"],
+    children: [
+      {
+        label: "訂位總覽",
+        path: "/admin/reservation",
+        roles: ["STAFF", "MANAGER", "ADMIN"],
+      },
+      {
+        label: "訂位名單",
+        path: "/admin/reservation-list",
+        roles: ["STAFF", "MANAGER", "ADMIN"],
+      },
+      {
+        label: "分配桌位",
+        path: "/admin/reservation-table",
+        roles: ["STAFF", "MANAGER", "ADMIN"],
+      },
+      {
+        label: "訂位日期＆時段",
+        path: "/admin/reservation-time-setting",
+        roles: ["MANAGER", "ADMIN"],
+      },
+    ],
+  },
+  {
+    key: "order",
+    label: "訂單管理",
+    icon: "bx bx-cart",
+    roles: ["STAFF", "MANAGER", "ADMIN"],
+    children: [
+      {
+        label: "訂單管理",
+        path: "/admin/order-manage",
+        roles: ["STAFF", "MANAGER", "ADMIN"],
+      },
+    ],
+  },
+  {
+    key: "store",
+    label: "分店管理",
+    icon: "bx bx-store",
+    roles: ["MANAGER", "ADMIN"],
+    children: [
+      {
+        label: "分店與桌位",
+        path: "/admin/store",
+        roles: ["MANAGER", "ADMIN"],
+      },
+    ],
+  },
+  {
+    key: "menu",
+    label: "菜單管理",
+    icon: "bx bx-food-menu",
+    roles: ["ADMIN"],
+    children: [
+      {
+        label: "新增菜單",
+        path: "/admin/menu-create",
+        roles: ["ADMIN"],
+      },
+      {
+        label: "修改菜單",
+        path: "/admin/menu-edit/1",
+        roles: ["ADMIN"],
+      },
+      {
+        label: "菜單設定",
+        path: "/admin/menu-setting",
+        roles: ["ADMIN"],
+      },
+    ],
+  },
+  {
+    key: "member",
+    type: "single",
+    label: "員工管理",
+    icon: "bx bx-group",
+    path: "/admin/member",
+    roles: ["ADMIN"],
+  },
+]);
+
+const visibleSidebarGroups = computed(() => {
+  return sidebarGroups.value.filter((group) => {
+    if (!hasPermission(group.roles)) return false;
+    if (!group.children) return true;
+    return hasVisibleChild(group.children);
+  });
+});
+
+const openMenu = ref({
+  reservation: route.path.startsWith("/admin/reservation"),
+  menu: route.path.startsWith("/admin/menu"),
+  order: route.path.startsWith("/admin/order"),
+  store: route.path.startsWith("/admin/store"),
+});
+
+const toggleMenu = (menu) => {
+  openMenu.value[menu] = !openMenu.value[menu];
+};
+
+const adminDropdownItems = computed(() => {
   const items = [
-    adminHomeItem,
+    {
+      label: "後台首頁",
+      subtitle: "返回工作總覽",
+      path: "/admin/home",
+      icon: "bx bx-tachometer",
+      roles: ["STAFF", "MANAGER", "ADMIN"],
+      menuClass: "admin-home-entry",
+    },
     {
       label: "個人資料",
       path: "/profile",
@@ -101,45 +217,9 @@ const adminDropdownItems = computed(() => {
       icon: "bx bx-receipt",
       roles: ["STAFF", "MANAGER"],
     },
-    {
-      label: "訂位管理",
-      path: "/admin/reservation",
-      icon: "bx bx-calendar-check",
-      roles: ["STAFF", "MANAGER", "ADMIN"],
-    },
-    {
-      label: "訂單管理",
-      path: "/admin/order-manage",
-      icon: "bx bx-receipt",
-      roles: ["STAFF", "MANAGER", "ADMIN"],
-    },
-    {
-      label: "菜單管理",
-      path: "/admin/menu-setting",
-      icon: "bx bx-food-menu",
-      roles: ["MANAGER", "ADMIN"],
-    },
-    {
-      label: "分店管理",
-      path: "/admin/store",
-      icon: "bx bx-store",
-      roles: ["MANAGER", "ADMIN"],
-    },
-    {
-      label: "員工管理",
-      path: "/admin/member",
-      icon: "bx bx-group",
-      roles: ["ADMIN"],
-    },
-    {
-      label: "門市管理",
-      path: "/admin/store",
-      icon: "bx bx-buildings",
-      roles: ["ADMIN"],
-    },
   ];
 
-  return items.filter((item) => item.roles.includes(roleName.value));
+  return items.filter((item) => hasPermission(item.roles));
 });
 
 const logout = () => {
@@ -152,272 +232,69 @@ const logout = () => {
 
 <template>
   <div class="admin-layout">
-    <!-- Sidebar -->
     <aside class="sidebar">
-      <!-- Logo -->
       <div class="sidebar-logo">
         <img src="../assets/images/logo.png" class="logo-image" />
         <span>後台管理系統</span>
       </div>
 
-      <!-- Menu -->
       <ul class="sidebar-menu">
-        <!-- 系統總覽：STAFF 也可以進首頁，但只能使用部分功能 -->
-        <li class="menu-group">
+        <li
+          v-for="group in visibleSidebarGroups"
+          :key="group.key"
+          class="menu-group"
+        >
           <button
+            v-if="group.type === 'single'"
             type="button"
             class="menu-title menu-button"
-            :class="{ active: isActive('/admin/home') }"
-            @click="goTo('/admin/home', ['STAFF', 'MANAGER', 'ADMIN'])"
+            :class="{ active: isActive(group.path) }"
+            @click="goTo(group.path, group.roles)"
           >
             <div>
-              <i class="bx bx-home-circle"></i>
-              系統總覽
+              <i :class="group.icon"></i>
+              {{ group.label }}
             </div>
           </button>
-        </li>
 
-        <!-- 用戶設定：店長 / 管理員 -->
-        <li class="menu-group">
-          <div class="menu-title" @click="toggleMenu('dashboard')">
-            <div>
-              <i class="bx bx-user"></i>
-              用戶設定
+          <template v-else>
+            <div class="menu-title" @click="toggleMenu(group.key)">
+              <div>
+                <i :class="group.icon"></i>
+                {{ group.label }}
+              </div>
+              <i
+                class="bx bx-chevron-down menu-arrow"
+                :class="{ open: openMenu[group.key] }"
+              ></i>
             </div>
-            <i class="bx bx-chevron-down"></i>
-          </div>
 
-          <ul v-show="openMenu.dashboard" class="submenu">
-            <li>
-              <a
-                href="#"
-                @click.prevent="goTo('/admin/store', ['MANAGER', 'ADMIN'])"
+            <ul v-show="openMenu[group.key]" class="submenu">
+              <li
+                v-for="child in group.children.filter((item) => hasPermission(item.roles))"
+                :key="child.path"
               >
-                分店管理
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
-                @click.prevent="
-                  goTo('/admin/system-setting', ['MANAGER', 'ADMIN'])
-                "
-              >
-                設定
-              </a>
-            </li>
-            <hr />
-          </ul>
-        </li>
-
-        <!-- 訂位管理：員工 / 店長 / 管理員 -->
-        <li class="menu-group">
-          <div class="menu-title" @click="toggleMenu('reservation')">
-            <div>
-              <i class="bx bx-calendar"></i>
-              訂位管理
-            </div>
-            <i class="bx bx-chevron-down"></i>
-          </div>
-
-          <ul v-show="openMenu.reservation" class="submenu">
-            <li>
-              <a
-                href="#"
-                @click.prevent="
-                  goTo('/admin/reservation', ['STAFF', 'MANAGER', 'ADMIN'])
-                "
-              >
-                訂位總覽
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
-                @click.prevent="
-                  goTo('/admin/reservation-list', ['STAFF', 'MANAGER', 'ADMIN'])
-                "
-              >
-                訂位名單
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
-                @click.prevent="
-                  goTo('/admin/reservation-table', [
-                    'STAFF',
-                    'MANAGER',
-                    'ADMIN',
-                  ])
-                "
-              >
-                分配桌位
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
-                @click.prevent="
-                  goTo('/admin/reservation-time-setting', [
-                    'STAFF',
-                    'MANAGER',
-                    'ADMIN',
-                  ])
-                "
-              >
-                訂位日期＆時段
-              </a>
-            </li>
-            <hr />
-          </ul>
-        </li>
-
-        <!-- 菜單管理：店長 / 管理員 -->
-        <li class="menu-group">
-          <div class="menu-title" @click="toggleMenu('menu')">
-            <div>
-              <i class="bx bx-food-menu"></i>
-              菜單管理
-            </div>
-            <i class="bx bx-chevron-down"></i>
-          </div>
-
-          <ul v-show="openMenu.menu" class="submenu">
-            <li>
-              <a
-                href="#"
-                @click.prevent="
-                  goTo('/admin/menu-create', ['MANAGER', 'ADMIN'])
-                "
-              >
-                新增菜單
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
-                @click.prevent="
-                  goTo('/admin/menu-edit/1', ['MANAGER', 'ADMIN'])
-                "
-              >
-                修改菜單
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
-                @click.prevent="
-                  goTo('/admin/menu-setting', ['MANAGER', 'ADMIN'])
-                "
-              >
-                設定
-              </a>
-            </li>
-            <hr />
-          </ul>
-        </li>
-
-        <!-- 訂餐管理：員工 / 店長 / 管理員 -->
-        <li class="menu-group">
-          <div class="menu-title" @click="toggleMenu('order')">
-            <div>
-              <i class="bx bx-cart"></i>
-              訂餐管理
-            </div>
-            <i class="bx bx-chevron-down"></i>
-          </div>
-
-          <ul v-show="openMenu.order" class="submenu">
-            <li>
-              <a
-                href="#"
-                @click.prevent="
-                  goTo('/admin/order-manage', ['STAFF', 'MANAGER', 'ADMIN'])
-                "
-              >
-                管理訂單
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
-                @click.prevent="
-                  goTo('/admin/order-create', ['STAFF', 'MANAGER', 'ADMIN'])
-                "
-              >
-                新增餐點
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
-                @click.prevent="
-                  goTo('/admin/order-edit', ['STAFF', 'MANAGER', 'ADMIN'])
-                "
-              >
-                修改餐點
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
-                @click.prevent="
-                  goTo('/admin/order-setting', ['STAFF', 'MANAGER', 'ADMIN'])
-                "
-              >
-                設定
-              </a>
-            </li>
-            <hr />
-          </ul>
-        </li>
-
-
-        <!-- 會員 / 員工管理：管理員 -->
-        <li class="menu-group">
-          <button
-            type="button"
-            class="menu-title menu-button"
-            :class="{ active: isActive('/admin/member') }"
-            @click="goTo('/admin/member', ['ADMIN'])"
-          >
-            <div>
-              <i class="bx bx-group"></i>
-              員工管理
-            </div>
-          </button>
-        </li>
-
-        <!-- 分店管理：管理員 -->
-        <li class="menu-group">
-          <div class="menu-title" @click="toggleMenu('store')">
-            <div>
-              <i class="bx bx-store"></i>
-              分店管理
-            </div>
-            <i class="bx bx-chevron-down"></i>
-          </div>
-
-          <ul v-show="openMenu.store" class="submenu">
-            <li>
-              <a
-                href="#"
-                @click.prevent="goTo('/admin/store', ['MANAGER', 'ADMIN'])"
-              >
-                分店與桌位
-              </a>
-            </li>
-          </ul>
+                <a
+                  href="#"
+                  :class="{ active: isActive(child.path) }"
+                  @click.prevent="goTo(child.path, child.roles)"
+                >
+                  {{ child.label }}
+                </a>
+              </li>
+            </ul>
+          </template>
         </li>
       </ul>
     </aside>
 
-    <!-- Main -->
     <div class="main-wrapper">
-      <!-- Navbar -->
       <nav class="top-navbar">
-        <div class="navbar-right dropdown ms-auto">
+        <div class="navbar-left">
+          <span class="navbar-page-title">{{ currentPageTitle }}</span>
+        </div>
+
+        <div class="navbar-right dropdown">
           <div class="profile-box dropdown-toggle" data-bs-toggle="dropdown">
             <img src="../assets/images/logo.png" class="logo-image" />
             <div>
@@ -426,7 +303,6 @@ const logout = () => {
             </div>
           </div>
 
-          <!-- Dropdown -->
           <ul class="dropdown-menu dropdown-menu-end admin-user-menu">
             <li>
               <RouterLink class="dropdown-item" to="/home">
@@ -467,7 +343,6 @@ const logout = () => {
         </div>
       </nav>
 
-      <!-- 頁面內容 -->
       <main class="main-content">
         <RouterView />
       </main>
@@ -481,8 +356,6 @@ const logout = () => {
   min-height: 100vh;
   background: #f8f3ed;
 }
-
-/* Sidebar */
 
 .sidebar {
   width: 280px;
@@ -553,7 +426,13 @@ const logout = () => {
   font-size: 22px;
 }
 
-/* submenu */
+.menu-arrow {
+  transition: transform 0.2s ease;
+}
+
+.menu-arrow.open {
+  transform: rotate(180deg);
+}
 
 .submenu {
   list-style: none;
@@ -574,7 +453,8 @@ const logout = () => {
   transition: 0.25s;
 }
 
-.submenu a:hover {
+.submenu a:hover,
+.submenu a.active {
   background: #e3ac7f;
   color: white;
 }
@@ -584,14 +464,10 @@ const logout = () => {
   color: white !important;
 }
 
-/* Main */
-
 .main-wrapper {
   flex: 1;
   margin-left: 280px;
 }
-
-/* Navbar */
 
 .top-navbar {
   height: 80px;
@@ -605,7 +481,17 @@ const logout = () => {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
-/* Right */
+.navbar-left {
+  display: flex;
+  align-items: center;
+}
+
+.navbar-page-title {
+  color: #566a7f;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
 
 .profile-box {
   display: flex;
@@ -621,8 +507,6 @@ const logout = () => {
   font-size: 14px;
   color: gray;
 }
-
-/* Dropdown */
 
 .admin-user-menu {
   min-width: 210px;
@@ -654,7 +538,6 @@ const logout = () => {
 .admin-user-menu .dropdown-item:hover i {
   color: white;
 }
-
 
 .admin-user-menu .dropdown-text {
   display: flex;
@@ -692,8 +575,6 @@ const logout = () => {
 .admin-user-menu .dropdown-divider {
   margin: 8px 0;
 }
-
-/* Content */
 
 .main-content {
   padding: 0 20px 20px;

@@ -54,11 +54,13 @@ public class AuthServiceImpl implements AuthService {
         @Transactional
         public LoginResponse registerMember(MemberRegisterRequest request) {
 
-                if (!verifiedEmails.contains(request.getEmail())) {
+                String email = normalizeEmail(request.getEmail());
+
+                if (!verifiedEmails.contains(email)) {
                         throw new BusinessException("請先完成 Email 驗證");
                 }
 
-                if (userRepository.existsByEmail(request.getEmail())) {
+                if (userRepository.existsByEmail(email)) {
                         throw new BusinessException("此 Email 已被註冊");
                 }
 
@@ -71,7 +73,7 @@ public class AuthServiceImpl implements AuthService {
 
                 User user = User.builder()
                                 .role(memberRole)
-                                .email(request.getEmail())
+                                .email(email)
                                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                                 .name(request.getName())
                                 .phone(request.getPhone())
@@ -87,8 +89,8 @@ public class AuthServiceImpl implements AuthService {
                 memberProfileRepository.save(profile);
 
                 // 註冊成功後，清掉這次的驗證狀態，避免同一個 email 驗證狀態殘留
-                verifiedEmails.remove(request.getEmail());
-                verificationCodes.remove(request.getEmail());
+                verifiedEmails.remove(email);
+                verificationCodes.remove(email);
 
                 String token = jwtUtil.generateToken(
                                 user.getUserId(),
@@ -108,7 +110,9 @@ public class AuthServiceImpl implements AuthService {
         @Transactional
         public StaffResponse createStaff(StaffCreateRequest request) {
 
-                if (userRepository.existsByEmail(request.getEmail())) {
+                String email = normalizeEmail(request.getEmail());
+
+                if (userRepository.existsByEmail(email)) {
                         throw new BusinessException("此 Email 已被使用");
                 }
 
@@ -121,7 +125,7 @@ public class AuthServiceImpl implements AuthService {
 
                 User user = User.builder()
                                 .role(role)
-                                .email(request.getEmail())
+                                .email(email)
                                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                                 .name(request.getName())
                                 .phone(request.getPhone())
@@ -180,17 +184,19 @@ public class AuthServiceImpl implements AuthService {
         @Override
         public void sendEmailVerificationCode(String email) {
 
-                if (userRepository.existsByEmail(email)) {
+                String normalizedEmail = normalizeEmail(email);
+
+                if (userRepository.existsByEmail(normalizedEmail)) {
                         throw new BusinessException("此 Email 已被註冊");
                 }
 
                 String code = generateSixDigitCode();
 
-                verificationCodes.put(email, code);
-                verifiedEmails.remove(email);
+                verificationCodes.put(normalizedEmail, code);
+                verifiedEmails.remove(normalizedEmail);
 
                 mailService.sendEmail(
-                                email,
+                                normalizedEmail,
                                 "敘日會員驗證信",
                                 "您好，您的驗證碼為：" + code);
         }
@@ -199,13 +205,16 @@ public class AuthServiceImpl implements AuthService {
         @Override
         public boolean verifyEmailCode(String email, String code) {
 
-                String savedCode = verificationCodes.get(email);
+                String normalizedEmail = normalizeEmail(email);
+                String normalizedCode = normalizeCode(code);
 
-                boolean success = savedCode != null && savedCode.equals(code);
+                String savedCode = verificationCodes.get(normalizedEmail);
+
+                boolean success = savedCode != null && savedCode.equals(normalizedCode);
 
                 if (success) {
-                        verifiedEmails.add(email);
-                        verificationCodes.remove(email);
+                        verifiedEmails.add(normalizedEmail);
+                        verificationCodes.remove(normalizedEmail);
                 }
 
                 return success;
@@ -215,12 +224,14 @@ public class AuthServiceImpl implements AuthService {
         @Override
         public void forgotPassword(String email) {
 
-                User user = userRepository.findByEmail(email)
+                String normalizedEmail = normalizeEmail(email);
+
+                User user = userRepository.findByEmail(normalizedEmail)
                                 .orElseThrow(() -> new BusinessException("此 Email 不存在"));
 
                 String code = generateSixDigitCode();
 
-                passwordResetCodes.put(user.getEmail(), code);
+                passwordResetCodes.put(normalizeEmail(user.getEmail()), code);
 
                 mailService.sendEmail(
                                 user.getEmail(),
@@ -228,25 +239,54 @@ public class AuthServiceImpl implements AuthService {
                                 "您好，您的密碼重設驗證碼為：" + code);
         }
 
+        // -----忘記密碼：驗證重設密碼驗證碼-----
+        @Override
+        public boolean verifyPasswordResetCode(String email, String code) {
+
+                String normalizedEmail = normalizeEmail(email);
+                String normalizedCode = normalizeCode(code);
+
+                String savedCode = passwordResetCodes.get(normalizedEmail);
+
+                return savedCode != null && savedCode.equals(normalizedCode);
+        }
+
         // -----重設密碼-----
         @Override
         @Transactional
         public void resetPassword(String email, String code, String newPassword) {
 
-                String savedCode = passwordResetCodes.get(email);
+                String normalizedEmail = normalizeEmail(email);
+                String normalizedCode = normalizeCode(code);
 
-                if (savedCode == null || !savedCode.equals(code)) {
+                String savedCode = passwordResetCodes.get(normalizedEmail);
+
+                if (savedCode == null || !savedCode.equals(normalizedCode)) {
                         throw new BusinessException("驗證碼錯誤");
                 }
 
-                User user = userRepository.findByEmail(email)
+                User user = userRepository.findByEmail(normalizedEmail)
                                 .orElseThrow(() -> new BusinessException("找不到帳號"));
 
                 user.setPasswordHash(passwordEncoder.encode(newPassword));
 
                 userRepository.save(user);
 
-                passwordResetCodes.remove(email);
+                passwordResetCodes.remove(normalizedEmail);
+        }
+
+        /**
+         * Email 驗證碼 Map 使用統一格式當 key，避免大小寫或空白導致驗證失敗。
+         */
+        private String normalizeEmail(String email) {
+                return email == null ? null : email.trim().toLowerCase();
+        }
+
+        /**
+         * 驗證碼只保留前後去空白後的內容，避免複製信件時帶到空白。
+         */
+        private String normalizeCode(String code) {
+                return code == null ? null : code.trim();
         }
 
         /**

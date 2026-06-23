@@ -66,7 +66,7 @@
             <div class="section-header">
               <div>
                 <h2>{{ profileTitle }}</h2>
-                <p>{{ profileDescription }}</p>
+                <p v-if="isEditingProfile">{{ profileDescription }}</p>
               </div>
 
               <button

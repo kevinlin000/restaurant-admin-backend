@@ -17,6 +17,7 @@ const form = reactive({
   password: "",
   name: "",
   phone: "",
+  birthday: "",
   storeId: "",
   staffNo: "",
   hireDate: "",
@@ -26,7 +27,6 @@ const form = reactive({
 const roleOptions = [
   { value: "STAFF", label: "員工" },
   { value: "MANAGER", label: "店長" },
-  { value: "ADMIN", label: "管理員" },
 ];
 
 const statusText = {
@@ -72,12 +72,22 @@ const filteredStaffList = computed(() => {
   });
 });
 
-const activeCount = computed(
-  () => staffList.value.filter((staff) => staff.status === "ACTIVE").length,
+const activeStaffList = computed(() =>
+  staffList.value.filter((staff) => staff.status === "ACTIVE"),
+);
+
+const activeCount = computed(() => activeStaffList.value.length);
+
+const staffCount = computed(
+  () => activeStaffList.value.filter((staff) => staff.roleName === "STAFF").length,
 );
 
 const managerCount = computed(
-  () => staffList.value.filter((staff) => staff.roleName === "MANAGER").length,
+  () => activeStaffList.value.filter((staff) => staff.roleName === "MANAGER").length,
+);
+
+const resignedCount = computed(
+  () => staffList.value.filter((staff) => staff.status === "RESIGNED").length,
 );
 
 const resetForm = () => {
@@ -85,6 +95,7 @@ const resetForm = () => {
   form.password = "";
   form.name = "";
   form.phone = "";
+  form.birthday = "";
   form.storeId = stores.value[0]?.storeId || "";
   form.staffNo = "";
   form.hireDate = new Date().toISOString().slice(0, 10);
@@ -116,8 +127,16 @@ const loadData = async () => {
 };
 
 const validateForm = () => {
-  if (!form.email || !form.password || !form.name || !form.storeId || !form.staffNo || !form.hireDate) {
-    return "請完整填寫 Email、密碼、姓名、門市、員工編號與入職日";
+  if (
+    !form.email ||
+    !form.password ||
+    !form.name ||
+    !form.birthday ||
+    !form.storeId ||
+    !form.staffNo ||
+    !form.hireDate
+  ) {
+    return "請完整填寫 Email、密碼、姓名、生日、門市、員工編號與到職日";
   }
 
   if (!/^\S+@\S+\.\S+$/.test(form.email)) {
@@ -130,6 +149,10 @@ const validateForm = () => {
 
   if (form.phone && !/^09\d{8}$/.test(form.phone)) {
     return "手機號碼格式必須為 09xxxxxxxx";
+  }
+
+  if (!roleOptions.some((role) => role.value === form.roleName)) {
+    return "員工管理僅能建立員工或店長帳號";
   }
 
   return "";
@@ -155,6 +178,7 @@ const handleCreateStaff = async () => {
       password: form.password,
       name: form.name.trim(),
       phone: form.phone.trim() || null,
+      birthday: form.birthday,
       storeId: Number(form.storeId),
       staffNo: form.staffNo.trim(),
       hireDate: form.hireDate,
@@ -164,7 +188,7 @@ const handleCreateStaff = async () => {
     await Swal.fire({
       icon: "success",
       title: "員工已建立",
-      text: "新的員工帳號已新增成功。",
+      text: "新的員工或店長帳號已新增成功。",
       confirmButtonColor: "#e3ac7f",
     });
 
@@ -186,7 +210,7 @@ const handleResignStaff = async (staff) => {
   const result = await Swal.fire({
     icon: "warning",
     title: "確認設為離職？",
-    text: `${staff.name} 將無法再以在職員工身分使用後台功能。`,
+    text: "設為離職後，該帳號將移除後台權限，但仍保留一般會員身分。",
     showCancelButton: true,
     confirmButtonText: "確認離職",
     cancelButtonText: "取消",
@@ -232,7 +256,7 @@ onMounted(async () => {
       <div>
         <p class="eyebrow">Member 模組</p>
         <h1>員工管理</h1>
-        <p>管理員可新增員工帳號、查看在職員工與設定離職狀態。</p>
+        <p>管理員可建立員工與店長帳號，並設定離職狀態。</p>
       </div>
       <button type="button" class="refresh-btn" :disabled="isLoading" @click="loadData">
         <i class="bx bx-refresh"></i>
@@ -247,26 +271,31 @@ onMounted(async () => {
 
     <div class="summary-grid">
       <article class="summary-card">
-        <span>在職員工</span>
+        <span>在職人員</span>
         <strong>{{ activeCount }}</strong>
-        <small>目前可使用後台的員工</small>
+        <small>目前可使用後台的人員</small>
+      </article>
+      <article class="summary-card">
+        <span>員工人數</span>
+        <strong>{{ staffCount }}</strong>
+        <small>角色為 STAFF 的在職人員</small>
       </article>
       <article class="summary-card">
         <span>店長人數</span>
         <strong>{{ managerCount }}</strong>
-        <small>角色為 MANAGER</small>
+        <small>角色為 MANAGER 的在職人員</small>
       </article>
       <article class="summary-card">
-        <span>門市數</span>
-        <strong>{{ stores.length }}</strong>
-        <small>用於建立員工時選擇門市</small>
+        <span>離職人員</span>
+        <strong>{{ resignedCount }}</strong>
+        <small>已移除後台權限的人員</small>
       </article>
     </div>
 
     <div class="content-grid">
       <section class="card form-card">
         <h2>新增員工</h2>
-        <p class="card-desc">建立後會同時建立 User、Staff 與對應會員資料。</p>
+        <p class="card-desc">員工與店長同時也是會員，因此需建立完整會員資料。</p>
 
         <div class="form-grid">
           <label>
@@ -290,17 +319,22 @@ onMounted(async () => {
           </label>
 
           <label>
+            生日
+            <input v-model="form.birthday" type="date" />
+          </label>
+
+          <label>
             員工編號
             <input v-model.trim="form.staffNo" type="text" placeholder="例如 S001" />
           </label>
 
           <label>
-            入職日
+            到職日
             <input v-model="form.hireDate" type="date" />
           </label>
 
           <label>
-            門市
+            所屬門市
             <select v-model="form.storeId">
               <option value="" disabled>請選擇門市</option>
               <option v-for="store in stores" :key="store.storeId" :value="store.storeId">
@@ -328,12 +362,12 @@ onMounted(async () => {
         <div class="list-header">
           <div>
             <h2>員工清單</h2>
-            <p class="card-desc">目前後端 API 回傳在職員工；保留狀態篩選方便後續擴充。</p>
+            <p class="card-desc">查看員工、店長所屬門市與在職狀態。</p>
           </div>
         </div>
 
         <div class="toolbar">
-          <input v-model.trim="keyword" type="search" placeholder="搜尋姓名、Email、員編" />
+          <input v-model.trim="keyword" type="search" placeholder="搜尋姓名、Email、員編、手機" />
           <select v-model="statusFilter">
             <option value="ALL">全部狀態</option>
             <option value="ACTIVE">在職</option>
@@ -342,16 +376,16 @@ onMounted(async () => {
         </div>
 
         <div v-if="isLoading" class="state-box">載入中...</div>
-        <div v-else-if="filteredStaffList.length === 0" class="state-box">目前沒有符合條件的員工。</div>
+        <div v-else-if="filteredStaffList.length === 0" class="state-box">目前沒有符合條件的人員。</div>
 
         <div v-else class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>員工</th>
+                <th>員工資料</th>
                 <th>角色</th>
-                <th>門市</th>
-                <th>入職日</th>
+                <th>所屬門市</th>
+                <th>到職日</th>
                 <th>狀態</th>
                 <th>操作</th>
               </tr>
@@ -361,7 +395,10 @@ onMounted(async () => {
                 <td>
                   <strong>{{ staff.name }}</strong>
                   <span>{{ staff.email }}</span>
-                  <small>{{ staff.staffNo }}</small>
+                  <small>
+                    {{ staff.staffNo || "未設定工號" }}
+                    <template v-if="staff.phone">｜{{ staff.phone }}</template>
+                  </small>
                 </td>
                 <td>{{ roleText[staff.roleName] || staff.roleName }}</td>
                 <td>{{ storeNameMap[staff.storeId] || `門市 #${staff.storeId}` }}</td>

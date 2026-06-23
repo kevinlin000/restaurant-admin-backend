@@ -11,6 +11,7 @@ import com.restaurant.member.dto.SendEmailVerificationCodeRequest;
 import com.restaurant.member.dto.StaffCreateRequest;
 import com.restaurant.member.dto.StaffResponse;
 import com.restaurant.member.dto.VerifyEmailCodeRequest;
+import com.restaurant.member.dto.VerifyPasswordResetCodeRequest;
 import com.restaurant.member.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +72,22 @@ public class AuthController {
 
                 return ResponseEntity.ok(
                                 ApiResponse.success("驗證碼已寄出"));
+        }
+
+        @PostMapping("/password/verify-code")
+        public ResponseEntity<ApiResponse<Void>> verifyPasswordResetCode(
+                        @Valid @RequestBody VerifyPasswordResetCodeRequest request) {
+
+                boolean verified = authService.verifyPasswordResetCode(
+                                request.getEmail(),
+                                request.getCode());
+
+                if (!verified) {
+                        throw new BusinessException("驗證碼錯誤");
+                }
+
+                return ResponseEntity.ok(
+                                ApiResponse.success("驗證成功"));
         }
 
         @PostMapping("/password/reset")
