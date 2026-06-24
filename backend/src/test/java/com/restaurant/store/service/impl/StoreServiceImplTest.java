@@ -33,6 +33,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -70,10 +72,10 @@ class StoreServiceImplTest {
                 .thenReturn(List.of(kaohsiung, taipei));
         when(storeFeatureRepository.findByStoreIdInOrderByStoreIdAscSortOrderAscFeatureIdAsc(List.of(2L, 1L)))
                 .thenReturn(List.of());
-        when(storeHolidayRepository.findByStoreIdAndHolidayDate(anyLong(), any(LocalDate.class)))
-                .thenReturn(Optional.empty());
-        when(storeHourRepository.findByStoreIdAndDayOfWeekAndIsClosedFalseOrderByOpenTimeAsc(anyLong(), anyInt()))
-                .thenReturn(openAllDayHours());
+        when(storeHolidayRepository.findByStoreIdInAndHolidayDate(eq(List.of(2L, 1L)), any(LocalDate.class)))
+                .thenReturn(List.of());
+        when(storeHourRepository.findByStoreIdInAndDayOfWeekAndIsClosedFalseOrderByStoreIdAscOpenTimeAsc(eq(List.of(2L, 1L)), anyInt()))
+                .thenReturn(List.of(openAllDayHour(1L), openAllDayHour(2L)));
 
         NearbySearchRequest request = new NearbySearchRequest();
         request.setLatitude(25.0359000);
@@ -85,6 +87,8 @@ class StoreServiceImplTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getStoreId()).isEqualTo(1L);
         assertThat(result.get(0).getDistanceKm()).isLessThan(1.0);
+        verify(storeHolidayRepository, never()).findByStoreIdAndHolidayDate(anyLong(), any(LocalDate.class));
+        verify(storeHourRepository, never()).findByStoreIdAndDayOfWeekAndIsClosedFalseOrderByOpenTimeAsc(anyLong(), anyInt());
     }
 
     @Test
@@ -98,18 +102,18 @@ class StoreServiceImplTest {
                 .thenReturn(List.of(holidayStore, normalStore));
         when(storeFeatureRepository.findByStoreIdInOrderByStoreIdAscSortOrderAscFeatureIdAsc(List.of(1L, 2L)))
                 .thenReturn(List.of());
-        when(storeHolidayRepository.findByStoreIdAndHolidayDate(eq(1L), any(LocalDate.class)))
-                .thenReturn(Optional.of(StoreHoliday.builder().storeId(1L).holidayDate(LocalDate.now()).build()));
-        when(storeHolidayRepository.findByStoreIdAndHolidayDate(eq(2L), any(LocalDate.class)))
-                .thenReturn(Optional.empty());
-        when(storeHourRepository.findByStoreIdAndDayOfWeekAndIsClosedFalseOrderByOpenTimeAsc(eq(2L), anyInt()))
-                .thenReturn(openAllDayHours());
+        when(storeHolidayRepository.findByStoreIdInAndHolidayDate(eq(List.of(1L, 2L)), any(LocalDate.class)))
+                .thenReturn(List.of(StoreHoliday.builder().storeId(1L).holidayDate(LocalDate.now()).build()));
+        when(storeHourRepository.findByStoreIdInAndDayOfWeekAndIsClosedFalseOrderByStoreIdAscOpenTimeAsc(eq(List.of(1L, 2L)), anyInt()))
+                .thenReturn(List.of(openAllDayHour(1L), openAllDayHour(2L)));
 
         List<StoreListResponse> result = storeService.getAllOpenStores();
 
         assertThat(result).extracting(StoreListResponse::getStoreId).containsExactly(1L, 2L);
         assertThat(result.get(0).isOpenNow()).isFalse();
         assertThat(result.get(1).isOpenNow()).isTrue();
+        verify(storeHolidayRepository, never()).findByStoreIdAndHolidayDate(anyLong(), any(LocalDate.class));
+        verify(storeHourRepository, never()).findByStoreIdAndDayOfWeekAndIsClosedFalseOrderByOpenTimeAsc(anyLong(), anyInt());
     }
 
     @Test
@@ -174,14 +178,14 @@ class StoreServiceImplTest {
                 .build();
     }
 
-    private static List<StoreHour> openAllDayHours() {
-        return List.of(StoreHour.builder()
-                .storeId(1L)
+    private static StoreHour openAllDayHour(Long storeId) {
+        return StoreHour.builder()
+                .storeId(storeId)
                 .dayOfWeek(LocalDate.now().getDayOfWeek().getValue())
                 .openTime(LocalTime.MIN)
                 .closeTime(LocalTime.MAX)
                 .mealPeriod("ALL_DAY")
                 .isClosed(false)
-                .build());
+                .build();
     }
 }

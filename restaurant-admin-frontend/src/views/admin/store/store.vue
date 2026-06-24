@@ -394,26 +394,26 @@ onMounted(loadStores);
 
 <template>
   <div class="store-admin-page">
-    <header class="page-header">
+    <header class="ops-header">
       <div>
-        <span>STORE OPERATIONS</span>
-        <h1>分店營運設定</h1>
-        <p>維護前台找門市會顯示的營業時間、公休日、門市圖片與桌位容量。</p>
+        <span>STORE OPS</span>
+        <h1>門市營運</h1>
+        <p>管理前台門市頁會使用的時間、圖片、標籤與桌位資料。</p>
       </div>
       <button class="refresh-btn" type="button" @click="loadStores">
         <i class="bx bx-refresh"></i>
-        重新整理
+        更新資料
       </button>
     </header>
 
     <div v-if="message" class="notice success">{{ message }}</div>
     <div v-if="errorMessage" class="notice error">{{ errorMessage }}</div>
 
-    <section class="admin-grid">
-      <aside class="store-panel">
-        <div class="panel-title">
-          <h2>門市清單</h2>
-          <span>{{ stores.length }} 間</span>
+    <section class="ops-layout">
+      <aside class="store-rail" aria-label="門市清單">
+        <div class="rail-heading">
+          <span>門市</span>
+          <strong>{{ stores.length }}</strong>
         </div>
 
         <div v-if="loadingStores" class="state-box">載入門市中</div>
@@ -433,44 +433,44 @@ onMounted(loadStores);
         </button>
       </aside>
 
-      <main class="detail-panel">
+      <main class="ops-workspace">
         <div v-if="!selectedStore" class="state-box large">請先選擇門市</div>
 
         <template v-else>
-          <section class="store-summary">
-            <div class="summary-image">
-              <img v-if="visibleHeroImage" :src="visibleHeroImage" :alt="selectedStore.storeName" />
-              <i v-else class="bx bx-store"></i>
-            </div>
-            <div class="summary-copy">
+          <section class="store-strip">
+            <img v-if="visibleHeroImage" :src="visibleHeroImage" :alt="selectedStore.storeName" />
+            <div v-else class="empty-photo"><i class="bx bx-store"></i></div>
+
+            <div class="store-identity">
               <span :class="['status-chip', selectedStore.status?.toLowerCase()]">
                 {{ statusLabel(selectedStore.status) }}
               </span>
               <h2>{{ selectedStore.storeName }}</h2>
               <p>{{ selectedStore.address }}</p>
             </div>
-            <div class="summary-metrics">
+
+            <dl class="metric-strip">
               <div>
-                <strong>{{ hours.length }}</strong>
-                <span>營業時段</span>
+                <dt>時段</dt>
+                <dd>{{ hours.length }}</dd>
               </div>
               <div>
-                <strong>{{ holidays.length }}</strong>
-                <span>公休日</span>
+                <dt>公休</dt>
+                <dd>{{ holidays.length }}</dd>
               </div>
               <div>
-                <strong>{{ features.length }}</strong>
-                <span>特色標籤</span>
+                <dt>標籤</dt>
+                <dd>{{ features.length }}</dd>
               </div>
               <div>
-                <strong>{{ availableTableCount }}/{{ tables.length }}</strong>
-                <span>可用桌位</span>
+                <dt>桌位</dt>
+                <dd>{{ availableTableCount }}/{{ tables.length }}</dd>
               </div>
               <div>
-                <strong>{{ totalSeats }}</strong>
-                <span>座位數</span>
+                <dt>座位</dt>
+                <dd>{{ totalSeats }}</dd>
               </div>
-            </div>
+            </dl>
           </section>
 
           <nav class="tab-row" aria-label="門市設定分頁">
@@ -488,42 +488,44 @@ onMounted(loadStores);
 
           <div v-if="loadingDetail" class="state-box">載入門市設定中</div>
 
-          <section v-else-if="activeTab === 'overview'" class="content-section">
-            <div class="info-grid">
+          <section v-else-if="activeTab === 'overview'" class="work-section">
+            <div class="field-grid">
               <div>
                 <span>電話</span>
                 <strong>{{ selectedStore.phone || "未提供" }}</strong>
               </div>
               <div>
-                <span>縣市區域</span>
+                <span>位置</span>
                 <strong>{{ selectedStore.city }} {{ selectedStore.district }}</strong>
               </div>
               <div>
-                <span>捷運資訊</span>
+                <span>交通</span>
                 <strong>{{ selectedStore.mrtInfo || "尚未設定" }}</strong>
               </div>
               <div>
-                <span>停車資訊</span>
+                <span>停車</span>
                 <strong>{{ selectedStore.parkingInfo || "尚未設定" }}</strong>
               </div>
             </div>
-            <article class="description-card">
-              <h3>門市特色</h3>
+
+            <div class="text-block">
+              <span>前台文案</span>
               <p>{{ selectedStore.description || "尚未填寫門市特色。" }}</p>
-            </article>
-            <article class="description-card">
-              <h3>前台情境標籤</h3>
-              <div v-if="features.length" class="feature-list compact">
+            </div>
+
+            <div class="text-block">
+              <span>前台情境標籤</span>
+              <div v-if="features.length" class="tag-list compact">
                 <span v-for="feature in features" :key="feature.featureId">
                   {{ feature.featureLabel }}
                 </span>
               </div>
               <p v-else>尚未設定情境標籤，前台無法依用餐情境推薦此門市。</p>
-            </article>
+            </div>
           </section>
 
-          <section v-else-if="activeTab === 'hours'" class="content-section">
-            <form class="setting-form" @submit.prevent="createHour">
+          <section v-else-if="activeTab === 'hours'" class="work-section">
+            <form class="setting-form hours-form" @submit.prevent="createHour">
               <label>
                 星期
                 <select v-model.number="hourForm.dayOfWeek">
@@ -550,11 +552,11 @@ onMounted(loadStores);
                 <input v-model="hourForm.isClosed" type="checkbox" />
                 公休
               </label>
-              <button class="submit-btn" :disabled="saving" type="submit">新增時段</button>
+              <button class="submit-btn" :disabled="saving" type="submit">新增</button>
             </form>
 
-            <div class="data-list">
-              <article v-for="hour in hours" :key="hour.hourId" class="data-card">
+            <div class="records-list">
+              <article v-for="hour in hours" :key="hour.hourId" class="record-row">
                 <div>
                   <strong>{{ hour.dayName }} {{ mealPeriodLabel(hour.mealPeriod) }}</strong>
                   <span v-if="isClosedHour(hour)">公休</span>
@@ -566,8 +568,8 @@ onMounted(loadStores);
             </div>
           </section>
 
-          <section v-else-if="activeTab === 'holidays'" class="content-section">
-            <form class="setting-form three" @submit.prevent="createHoliday">
+          <section v-else-if="activeTab === 'holidays'" class="work-section">
+            <form class="setting-form holiday-form" @submit.prevent="createHoliday">
               <label>
                 公休日期
                 <input v-model="holidayForm.holidayDate" type="date" required />
@@ -576,11 +578,11 @@ onMounted(loadStores);
                 原因
                 <input v-model.trim="holidayForm.reason" maxlength="100" type="text" />
               </label>
-              <button class="submit-btn" :disabled="saving" type="submit">新增公休日</button>
+              <button class="submit-btn" :disabled="saving" type="submit">新增</button>
             </form>
 
-            <div class="data-list">
-              <article v-for="holiday in holidays" :key="holiday.holidayId" class="data-card">
+            <div class="records-list">
+              <article v-for="holiday in holidays" :key="holiday.holidayId" class="record-row">
                 <div>
                   <strong>{{ holiday.holidayDate }}</strong>
                   <span>{{ holiday.reason || "門市公休" }}</span>
@@ -591,7 +593,7 @@ onMounted(loadStores);
             </div>
           </section>
 
-          <section v-else-if="activeTab === 'images'" class="content-section">
+          <section v-else-if="activeTab === 'images'" class="work-section">
             <form class="setting-form image-form" @submit.prevent="createImage">
               <label>
                 圖片 URL
@@ -605,23 +607,23 @@ onMounted(loadStores);
                 排序
                 <input v-model.number="imageForm.sortOrder" min="0" type="number" />
               </label>
-              <button class="submit-btn" :disabled="saving" type="submit">新增圖片</button>
+              <button class="submit-btn" :disabled="saving" type="submit">新增</button>
             </form>
 
             <div class="image-grid">
-              <article v-for="image in images" :key="image.imageId" class="image-card">
+              <article v-for="image in images" :key="image.imageId" class="image-tile">
                 <img :src="image.imageUrl" :alt="image.caption || selectedStore.storeName" />
                 <div>
                   <strong>{{ image.caption || "未命名圖片" }}</strong>
                   <span>排序 {{ image.sortOrder ?? 0 }}</span>
+                  <button type="button" @click="deleteImage(image.imageId)">刪除</button>
                 </div>
-                <button type="button" @click="deleteImage(image.imageId)">刪除</button>
               </article>
               <div v-if="images.length === 0" class="state-box">尚未建立門市圖片</div>
             </div>
           </section>
 
-          <section v-else-if="activeTab === 'features'" class="content-section">
+          <section v-else-if="activeTab === 'features'" class="work-section">
             <div class="preset-row">
               <span>常用標籤</span>
               <button
@@ -659,11 +661,11 @@ onMounted(loadStores);
                 排序
                 <input v-model.number="featureForm.sortOrder" min="0" type="number" />
               </label>
-              <button class="submit-btn" :disabled="saving" type="submit">新增標籤</button>
+              <button class="submit-btn" :disabled="saving" type="submit">新增</button>
             </form>
 
-            <div class="feature-list">
-              <article v-for="feature in features" :key="feature.featureId" class="feature-card">
+            <div class="records-list">
+              <article v-for="feature in features" :key="feature.featureId" class="record-row">
                 <div>
                   <strong>{{ feature.featureLabel }}</strong>
                   <span>{{ feature.featureKey }} · 排序 {{ feature.sortOrder ?? 0 }}</span>
@@ -676,7 +678,7 @@ onMounted(loadStores);
             </div>
           </section>
 
-          <section v-else-if="activeTab === 'tables'" class="content-section">
+          <section v-else-if="activeTab === 'tables'" class="work-section">
             <form class="setting-form table-form" @submit.prevent="createTable">
               <label>
                 桌號
@@ -698,15 +700,15 @@ onMounted(loadStores);
                 <input v-model="tableForm.isCombinable" type="checkbox" />
                 可併桌
               </label>
-              <button class="submit-btn" :disabled="saving" type="submit">新增桌位</button>
+              <button class="submit-btn" :disabled="saving" type="submit">新增</button>
             </form>
 
             <div class="table-grid">
-              <article v-for="table in tables" :key="table.tableId" class="table-card">
-                <div>
+              <article v-for="table in tables" :key="table.tableId" class="table-tile">
+                <header>
                   <strong>{{ table.tableNumber }}</strong>
-                  <span>{{ table.tableSize }} 人桌</span>
-                </div>
+                  <span>{{ table.tableSize }} 人</span>
+                </header>
                 <p>{{ table.zone || "未分區" }} · {{ table.tableType || "一般桌" }}</p>
                 <footer>
                   <span>{{ table.status }}</span>
@@ -725,65 +727,57 @@ onMounted(loadStores);
 <style scoped>
 .store-admin-page {
   display: grid;
-  gap: 20px;
-  color: #344051;
+  gap: 18px;
+  color: #24211e;
 }
 
-.page-header,
-.store-panel,
-.detail-panel,
-.store-summary,
-.content-section {
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-}
-
-.page-header {
+.ops-header {
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
   align-items: center;
-  padding: 24px;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid #ddd6cc;
+  padding-bottom: 18px;
 }
 
-.page-header span {
-  color: #b1642f;
+.ops-header span,
+.rail-heading span {
+  color: #9a6b42;
   font-size: 12px;
   font-weight: 900;
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
 }
 
-.page-header h1 {
-  margin: 4px 0 6px;
-  font-size: 28px;
+.ops-header h1 {
+  margin: 4px 0;
+  font-size: 30px;
   font-weight: 900;
+  letter-spacing: 0;
 }
 
-.page-header p,
+.ops-header p,
 .store-row span,
 .store-row em,
-.summary-copy p,
-.description-card p,
-.data-card span,
-.image-card span,
-.table-card p {
+.store-identity p,
+.record-row span,
+.image-tile span,
+.table-tile p {
   margin: 0;
-  color: #697386;
+  color: #6b625a;
   font-style: normal;
 }
 
 .refresh-btn,
 .submit-btn {
-  height: 42px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 0;
-  border-radius: 8px;
-  background: #b1642f;
-  color: #ffffff;
+  min-height: 40px;
+  border: 1px solid #8f1f1d;
+  border-radius: 4px;
+  background: #8f1f1d;
+  color: #fff;
   font-weight: 800;
   padding: 0 16px;
 }
@@ -793,7 +787,8 @@ onMounted(loadStores);
 }
 
 .notice {
-  border-radius: 8px;
+  border-left: 3px solid currentColor;
+  background: #fff;
   padding: 12px 16px;
   font-weight: 800;
 }
@@ -808,135 +803,135 @@ onMounted(loadStores);
   color: #b42318;
 }
 
-.admin-grid {
+.ops-layout {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 24px;
   align-items: start;
 }
 
-.store-panel,
-.detail-panel {
-  padding: 20px;
+.store-rail {
+  position: sticky;
+  top: 92px;
+  border-top: 3px solid #24211e;
+  background: #fff;
+  padding-top: 16px;
 }
 
-.panel-title {
+.rail-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
   margin-bottom: 16px;
 }
 
-.panel-title h2 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 900;
-}
-
-.panel-title span {
-  color: #b1642f;
-  font-weight: 900;
+.rail-heading strong {
+  font-size: 24px;
 }
 
 .store-row {
   width: 100%;
   display: grid;
   gap: 4px;
-  border: 1px solid #ebe4dc;
-  border-radius: 8px;
+  border: 1px solid #ddd6cc;
+  border-radius: 0;
   background: #ffffff;
   padding: 14px;
   text-align: left;
-  margin-bottom: 10px;
+}
+
+.store-row + .store-row {
+  border-top: 0;
 }
 
 .store-row.active {
-  border-color: #b1642f;
-  background: #fff8f2;
+  border-left: 4px solid #8f1f1d;
+  background: #fffaf5;
 }
 
 .store-row strong {
-  color: #263445;
+  color: #24211e;
   font-size: 16px;
 }
 
-.detail-panel {
+.ops-workspace {
   display: grid;
   gap: 18px;
   min-width: 0;
 }
 
-.store-summary {
+.store-strip {
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr) minmax(280px, 0.8fr);
-  gap: 20px;
+  grid-template-columns: 180px minmax(0, 1fr) minmax(360px, 0.8fr);
+  gap: 18px;
   align-items: center;
-  padding: 18px;
+  border: 1px solid #24211e;
+  background: #fff;
+  padding: 14px;
 }
 
-.summary-image {
+.store-strip > img,
+.empty-photo {
   height: 120px;
-  display: grid;
-  place-items: center;
   overflow: hidden;
-  border-radius: 8px;
-  background: #f7f3ee;
+  background: #eee8df;
 }
 
-.summary-image img {
+.store-strip > img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.summary-image i {
-  color: #b1642f;
+.empty-photo {
+  display: grid;
+  place-items: center;
+}
+
+.empty-photo i {
+  color: #9a6b42;
   font-size: 36px;
 }
 
-.summary-copy h2 {
+.store-identity h2 {
   margin: 10px 0 8px;
-  color: #263445;
+  color: #24211e;
   font-size: 26px;
   font-weight: 900;
 }
 
-.summary-metrics {
+.metric-strip {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  border-left: 1px solid #ddd6cc;
 }
 
-.summary-metrics div,
-.info-grid div,
-.description-card {
-  border: 1px solid #eee5dd;
-  border-radius: 8px;
-  background: #fbf8f5;
-  padding: 14px;
+.metric-strip div {
+  padding: 8px 12px;
+  border-right: 1px solid #ddd6cc;
 }
 
-.summary-metrics strong {
-  display: block;
-  color: #a2322f;
-  font-size: 24px;
+.metric-strip dt {
+  color: #6b625a;
+  font-size: 12px;
   font-weight: 900;
 }
 
-.summary-metrics span,
-.info-grid span {
-  color: #697386;
-  font-size: 13px;
-  font-weight: 800;
+.metric-strip dd {
+  margin: 4px 0 0;
+  color: #8f1f1d;
+  font-size: 24px;
+  font-weight: 900;
 }
 
 .status-chip {
   display: inline-flex;
   border-radius: 999px;
-  background: #f2f0ed;
-  color: #736b63;
-  padding: 7px 12px;
+  background: #eee9e2;
+  color: #625951;
+  padding: 6px 10px;
   font-size: 13px;
   font-weight: 900;
 }
@@ -955,51 +950,71 @@ onMounted(loadStores);
 .tab-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  border-bottom: 1px solid #ddd6cc;
 }
 
 .tab-button {
-  height: 42px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid #d7c6b7;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #8c552e;
+  min-height: 44px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: #625951;
   font-weight: 900;
-  padding: 0 14px;
+  padding: 0 16px 10px;
 }
 
 .tab-button.active {
-  border-color: #1c2c3d;
-  background: #1c2c3d;
-  color: #ffffff;
+  border-bottom-color: #8f1f1d;
+  color: #8f1f1d;
 }
 
-.content-section {
+.work-section {
   display: grid;
   gap: 18px;
+  border: 1px solid #ddd6cc;
+  background: #fff;
   padding: 18px;
 }
 
-.info-grid {
+.field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  border-top: 1px solid #ddd6cc;
+  border-left: 1px solid #ddd6cc;
 }
 
-.info-grid strong {
+.field-grid div {
+  padding: 14px;
+  border-right: 1px solid #ddd6cc;
+  border-bottom: 1px solid #ddd6cc;
+}
+
+.field-grid span,
+.text-block span {
+  color: #8f1f1d;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.field-grid strong {
   display: block;
   margin-top: 6px;
-  color: #263445;
+  color: #24211e;
   line-height: 1.5;
 }
 
-.description-card h3 {
-  margin: 0 0 8px;
-  font-size: 18px;
-  font-weight: 900;
+.text-block {
+  display: grid;
+  gap: 8px;
+}
+
+.text-block p {
+  margin: 0;
+  color: #4f463e;
+  line-height: 1.8;
 }
 
 .setting-form {
@@ -1007,9 +1022,11 @@ onMounted(loadStores);
   grid-template-columns: repeat(4, minmax(120px, 1fr)) auto auto;
   gap: 12px;
   align-items: end;
+  border-bottom: 1px solid #ddd6cc;
+  padding-bottom: 18px;
 }
 
-.setting-form.three {
+.holiday-form {
   grid-template-columns: 180px minmax(220px, 1fr) auto;
 }
 
@@ -1024,7 +1041,7 @@ onMounted(loadStores);
 .setting-form label {
   display: grid;
   gap: 6px;
-  color: #566a7f;
+  color: #625951;
   font-size: 13px;
   font-weight: 800;
 }
@@ -1032,8 +1049,8 @@ onMounted(loadStores);
 .setting-form input,
 .setting-form select {
   height: 40px;
-  border: 1px solid #e4ddd3;
-  border-radius: 8px;
+  border: 1px solid #d8d0c6;
+  border-radius: 4px;
   padding: 0 10px;
 }
 
@@ -1050,29 +1067,28 @@ onMounted(loadStores);
   height: 16px;
 }
 
-.data-list {
+.records-list {
   display: grid;
-  gap: 10px;
+  border-top: 1px solid #ddd6cc;
 }
 
-.data-card {
+.record-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  border: 1px solid #ebe4dc;
-  border-radius: 8px;
-  padding: 14px;
+  border-bottom: 1px solid #ddd6cc;
+  padding: 12px 0;
 }
 
-.data-card strong {
+.record-row strong {
   display: block;
-  color: #263445;
+  color: #24211e;
 }
 
-.data-card button,
-.table-card button,
-.image-card button {
+.record-row button,
+.table-tile button,
+.image-tile button {
   border: 0;
   background: transparent;
   color: #b42318;
@@ -1095,16 +1111,16 @@ onMounted(loadStores);
 
 .preset-row span {
   margin-right: 4px;
-  color: #8c552e;
+  color: #8f1f1d;
   font-size: 13px;
   font-weight: 900;
 }
 
 .preset-row button,
-.feature-list.compact span {
+.tag-list.compact span {
   border-radius: 999px;
-  background: #faf3ea;
-  color: #8c552e;
+  background: #f7efe8;
+  color: #74502f;
   font-size: 13px;
   font-weight: 900;
 }
@@ -1114,92 +1130,60 @@ onMounted(loadStores);
   padding: 8px 11px;
 }
 
-.feature-list {
-  display: grid;
-  gap: 10px;
-}
-
-.feature-list.compact {
+.tag-list.compact {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.feature-list.compact span {
+.tag-list.compact span {
   display: inline-flex;
   padding: 6px 10px;
 }
 
-.feature-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  border: 1px solid #ebe4dc;
-  border-radius: 8px;
-  padding: 14px;
-}
-
-.feature-card strong {
-  display: block;
-  color: #263445;
-}
-
-.feature-card span {
-  color: #697386;
-  font-size: 13px;
-}
-
-.feature-card button {
-  border: 0;
-  background: transparent;
-  color: #b42318;
-  font-weight: 900;
-}
-
-.image-card,
-.table-card {
-  border: 1px solid #ebe4dc;
-  border-radius: 8px;
+.image-tile,
+.table-tile {
+  border: 1px solid #ddd6cc;
   overflow: hidden;
   background: #ffffff;
 }
 
-.image-card img {
+.image-tile img {
   width: 100%;
   height: 130px;
   object-fit: cover;
-  background: #f7f3ee;
+  background: #eee9e2;
 }
 
-.image-card div,
-.table-card {
+.image-tile div,
+.table-tile {
   padding: 14px;
 }
 
-.image-card strong,
-.table-card strong {
+.image-tile strong,
+.table-tile strong {
   display: block;
-  color: #263445;
+  color: #24211e;
   font-size: 17px;
 }
 
-.image-card button {
-  margin: 0 14px 14px;
+.image-tile button {
+  margin-top: 10px;
+  padding: 0;
 }
 
-.table-card div,
-.table-card footer {
+.table-tile header,
+.table-tile footer {
   display: flex;
   justify-content: space-between;
   gap: 10px;
 }
 
-.table-card p {
+.table-tile p {
   margin: 10px 0 0;
 }
 
-.table-card footer {
+.table-tile footer {
   align-items: center;
   border-top: 1px solid #f0e9e1;
   margin-top: 12px;
@@ -1208,9 +1192,9 @@ onMounted(loadStores);
 
 .state-box {
   border: 1px dashed #d8c9bc;
-  border-radius: 8px;
+  background: #fff;
   padding: 28px;
-  color: #697386;
+  color: #6b625a;
   text-align: center;
 }
 
@@ -1221,24 +1205,32 @@ onMounted(loadStores);
 }
 
 @media (max-width: 1200px) {
-  .admin-grid,
-  .store-summary,
+  .ops-layout,
+  .store-strip,
   .setting-form,
-  .setting-form.three,
+  .holiday-form,
   .image-form,
   .feature-form {
     grid-template-columns: 1fr;
   }
+
+  .store-rail {
+    position: static;
+  }
+
+  .metric-strip {
+    border-left: 0;
+  }
 }
 
 @media (max-width: 768px) {
-  .page-header {
+  .ops-header {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .info-grid,
-  .summary-metrics {
+  .field-grid,
+  .metric-strip {
     grid-template-columns: 1fr;
   }
 }

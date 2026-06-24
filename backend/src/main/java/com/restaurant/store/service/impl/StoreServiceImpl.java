@@ -14,8 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,8 +39,9 @@ public class StoreServiceImpl implements StoreService {
     public List<StoreListResponse> getAllOpenStores() {
         List<Store> stores = storeRepository.findByIsDeletedFalseAndStatusOrderByCityAscDistrictAscStoreNameAsc("OPEN");
         Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        Map<Long, Boolean> openNowMap = loadOpenNowMap(stores);
         return stores.stream()
-                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of())))
+                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of()), openNowMap))
                 .collect(Collectors.toList());
     }
 
@@ -46,8 +50,9 @@ public class StoreServiceImpl implements StoreService {
     public List<StoreListResponse> searchStores(String keyword) {
         List<Store> stores = storeRepository.searchByKeyword(keyword);
         Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        Map<Long, Boolean> openNowMap = loadOpenNowMap(stores);
         return stores.stream()
-                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of())))
+                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of()), openNowMap))
                 .collect(Collectors.toList());
     }
 
@@ -56,8 +61,9 @@ public class StoreServiceImpl implements StoreService {
     public List<StoreListResponse> getStoresByCity(String city) {
         List<Store> stores = storeRepository.findByIsDeletedFalseAndStatusAndCityOrderByDistrictAscStoreNameAsc("OPEN", city);
         Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        Map<Long, Boolean> openNowMap = loadOpenNowMap(stores);
         return stores.stream()
-                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of())))
+                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of()), openNowMap))
                 .collect(Collectors.toList());
     }
 
@@ -66,8 +72,9 @@ public class StoreServiceImpl implements StoreService {
     public List<StoreListResponse> getStoresByCityAndDistrict(String city, String district) {
         List<Store> stores = storeRepository.findByIsDeletedFalseAndStatusAndCityAndDistrictOrderByStoreNameAsc("OPEN", city, district);
         Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        Map<Long, Boolean> openNowMap = loadOpenNowMap(stores);
         return stores.stream()
-                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of())))
+                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of()), openNowMap))
                 .collect(Collectors.toList());
     }
 
@@ -76,6 +83,7 @@ public class StoreServiceImpl implements StoreService {
     public List<StoreListResponse> findNearbyStores(NearbySearchRequest request) {
         List<Store> stores = storeRepository.findByIsDeletedFalseAndStatusOrderByCityAscDistrictAscStoreNameAsc("OPEN");
         Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        Map<Long, Boolean> openNowMap = loadOpenNowMap(stores);
         return stores
                 .stream()
                 .filter(s -> s.getLatitude() != null && s.getLongitude() != null)
@@ -83,7 +91,7 @@ public class StoreServiceImpl implements StoreService {
                     double dist = haversineKm(
                             request.getLatitude(), request.getLongitude(),
                             s.getLatitude().doubleValue(), s.getLongitude().doubleValue());
-                    return toListResponse(s, dist, featureMap.getOrDefault(s.getStoreId(), List.of()));
+                    return toListResponse(s, dist, featureMap.getOrDefault(s.getStoreId(), List.of()), openNowMap);
                 })
                 .sorted(Comparator.comparingDouble(StoreListResponse::getDistanceKm))
                 .limit(request.getLimit())
@@ -149,8 +157,9 @@ public class StoreServiceImpl implements StoreService {
     public List<StoreListResponse> getAllStoresForAdmin() {
         List<Store> stores = storeRepository.findByIsDeletedFalseOrderByCityAscDistrictAscStoreNameAsc();
         Map<Long, List<StoreFeatureResponse>> featureMap = loadFeatureMap(stores);
+        Map<Long, Boolean> openNowMap = loadOpenNowMap(stores);
         return stores.stream()
-                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of())))
+                .map(s -> toListResponse(s, null, featureMap.getOrDefault(s.getStoreId(), List.of()), openNowMap))
                 .collect(Collectors.toList());
     }
 
@@ -523,6 +532,38 @@ public class StoreServiceImpl implements StoreService {
         LocalTime now = LocalTime.now();
         List<StoreHour> hours = storeHourRepository
                 .findByStoreIdAndDayOfWeekAndIsClosedFalseOrderByOpenTimeAsc(storeId, todayDow);
+        return hasOpenHour(hours, now);
+    }
+
+    private Map<Long, Boolean> loadOpenNowMap(List<Store> stores) {
+        List<Long> storeIds = stores.stream().map(Store::getStoreId).toList();
+        if (storeIds.isEmpty()) {
+            return Map.of();
+        }
+
+        LocalDate today = LocalDate.now();
+        int todayDow = today.getDayOfWeek().getValue(); // ISO: 週一=1, 週日=7
+        LocalTime now = LocalTime.now();
+
+        Set<Long> holidayStoreIds = storeHolidayRepository.findByStoreIdInAndHolidayDate(storeIds, today)
+                .stream()
+                .map(StoreHoliday::getStoreId)
+                .collect(Collectors.toCollection(HashSet::new));
+
+        Map<Long, List<StoreHour>> hoursByStoreId = storeHourRepository
+                .findByStoreIdInAndDayOfWeekAndIsClosedFalseOrderByStoreIdAscOpenTimeAsc(storeIds, todayDow)
+                .stream()
+                .collect(Collectors.groupingBy(StoreHour::getStoreId));
+
+        Map<Long, Boolean> openNowMap = new HashMap<>();
+        for (Long storeId : storeIds) {
+            openNowMap.put(storeId, !holidayStoreIds.contains(storeId)
+                    && hasOpenHour(hoursByStoreId.getOrDefault(storeId, List.of()), now));
+        }
+        return openNowMap;
+    }
+
+    private boolean hasOpenHour(List<StoreHour> hours, LocalTime now) {
         return hours.stream()
                 .anyMatch(h -> !now.isBefore(h.getOpenTime()) && !now.isAfter(h.getCloseTime()));
     }
@@ -549,7 +590,11 @@ public class StoreServiceImpl implements StoreService {
                         Collectors.mapping(this::toFeatureResponse, Collectors.toList())));
     }
 
-    private StoreListResponse toListResponse(Store s, Double distanceKm, List<StoreFeatureResponse> features) {
+    private StoreListResponse toListResponse(
+            Store s,
+            Double distanceKm,
+            List<StoreFeatureResponse> features,
+            Map<Long, Boolean> openNowMap) {
         return StoreListResponse.builder()
                 .storeId(s.getStoreId())
                 .storeCode(s.getStoreCode())
@@ -563,7 +608,7 @@ public class StoreServiceImpl implements StoreService {
                 .mainImageUrl(s.getMainImageUrl())
                 .status(s.getStatus())
                 .mrtInfo(s.getMrtInfo())
-                .isOpenNow(isOpenNow(s.getStoreId()))
+                .isOpenNow(openNowMap.getOrDefault(s.getStoreId(), false))
                 .distanceKm(distanceKm)
                 .featureTags(features)
                 .build();
