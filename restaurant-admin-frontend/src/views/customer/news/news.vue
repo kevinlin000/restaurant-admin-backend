@@ -22,34 +22,28 @@ const newsItems = [
     id: 1,
     category: "event",
     categoryLabel: "活動",
+    publishedAt: "2026.06.24",
+    period: "2026.06.24 - 2026.08.31",
     title: "夏旬和食祭｜海味、炙燒與清酒佐餐同步登場",
     summary:
       "以鮭魚、干貝、季節野菜與吟釀酒香搭出夏季限定菜色，內用套餐可加購指定佐餐飲品。",
-    body:
-      "本季菜單以清爽海味與桌邊炙燒為主軸，保留職人料理的節奏，也讓聚餐更有儀式感。活動期間內用指定套餐，可用優惠價加購日本清酒、朝日啤酒或無酒精可爾必思。",
-    from: "2026.06.24",
-    to: "2026.08.31",
     storeScope: "全門市適用",
     image: seasonalImage,
-    status: "進行中",
     highlight: true,
-    ctaText: "立即訂位",
+    ctaText: "預約席次",
     ctaTo: "/reservation",
   },
   {
     id: 2,
     category: "opening",
     categoryLabel: "展店",
+    publishedAt: "2026.06.21",
+    period: "2026.07.05 - 2026.07.31",
     title: "台中勤美店試營運公告｜午間席次優先開放",
     summary:
       "新門市試營運期間採分段開放訂位，午餐、下午茶與晚餐席次將依現場準備狀況逐步增加。",
-    body:
-      "台中勤美店以城市聚餐與包廂宴席為主要情境，試營運期間每日席次有限。為維持服務品質，線上訂位會分階段開放，建議提前選擇候補時段或鄰近門市。",
-    from: "2026.07.05",
-    to: "2026.07.31",
     storeScope: "台中勤美店",
     image: openingImage,
-    status: "即將開始",
     ctaText: "查看門市",
     ctaTo: "/store",
   },
@@ -57,33 +51,28 @@ const newsItems = [
     id: 3,
     category: "notice",
     categoryLabel: "公告",
+    publishedAt: "2026.06.20",
+    period: "長期公告",
     title: "重要提醒｜請透過官方網站、APP 或門市電話完成訂位",
     summary:
-      "敘日未授權第三方代訂平台收取訂金或轉售席次，請勿購買來路不明的訂位。",
-    body:
-      "近期餐飲訂位詐騙與轉售案件增加。敘日所有訂位資訊皆以官方網站、會員 APP 與門市電話公告為準，不會要求顧客透過私人帳號匯款，也不會以非官方 LINE 帳號確認付款。",
-    from: "2026.06.20",
-    to: "長期公告",
+      "敘日未授權第三方代訂平台收取訂金或轉售席次，所有訂位資訊以官方網站、會員 APP 與門市公告為準。",
     storeScope: "全門市適用",
     image: noticeImage,
-    status: "重要",
     ctaText: "查看門市電話",
     ctaTo: "/store",
+    important: true,
   },
   {
     id: 4,
     category: "member",
     categoryLabel: "會員",
+    publishedAt: "2026.06.18",
+    period: "2026.07.01 - 2026.07.14",
     title: "敘日會員週｜平日午餐點數雙倍累積",
     summary:
       "會員平日 11:30 至 14:00 內用，單筆滿額享點數雙倍累積，可與生日禮擇優使用。",
-    body:
-      "希望把平日聚餐做得更輕鬆，本月會員週將午餐時段納入點數加倍。活動適用會員本人消費，點數將於結帳後自動入帳，企業包場與外帶訂單不適用。",
-    from: "2026.07.01",
-    to: "2026.07.14",
     storeScope: "全門市適用",
     image: memberImage,
-    status: "即將開始",
     ctaText: "會員登入",
     ctaTo: "/login",
   },
@@ -91,16 +80,13 @@ const newsItems = [
     id: 5,
     category: "event",
     categoryLabel: "活動",
+    publishedAt: "2026.06.14",
+    period: "2026.06.27 - 2026.08.28",
     title: "雙人餐酒夜｜週四晚餐限定席",
     summary:
-      "精選雙人套餐搭配指定飲品，適合慶生、約會與下班後的小型聚餐。",
-    body:
-      "週四晚餐限定推出雙人餐酒夜，餐點包含前菜、刺身、炙燒主菜、鍋物與甜點。部分門市提供吧檯席，適合想安靜用餐或慶祝紀念日的顧客。",
-    from: "2026.06.27",
-    to: "2026.08.28",
+      "精選雙人套餐搭配指定飲品，適合慶生、約會與下班後的小型聚餐。部分門市提供吧檯席。",
     storeScope: "台北信義店、新竹巨城店、台中勤美店",
     image: diningImage,
-    status: "進行中",
     ctaText: "預約晚餐",
     ctaTo: "/reservation",
   },
@@ -108,23 +94,19 @@ const newsItems = [
     id: 6,
     category: "notice",
     categoryLabel: "公告",
+    publishedAt: "2026.06.10",
+    period: "長期公告",
     title: "外帶自取包裝調整｜鍋物與生食餐點分裝升級",
     summary:
       "為維持餐點狀態，外帶自取餐盒將依品項調整為冷熱分裝，部分套餐備餐時間同步延長。",
-    body:
-      "外帶自取將針對鍋物、生食與甜點調整分裝方式，減少溫度互相影響。尖峰時段建議提前 40 分鐘下單，門市會依現場訂單狀況確認最早取餐時間。",
-    from: "2026.06.18",
-    to: "長期公告",
     storeScope: "供應外帶門市",
     image: takeoutImage,
-    status: "公告",
     ctaText: "前往點餐",
     ctaTo: "/order",
   },
 ];
 
 const activeCategory = ref("all");
-const selectedId = ref(newsItems[0].id);
 
 const featuredNews = computed(() => newsItems.find((item) => item.highlight) || newsItems[0]);
 
@@ -136,19 +118,11 @@ const filteredNews = computed(() => {
   return newsItems.filter((item) => item.category === activeCategory.value);
 });
 
-const selectedNews = computed(() => {
-  const current = filteredNews.value.find((item) => item.id === selectedId.value);
-  return current || filteredNews.value[0] || featuredNews.value;
-});
+const listNews = computed(() =>
+  filteredNews.value.filter((item) => item.id !== featuredNews.value.id),
+);
 
-const setCategory = (category) => {
-  activeCategory.value = category;
-  selectedId.value = filteredNews.value[0]?.id || featuredNews.value.id;
-};
-
-const selectNews = (id) => {
-  selectedId.value = id;
-};
+const visibleCountLabel = computed(() => `${filteredNews.value.length} 則消息`);
 
 onMounted(() => {
   requestAnimationFrame(() => {
@@ -159,102 +133,111 @@ onMounted(() => {
 
 <template>
   <section class="news-page">
-    <section class="news-hero" :style="{ backgroundImage: `url(${heroImage})` }">
-      <div class="news-hero__overlay">
-        <div class="news-container news-hero__content">
-          <span class="eyebrow">News & Notice</span>
+    <header class="news-header" :style="{ backgroundImage: `url(${heroImage})` }">
+      <div class="news-header__shade">
+        <div class="news-container">
+          <nav class="breadcrumb-line" aria-label="目前位置">
+            <RouterLink to="/home">首頁</RouterLink>
+            <span>/</span>
+            <span>最新消息</span>
+          </nav>
+          <p class="section-label">News</p>
           <h1>最新消息</h1>
-          <p>
-            掌握敘日最新菜單、門市營運、會員禮遇與重要公告。每一則消息都標示適用期間與門市，方便你安排下一次聚餐。
+          <p class="header-copy">
+            活動、門市營運與重要公告都集中在這裡。每則消息標示發布日期、適用期間與門市，方便安排訂位與用餐。
           </p>
-          <div class="hero-actions">
-            <RouterLink class="primary-action" to="/reservation">預約席次</RouterLink>
-            <RouterLink class="secondary-action" to="/store">查看門市</RouterLink>
+        </div>
+      </div>
+    </header>
+
+    <main class="news-container news-content">
+      <section class="featured-block" aria-labelledby="featured-title">
+        <div class="section-heading">
+          <p class="section-label">Selected</p>
+          <h2 id="featured-title">本期焦點</h2>
+        </div>
+
+        <article class="featured-article">
+          <img :src="featuredNews.image" :alt="featuredNews.title" />
+          <div class="featured-copy">
+            <div class="news-meta">
+              <span>{{ featuredNews.categoryLabel }}</span>
+              <time>{{ featuredNews.publishedAt }}</time>
+            </div>
+            <h3>{{ featuredNews.title }}</h3>
+            <p>{{ featuredNews.summary }}</p>
+            <dl class="event-facts">
+              <div>
+                <dt>期間</dt>
+                <dd>{{ featuredNews.period }}</dd>
+              </div>
+              <div>
+                <dt>門市</dt>
+                <dd>{{ featuredNews.storeScope }}</dd>
+              </div>
+            </dl>
+            <RouterLink class="text-action dark" :to="featuredNews.ctaTo">
+              {{ featuredNews.ctaText }}
+              <i class="bi bi-arrow-right"></i>
+            </RouterLink>
           </div>
-        </div>
-      </div>
-    </section>
+        </article>
+      </section>
 
-    <section class="news-container news-feature">
-      <div class="feature-copy">
-        <span class="eyebrow">Featured</span>
-        <h2>{{ featuredNews.title }}</h2>
-        <p>{{ featuredNews.summary }}</p>
-      </div>
-      <div class="feature-meta">
-        <span>{{ featuredNews.from }} - {{ featuredNews.to }}</span>
-        <strong>{{ featuredNews.storeScope }}</strong>
-      </div>
-    </section>
-
-    <section class="news-container news-board" aria-label="最新消息列表">
-      <div class="news-board__header">
-        <div>
-          <span class="eyebrow">Browse</span>
-          <h2>消息一覽</h2>
+      <section class="news-index" aria-labelledby="news-index-title">
+        <div class="index-toolbar">
+          <div>
+            <p class="section-label">Archive</p>
+            <h2 id="news-index-title">消息列表</h2>
+          </div>
+          <span class="result-count">{{ visibleCountLabel }}</span>
         </div>
+
         <div class="category-tabs" aria-label="消息分類">
           <button
             v-for="category in categories"
             :key="category.value"
             type="button"
             :class="['category-tab', { active: activeCategory === category.value }]"
-            @click="setCategory(category.value)"
+            @click="activeCategory = category.value"
           >
             {{ category.label }}
           </button>
         </div>
-      </div>
 
-      <div class="news-layout">
         <div class="news-list">
-          <button
-            v-for="item in filteredNews"
+          <article
+            v-for="item in listNews"
             :key="item.id"
-            type="button"
-            :class="['news-row', { active: selectedNews.id === item.id }]"
-            @click="selectNews(item.id)"
+            :class="['news-item', { important: item.important }]"
           >
-            <span class="news-date">{{ item.from }}</span>
-            <span class="news-row__main">
-              <span class="news-row__topline">
-                <span class="news-category">{{ item.categoryLabel }}</span>
-                <span class="news-status">{{ item.status }}</span>
-              </span>
-              <strong>{{ item.title }}</strong>
-              <span>{{ item.summary }}</span>
-            </span>
-            <i class="bi bi-arrow-right-short"></i>
-          </button>
-        </div>
-
-        <article class="news-detail">
-          <img :src="selectedNews.image" :alt="selectedNews.title" />
-          <div class="news-detail__body">
-            <div class="detail-meta">
-              <span>{{ selectedNews.categoryLabel }}</span>
-              <span>{{ selectedNews.from }} - {{ selectedNews.to }}</span>
+            <div class="date-block">
+              <time>{{ item.publishedAt }}</time>
+              <span>{{ item.categoryLabel }}</span>
             </div>
-            <h3>{{ selectedNews.title }}</h3>
-            <p>{{ selectedNews.body }}</p>
-            <dl class="detail-list">
-              <div>
-                <dt>適用門市</dt>
-                <dd>{{ selectedNews.storeScope }}</dd>
+            <img :src="item.image" :alt="item.title" />
+            <div class="news-item__body">
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.summary }}</p>
+              <div class="item-facts">
+                <span>
+                  <i class="bi bi-calendar3"></i>
+                  {{ item.period }}
+                </span>
+                <span>
+                  <i class="bi bi-shop"></i>
+                  {{ item.storeScope }}
+                </span>
               </div>
-              <div>
-                <dt>消息狀態</dt>
-                <dd>{{ selectedNews.status }}</dd>
-              </div>
-            </dl>
-            <RouterLink class="detail-action" :to="selectedNews.ctaTo">
-              {{ selectedNews.ctaText }}
+            </div>
+            <RouterLink class="text-action" :to="item.ctaTo">
+              {{ item.ctaText }}
               <i class="bi bi-arrow-right"></i>
             </RouterLink>
-          </div>
-        </article>
-      </div>
-    </section>
+          </article>
+        </div>
+      </section>
+    </main>
   </section>
 </template>
 
@@ -270,323 +253,283 @@ onMounted(() => {
   margin: 0 auto;
 }
 
-.news-hero {
-  min-height: 560px;
+.news-header {
   background-position: center;
   background-size: cover;
 }
 
-.news-hero__overlay {
-  display: flex;
-  min-height: 560px;
-  align-items: end;
-  background: linear-gradient(180deg, rgba(20, 24, 28, 0.26), rgba(20, 24, 28, 0.72));
-  padding: 160px 0 72px;
-}
-
-.news-hero__content {
+.news-header__shade {
+  min-height: 500px;
+  background: linear-gradient(180deg, rgba(18, 22, 25, 0.18), rgba(18, 22, 25, 0.76));
   color: #fff;
+  padding: 150px 0 72px;
 }
 
-.eyebrow {
-  display: inline-block;
-  margin-bottom: 12px;
-  color: #a96530;
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.news-hero .eyebrow {
-  color: #f3cba6;
-}
-
-.news-hero h1 {
-  margin: 0;
-  font-size: clamp(44px, 7vw, 82px);
-  font-weight: 900;
-  line-height: 1.05;
-  letter-spacing: 0;
-}
-
-.news-hero p {
-  max-width: 620px;
-  margin: 24px 0 0;
-  color: rgba(255, 255, 255, 0.86);
-  font-size: 18px;
-  line-height: 1.85;
-}
-
-.hero-actions {
+.breadcrumb-line {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 32px;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 48px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+  font-weight: 800;
 }
 
-.primary-action,
-.secondary-action,
-.detail-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 46px;
-  border-radius: 8px;
-  padding: 0 18px;
-  font-weight: 900;
+.breadcrumb-line a {
+  color: inherit;
   text-decoration: none;
 }
 
-.primary-action {
-  background: #a96530;
-  color: #fff;
+.section-label {
+  margin: 0 0 10px;
+  color: #a96530;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.secondary-action {
-  border: 1px solid rgba(255, 255, 255, 0.52);
-  color: #fff;
+.news-header .section-label {
+  color: #f1c8a0;
 }
 
-.news-feature {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 32px;
-  border-bottom: 1px solid #dfd3c7;
-  padding: 42px 0;
-}
-
-.feature-copy h2,
-.news-board__header h2 {
+.news-header h1 {
   margin: 0;
-  color: #263445;
+  font-size: clamp(46px, 6vw, 78px);
+  font-weight: 900;
+  line-height: 1.04;
+  letter-spacing: 0;
+}
+
+.header-copy {
+  max-width: 650px;
+  margin: 22px 0 0;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 18px;
+  line-height: 1.8;
+}
+
+.news-content {
+  padding: 58px 0 96px;
+}
+
+.section-heading,
+.index-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: end;
+  margin-bottom: 22px;
+}
+
+.section-heading h2,
+.index-toolbar h2 {
+  margin: 0;
+  color: #25313f;
   font-size: 34px;
   font-weight: 900;
   letter-spacing: 0;
 }
 
-.feature-copy p {
-  max-width: 720px;
-  margin: 14px 0 0;
-  color: #697386;
-  font-size: 17px;
+.featured-article {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(380px, 0.95fr);
+  overflow: hidden;
+  border: 1px solid #d8cbbd;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.featured-article > img {
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+  object-fit: cover;
+}
+
+.featured-copy {
+  padding: 42px;
+}
+
+.news-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  color: #8c552e;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.news-meta span {
+  border: 1px solid #d8cbbd;
+  border-radius: 999px;
+  padding: 5px 11px;
+}
+
+.featured-copy h3 {
+  margin: 18px 0 14px;
+  color: #25313f;
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.featured-copy p,
+.news-item__body p {
+  color: #657284;
   line-height: 1.8;
 }
 
-.feature-meta {
-  align-self: end;
-  border-left: 3px solid #a96530;
-  padding-left: 18px;
+.event-facts {
+  display: grid;
+  gap: 12px;
+  margin: 28px 0;
 }
 
-.feature-meta span,
-.feature-meta strong {
-  display: block;
+.event-facts div {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  gap: 14px;
+  border-top: 1px solid #ece3da;
+  padding-top: 12px;
 }
 
-.feature-meta span {
-  color: #697386;
-  font-size: 14px;
+.event-facts dt {
+  color: #8a7d70;
+  font-weight: 900;
+}
+
+.event-facts dd {
+  margin: 0;
+  color: #25313f;
   font-weight: 800;
 }
 
-.feature-meta strong {
-  margin-top: 8px;
-  color: #263445;
-  font-size: 18px;
+.text-action {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  color: #8c552e;
+  font-weight: 900;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
-.news-board {
-  padding: 54px 0 96px;
+.text-action.dark {
+  min-height: 46px;
+  border-radius: 6px;
+  background: #25313f;
+  color: #fff;
+  padding: 0 18px;
 }
 
-.news-board__header {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 24px;
+.news-index {
+  margin-top: 64px;
+}
+
+.result-count {
+  color: #657284;
+  font-weight: 900;
 }
 
 .category-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  border-bottom: 1px solid #d8cbbd;
+  padding-bottom: 16px;
 }
 
 .category-tab {
-  border: 1px solid #d6c7b9;
+  border: 1px solid #d8cbbd;
   border-radius: 999px;
-  background: #fff;
+  background: transparent;
   color: #685c51;
-  padding: 9px 16px;
+  padding: 8px 16px;
   font-weight: 900;
 }
 
 .category-tab.active {
-  border-color: #a96530;
-  background: #a96530;
+  border-color: #8c552e;
+  background: #8c552e;
   color: #fff;
-}
-
-.news-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 420px;
-  gap: 28px;
-  align-items: start;
 }
 
 .news-list {
   display: grid;
-  gap: 10px;
+  margin-top: 10px;
 }
 
-.news-row {
+.news-item {
   display: grid;
-  grid-template-columns: 104px minmax(0, 1fr) 24px;
-  gap: 18px;
+  grid-template-columns: 120px 188px minmax(0, 1fr) auto;
+  gap: 24px;
   align-items: center;
-  width: 100%;
-  border: 1px solid #e1d6ca;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.78);
-  padding: 18px;
-  color: inherit;
-  text-align: left;
-  transition: border-color 0.2s, background 0.2s, transform 0.2s;
+  border-bottom: 1px solid #d8cbbd;
+  padding: 24px 0;
 }
 
-.news-row:hover,
-.news-row.active {
-  border-color: #a96530;
-  background: #fff;
-  transform: translateY(-1px);
+.news-item.important {
+  background: linear-gradient(90deg, rgba(169, 101, 48, 0.08), rgba(169, 101, 48, 0));
 }
 
-.news-date {
-  color: #a96530;
-  font-weight: 900;
-}
-
-.news-row__main {
+.date-block {
   display: grid;
   gap: 7px;
-  min-width: 0;
 }
 
-.news-row__topline {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.news-category,
-.news-status {
-  border-radius: 999px;
-  padding: 4px 9px;
-  font-size: 12px;
+.date-block time {
+  color: #25313f;
+  font-size: 18px;
   font-weight: 900;
 }
 
-.news-category {
-  background: #f4e6d8;
+.date-block span {
+  width: fit-content;
+  border: 1px solid #d8cbbd;
+  border-radius: 999px;
   color: #8c552e;
-}
-
-.news-status {
-  background: #eef2f5;
-  color: #536271;
-}
-
-.news-row strong {
-  color: #263445;
-  font-size: 18px;
-  line-height: 1.35;
-}
-
-.news-row__main > span:last-child {
-  color: #697386;
-  line-height: 1.6;
-}
-
-.news-row i {
-  color: #a96530;
-  font-size: 24px;
-}
-
-.news-detail {
-  position: sticky;
-  top: 112px;
-  overflow: hidden;
-  border: 1px solid #d8ccbf;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 18px 42px rgba(52, 64, 81, 0.1);
-}
-
-.news-detail img {
-  width: 100%;
-  height: 240px;
-  object-fit: cover;
-}
-
-.news-detail__body {
-  padding: 26px;
-}
-
-.detail-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  color: #8c552e;
+  padding: 4px 10px;
   font-size: 13px;
   font-weight: 900;
 }
 
-.news-detail h3 {
-  margin: 14px 0 12px;
-  color: #263445;
-  font-size: 26px;
-  font-weight: 900;
-  line-height: 1.3;
+.news-item img {
+  width: 188px;
+  aspect-ratio: 4 / 3;
+  border-radius: 4px;
+  object-fit: cover;
 }
 
-.news-detail p {
-  margin: 0;
-  color: #697386;
-  line-height: 1.85;
-}
-
-.detail-list {
-  display: grid;
-  gap: 12px;
-  margin: 22px 0;
-}
-
-.detail-list div {
-  display: grid;
-  grid-template-columns: 86px minmax(0, 1fr);
-  gap: 12px;
-  border-top: 1px solid #ede4da;
-  padding-top: 12px;
-}
-
-.detail-list dt {
-  color: #7a6f65;
-  font-weight: 900;
-}
-
-.detail-list dd {
-  margin: 0;
+.news-item h3 {
+  margin: 0 0 8px;
   color: #25313f;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+
+.news-item__body p {
+  margin: 0;
+}
+
+.item-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin-top: 12px;
+  color: #70665d;
+  font-size: 14px;
   font-weight: 800;
 }
 
-.detail-action {
-  width: 100%;
-  background: #263445;
-  color: #fff;
+.item-facts span {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
 }
 
 @media (max-width: 991px) {
@@ -594,55 +537,63 @@ onMounted(() => {
     width: min(100% - 28px, 720px);
   }
 
-  .news-hero,
-  .news-hero__overlay {
-    min-height: 520px;
+  .news-header__shade {
+    min-height: 470px;
+    padding: 128px 0 56px;
   }
 
-  .news-feature,
-  .news-layout,
-  .news-board__header {
-    grid-template-columns: 1fr;
+  .breadcrumb-line {
+    margin-bottom: 34px;
   }
 
-  .news-board__header {
+  .section-heading,
+  .index-toolbar {
     display: grid;
     align-items: start;
   }
 
-  .news-detail {
-    position: static;
+  .featured-article,
+  .news-item {
+    grid-template-columns: 1fr;
+  }
+
+  .featured-article > img {
+    min-height: 260px;
+  }
+
+  .featured-copy {
+    padding: 28px;
+  }
+
+  .news-item {
+    gap: 14px;
+  }
+
+  .news-item img {
+    width: 100%;
+    max-height: 260px;
   }
 }
 
 @media (max-width: 640px) {
-  .news-hero__overlay {
-    align-items: center;
-    padding: 128px 0 56px;
+  .news-header__shade {
+    min-height: 450px;
   }
 
-  .news-hero p {
+  .header-copy {
     font-size: 16px;
   }
 
-  .news-feature {
-    padding: 30px 0;
-  }
-
-  .feature-copy h2,
-  .news-board__header h2 {
+  .section-heading h2,
+  .index-toolbar h2 {
     font-size: 28px;
   }
 
-  .news-row {
-    grid-template-columns: 1fr 24px;
+  .featured-copy h3 {
+    font-size: 26px;
   }
 
-  .news-date {
-    grid-column: 1 / -1;
-  }
-
-  .detail-list div {
+  .event-facts div {
     grid-template-columns: 1fr;
     gap: 4px;
   }
