@@ -35,6 +35,14 @@ public class StoreAdminAccessService {
         }
     }
 
+    public boolean isAdmin(Authentication authentication) {
+        return hasAuthority(authentication, "ROLE_ADMIN");
+    }
+
+    public Long currentManagerStoreId(Authentication authentication) {
+        return currentStaffStoreId(authentication);
+    }
+
     public void requireStoreAccess(Authentication authentication, Long storeId) {
         if (hasAuthority(authentication, "ROLE_ADMIN")) {
             return;

@@ -156,6 +156,10 @@ const logout = async () => {
               <li class="nav-item">
                 <RouterLink class="nav-link" to="/store">分店資訊</RouterLink>
               </li>
+
+              <li class="nav-item">
+                <RouterLink class="nav-link" to="/news">最新消息</RouterLink>
+              </li>
               <li v-if="!userInfo" class="nav-item ms-lg-5">
                 <RouterLink to="/login" class="login-btn">
                   <i class="bi bi-person"></i>
