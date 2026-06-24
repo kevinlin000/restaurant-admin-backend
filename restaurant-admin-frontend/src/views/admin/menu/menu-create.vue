@@ -1,10 +1,13 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue' // 💡 完美引入動態計算屬性
 import { useRouter } from 'vue-router' // 🚀 1. 引入 Vue Router 的導航推手
-import axios from 'axios'
+import axios from '@/api/axios';
 
 // 🚀 2. 啟動導航推手
 const router = useRouter()
+
+// 🏪 多租戶防禦點火線：獲取當前店長專屬的 storeId (可根據你們組內的 localStorage 鍵名調整，如 'storeId' 或 'user')
+const currentStoreId = ref(localStorage.getItem('storeId') || 1) 
 
 // 🚀 3. 後端大寫 MenuCreateDTO 規格變數
 const newItem = ref({
@@ -14,12 +17,12 @@ const newItem = ref({
   imageUrl: '',
   categoryId: 1,
   status: 'AVAILABLE',
-  allergenInfo: ''
+  allergenInfo: '',
+  featureTags: null
 })
 
 // 🚀 4. 初始化為空籃子，準備裝真實數據
 const menuItems = ref([])
-
 // 🚀 5. 搜尋欄位的響應式變數
 const searchQuery = ref('')
 
@@ -33,10 +36,12 @@ const filteredMenuItems = computed(() => {
   })
 })
 
-// 🚀 7. 去資料庫撈真數據的方法
+// 🚀 7. 去資料庫撈真數據的方法 —— ⚡ 史詩級升級：只撈取該店長所屬分店的菜單，達成多租戶隔離！
 const fetchMenuItems = async () => {
   try {
-    const response = await axios.get('/api/menu-items')
+    // 🎯 完美咬合後端 MenuItemController.java 第 68 行的專屬菜單 displayList 路由！
+    const response = await axios.get(`/api/menu-items/store/${currentStoreId.value}`)
+    // 由於後端 getStoreMenu 回傳的是 StoreMenuDisplayResponse 自訂結構，資料在外層的 .data 內
     menuItems.value = response.data.data || response.data
   } catch (error) {
     console.error('後端發電廠傳輸大塞車：', error)
@@ -51,41 +56,55 @@ onMounted(() => {
 // 🚀 9. 點擊「編輯此項」跨頁面轉跳方法（對齊 /admin/menu-edit/:id 路由）
 const selectItem = (item) => {
   if (!item.id) {
-    alert('⚠️ 這道餐點沒有 ID 數據，無法進行編輯！')
+    alert(' ⚠️ 這道餐點沒有 ID 數據，無法進行編輯！')
     return
   }
   // 帶著 ID 絲滑轉跳到修改頁面
   router.push(`/admin/menu-edit/${item.id}`)
 }
 
-// 🚀 10. 新增菜單連通點火方法
+// 🚀 10. 新增菜單連通點火方法 —— ⚡ 史詩級升級：對齊後端獨立分店寫入管線
 const handleAddItemMenu = async () => {
   if (!newItem.value.itemName || !newItem.value.price) {
     alert('請填寫完整餐點名稱與價格！')
     return
   }
-
   try {
-    const response = await axios.post('/api/menu-items', {
+    // 🎯 完美咬合後端最新 POST /api/menu-items/store/{storeId} 隔離管線，精準寫入 store_menu！
+    const response = await axios.post(`/api/menu-items/store/${currentStoreId.value}`, {
       categoryId: Number(newItem.value.categoryId),
       itemName: newItem.value.itemName,
       price: Number(newItem.value.price),
       description: newItem.value.description || "日式職人手作美味。",
       imageUrl: newItem.value.imageUrl || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c",
       allergenInfo: newItem.value.allergenInfo || "無特殊過敏原提示。",
-      isActive: true
+      isActive: true,
+      
+      // ⚡ 關鍵加入這一行！將前端選好的標籤打包送往後端
+      featureTags: newItem.value.featureTags 
     })
-
+    
     if (response.data.success) {
-      alert('🎉成功新增一筆定食專賣店餐點到資料庫！')
-      fetchMenuItems() // 重新刷新資料庫列表
-      newItem.value = { itemName: '', price: '', description: '', imageUrl: '', categoryId: 1, status: 'AVAILABLE', allergenInfo: '' }
+      alert(` 🎉 成功新增一筆定食餐點，並寫入第 ${currentStoreId.value} 號分店資料庫！`)
+      fetchMenuItems() // 重新刷新列表
+      
+      // 腦收集籃擦乾淨：記得把 featureTags 也重設為 null
+      newItem.value = { 
+        itemName: '', 
+        price: '', 
+        description: '', 
+        imageUrl: '', 
+        categoryId: 1, 
+        status: 'AVAILABLE', 
+        allergenInfo: '',
+        featureTags: null // 👈 清空重置
+      } 
     } else {
       alert('上架失敗：' + response.data.message)
     }
   } catch (error) {
-    console.error('後端發電廠拒收包裹：', error)
-    alert('⚠️ Code is correct but not running！請檢查後端控制台！')
+    console.error('後端資料庫拒收包裹：', error)
+    alert(' ⚠️ 請檢查後端控制台是否已完全啟動！')
   }
 }
 </script>
@@ -152,6 +171,23 @@ const handleAddItemMenu = async () => {
                 style="color: #374151; border-color: #fed7aa; background-color: #ffffff; font-weight: 500;"
               >
             </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold text-secondary">✨ 特色行銷標籤：</label>
+            <select v-model="newItem.featureTags" class="form-select border-2">
+              <option :value="null">-- 不設定標籤（留白） --</option>
+              <option value="👑 店長推薦">👑 店長推薦 </option>
+              <option value="🔥 人氣熱銷">🔥 人氣熱銷 </option>
+              <option value="🍣 主廚推薦">🍣 主廚推薦 </option>
+              <option value="🔥 入口即化">🔥 入口即化 </option>
+              <option value="🥩 頂級和牛">🥩 頂級和牛 </option>
+              <option value="🍵 濃郁系">🍵 濃郁系 </option>
+              <option value="🥢 手工研磨">🥢 手工研磨 </option>
+              <option value="🧊 夏季限定">🧊 夏季限定 </option>
+              <option value="🍶 頂級清酒">🍶 頂級清酒 </option>
+            </select>
+            <div class="form-text small text-muted">選擇一個最能吸引顧客下單的特色標籤，前台將會優雅顯示。</div>
           </div>
 
           <div class="col-md-3">
