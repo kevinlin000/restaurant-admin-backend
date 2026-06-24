@@ -450,332 +450,369 @@ onMounted(async () => {
 <template>
   <main class="store-page">
     <section class="store-hero">
-      <div class="container hero-shell">
-        <div class="hero-content">
-          <span class="eyebrow">門市查詢</span>
-          <h1>分店資訊</h1>
-          <p>查詢鄰近門市、營業狀態與交通資訊，選好地點後直接前往訂位或點餐。</p>
+      <div class="store-hero__image" aria-hidden="true"></div>
+      <div class="container store-hero__content">
+        <p class="eyebrow">Location</p>
+        <h1>門市據點</h1>
+        <p class="hero-lead">選擇今晚的餐桌，確認營業時段、交通與訂位資訊。</p>
+        <div class="hero-actions">
+          <button class="hero-action primary-action" type="button" @click="findNearby">
+            <span v-if="nearbyLoading" class="spinner-border spinner-border-sm"></span>
+            <i v-else class="bi bi-crosshair"></i>
+            附近門市
+          </button>
+          <a class="hero-action secondary-action" href="#store-results">
+            <i class="bi bi-list-ul"></i>
+            瀏覽全部
+          </a>
         </div>
       </div>
     </section>
 
-    <section class="store-content">
-      <div class="container">
-        <div class="filter-panel">
-          <div class="search-box">
-            <i class="bi bi-search"></i>
-            <input
-              v-model="keyword"
-              type="search"
-              placeholder="搜尋門市、區域、捷運或地址"
-              @keyup.enter="applyFilters"
-            />
+    <section id="store-results" class="store-content">
+      <div class="container store-shell">
+        <aside class="store-controls" aria-label="門市篩選">
+          <div class="control-heading">
+            <span>Find a Table</span>
+            <strong>{{ stores.length }} 間門市</strong>
           </div>
 
-          <select v-model="selectedCity" class="filter-select" @change="loadDistricts">
-            <option value="">全部縣市</option>
-            <option v-for="city in cities" :key="city" :value="city">{{ city }}</option>
-          </select>
+          <label class="search-field">
+            <span>關鍵字</span>
+            <div>
+              <i class="bi bi-search"></i>
+              <input
+                v-model="keyword"
+                type="search"
+                placeholder="店名、地址、捷運站"
+                @keyup.enter="applyFilters"
+              />
+            </div>
+          </label>
 
-          <select
-            v-model="selectedDistrict"
-            class="filter-select"
-            :disabled="!selectedCity"
-            @change="applyFilters"
-          >
-            <option value="">全部區域</option>
-            <option v-for="district in districts" :key="district" :value="district">
-              {{ district }}
-            </option>
-          </select>
+          <div class="select-grid">
+            <label>
+              <span>縣市</span>
+              <select v-model="selectedCity" class="filter-select" @change="loadDistricts">
+                <option value="">全部縣市</option>
+                <option v-for="city in cities" :key="city" :value="city">{{ city }}</option>
+              </select>
+            </label>
 
-          <button class="primary-action" type="button" @click="applyFilters">
-            <i class="bi bi-funnel"></i>
-            篩選
-          </button>
-
-          <button class="secondary-action" type="button" @click="findNearby">
-            <span v-if="nearbyLoading" class="spinner-border spinner-border-sm"></span>
-            <i v-else class="bi bi-geo-alt"></i>
-            附近門市
-          </button>
-        </div>
-
-        <div class="region-row" aria-label="快速區域篩選">
-          <button
-            v-for="region in regions"
-            :key="region.key"
-            type="button"
-            :class="['region-tab', activeRegion === region.key ? 'active' : '']"
-            @click="selectRegion(region.key)"
-          >
-            {{ region.label }}
-          </button>
-        </div>
-
-        <div v-if="featureOptions.length" class="feature-row" aria-label="用餐情境篩選">
-          <span>用餐情境</span>
-          <button
-            v-for="feature in featureOptions"
-            :key="feature.featureKey"
-            type="button"
-            :class="[
-              'feature-chip',
-              selectedFeatures.includes(feature.featureKey) ? 'active' : '',
-            ]"
-            @click="toggleFeature(feature.featureKey)"
-          >
-            {{ feature.featureLabel }}
-          </button>
-        </div>
-
-        <div class="tools-row">
-          <div class="result-summary">
-            <span>{{ selectedRegionLabel }}</span>
-            <strong>{{ stores.length }}</strong>
-            <span>間門市</span>
-            <span class="divider"></span>
-            <span>{{ openStoreCount }} 間營業中</span>
-            <span v-if="closestStore" class="nearby-note">
-              最近 {{ closestStore.storeName }} {{ formatDistance(closestStore.distanceKm) }}
-            </span>
+            <label>
+              <span>區域</span>
+              <select
+                v-model="selectedDistrict"
+                class="filter-select"
+                :disabled="!selectedCity"
+                @change="applyFilters"
+              >
+                <option value="">全部區域</option>
+                <option v-for="district in districts" :key="district" :value="district">
+                  {{ district }}
+                </option>
+              </select>
+            </label>
           </div>
 
-          <div class="tool-actions">
-            <button
-              type="button"
-              :class="['toggle-action', openOnly ? 'active' : '']"
-              @click="toggleOpenOnly"
-            >
-              <i class="bi bi-clock"></i>
-              只看營業中
+          <div class="control-actions">
+            <button class="primary-action" type="button" @click="applyFilters">
+              <i class="bi bi-funnel"></i>
+              套用篩選
             </button>
-
-            <select v-model="sortMode" class="sort-select" @change="updateSort">
-              <option value="recommended">推薦排序</option>
-              <option value="open">營業優先</option>
-              <option value="distance">距離優先</option>
-              <option value="name">名稱排序</option>
-            </select>
-
             <button v-if="hasFilters" class="ghost-action" type="button" @click="clearFilters">
-              清除
+              清除條件
             </button>
           </div>
-        </div>
 
-        <div v-if="errorMessage" class="notice-banner">
-          <i class="bi bi-exclamation-triangle"></i>
-          {{ errorMessage }}
-        </div>
-
-        <div class="store-layout">
-          <section class="store-list" aria-label="門市列表">
-            <div v-if="loading" class="loading-state">
-              <span class="spinner-border"></span>
-              <span>載入門市中</span>
+          <div class="region-group">
+            <p>區域</p>
+            <div class="region-row" aria-label="快速區域篩選">
+              <button
+                v-for="region in regions"
+                :key="region.key"
+                type="button"
+                :class="['region-tab', activeRegion === region.key ? 'active' : '']"
+                @click="selectRegion(region.key)"
+              >
+                {{ region.label }}
+              </button>
             </div>
+          </div>
 
-            <div v-else-if="stores.length === 0" class="empty-state">
-              <i class="bi bi-shop"></i>
-              <strong>目前沒有符合條件的門市</strong>
-              <span>調整地區或關鍵字後再查詢。</span>
-            </div>
-
+          <div v-if="featureOptions.length" class="feature-row" aria-label="用餐情境篩選">
+            <p>用餐情境</p>
             <button
-              v-for="store in stores"
-              v-else
-              :key="store.storeId"
+              v-for="feature in featureOptions"
+              :key="feature.featureKey"
               type="button"
               :class="[
-                'store-card',
-                selectedStore?.storeId === store.storeId ? 'store-card-active' : '',
+                'feature-chip',
+                selectedFeatures.includes(feature.featureKey) ? 'active' : '',
               ]"
-              @click="loadStoreDetail(store.storeId)"
+              @click="toggleFeature(feature.featureKey)"
             >
-              <div class="card-topline">
-                <span>{{ storeLocation(store) || "分店" }}</span>
-                <span v-if="store.distanceKm !== null && store.distanceKm !== undefined" class="distance">
-                  {{ formatDistance(store.distanceKm) }}
-                </span>
-              </div>
-
-              <div class="store-title-row">
-                <h2>{{ store.storeName }}</h2>
-                <span :class="['status-pill', store.openNow ? 'open' : 'closed']">
-                  {{ openStatusText(store) }}
-                </span>
-              </div>
-
-              <p class="address">{{ store.address }}</p>
-
-              <div v-if="store.featureTags?.length" class="store-tags">
-                <span
-                  v-for="feature in store.featureTags.slice(0, 3)"
-                  :key="feature.featureKey"
-                >
-                  {{ feature.featureLabel }}
-                </span>
-              </div>
-
-              <div class="meta-row">
-                <span><i class="bi bi-telephone"></i>{{ store.phone || "未提供電話" }}</span>
-                <span><i class="bi bi-train-front"></i>{{ store.mrtInfo || "交通資訊更新中" }}</span>
-              </div>
+              {{ feature.featureLabel }}
             </button>
-          </section>
+          </div>
 
-          <aside class="store-detail" aria-label="門市詳細資料">
-            <div v-if="detailLoading" class="loading-state compact">
-              <span class="spinner-border spinner-border-sm"></span>
-              <span>載入詳細資訊</span>
+          <div class="side-note">
+            <span>{{ selectedRegionLabel }}</span>
+            <strong>{{ openStoreCount }}</strong>
+            <span>間目前營業中</span>
+          </div>
+        </aside>
+
+        <section class="store-results" aria-label="門市列表">
+          <div class="result-toolbar">
+            <div>
+              <p>{{ resultMode === "nearby" ? "Nearby" : "Shops" }}</p>
+              <h2>{{ resultMode === "nearby" ? "附近門市" : "全部門市" }}</h2>
             </div>
 
-            <template v-else-if="selectedStore">
-              <div class="detail-image">
-                <img
-                  :src="detailHeroImage"
-                  :alt="selectedStore.storeName"
-                />
-                <span :class="['status-pill image-status', selectedStore.openNow ? 'open' : 'closed']">
-                  {{ openStatusText(selectedStore) }}
-                </span>
+            <div class="tool-actions">
+              <button
+                type="button"
+                :class="['toggle-action', openOnly ? 'active' : '']"
+                @click="toggleOpenOnly"
+              >
+                <i class="bi bi-clock"></i>
+                營業中
+              </button>
+
+              <select v-model="sortMode" class="sort-select" @change="updateSort">
+                <option value="recommended">推薦排序</option>
+                <option value="open">營業優先</option>
+                <option value="distance">距離優先</option>
+                <option value="name">名稱排序</option>
+              </select>
+            </div>
+          </div>
+
+          <div v-if="closestStore" class="nearby-note">
+            <i class="bi bi-geo-alt"></i>
+            最近門市：{{ closestStore.storeName }} {{ formatDistance(closestStore.distanceKm) }}
+          </div>
+
+          <div v-if="errorMessage" class="notice-banner">
+            <i class="bi bi-exclamation-triangle"></i>
+            {{ errorMessage }}
+          </div>
+
+          <div class="store-layout">
+            <div class="store-list">
+              <div v-if="loading" class="loading-state">
+                <span class="spinner-border"></span>
+                <span>載入門市中</span>
               </div>
 
-              <div v-if="galleryImages.length > 1" class="image-strip" aria-label="門市圖片">
-                <button
-                  v-for="(imageUrl, index) in galleryImages"
-                  :key="imageUrl"
-                  type="button"
-                  :class="['image-thumb', selectedImageIndex === index ? 'active' : '']"
-                  @click="selectGalleryImage(index)"
-                >
-                  <img :src="imageUrl" :alt="`${selectedStore.storeName} 圖片 ${index + 1}`" />
+              <div v-else-if="stores.length === 0" class="empty-state">
+                <i class="bi bi-shop"></i>
+                <strong>目前沒有符合條件的門市</strong>
+                <span>調整地區或關鍵字後再查詢。</span>
+              </div>
+
+              <article
+                v-for="store in stores"
+                v-else
+                :key="store.storeId"
+                :class="[
+                  'store-card',
+                  selectedStore?.storeId === store.storeId ? 'store-card-active' : '',
+                ]"
+              >
+                <button class="store-card-main" type="button" @click="loadStoreDetail(store.storeId)">
+                  <span class="store-area">{{ storeLocation(store) || "分店" }}</span>
+                  <span :class="['status-pill', store.openNow ? 'open' : 'closed']">
+                    {{ openStatusText(store) }}
+                  </span>
+
+                  <strong>{{ store.storeName }}</strong>
+                  <span class="store-address">{{ store.address }}</span>
+
+                  <span class="store-meta-line">
+                    <i class="bi bi-telephone"></i>
+                    {{ store.phone || "未提供電話" }}
+                  </span>
+                  <span class="store-meta-line">
+                    <i class="bi bi-train-front"></i>
+                    {{ store.mrtInfo || "交通資訊更新中" }}
+                  </span>
                 </button>
-              </div>
 
-              <div class="detail-body">
-                <div class="detail-heading">
-                  <div>
-                    <p>{{ storeLocation(selectedStore) }}</p>
-                    <h2>{{ selectedStore.storeName }}</h2>
-                  </div>
-                  <a class="map-link" :href="mapsUrl(selectedStore)" target="_blank" rel="noreferrer">
-                    <i class="bi bi-map"></i>
-                  </a>
-                </div>
-
-                <p class="detail-address">{{ selectedStore.address }}</p>
-
-                <div v-if="selectedStore.featureTags?.length" class="detail-tags">
+                <div v-if="store.featureTags?.length" class="store-tags">
                   <span
-                    v-for="feature in selectedStore.featureTags"
+                    v-for="feature in store.featureTags.slice(0, 3)"
                     :key="feature.featureKey"
                   >
                     {{ feature.featureLabel }}
                   </span>
                 </div>
 
-                <div class="detail-actions">
-                  <button class="primary-action link-action" type="button" @click="goReservation(selectedStore)">
+                <div class="store-card-actions">
+                  <button type="button" @click="goReservation(store)">
                     <i class="bi bi-calendar-check"></i>
-                    線上訂位
+                    訂位
                   </button>
-                  <button class="secondary-action link-action" type="button" @click="goOrder(selectedStore)">
+                  <button type="button" @click="goOrder(store)">
                     <i class="bi bi-bag-check"></i>
-                    外帶點餐
+                    外帶
                   </button>
-                  <a v-if="selectedStore.phone" class="icon-action" :href="`tel:${selectedStore.phone}`">
-                    <i class="bi bi-telephone"></i>
+                  <a :href="mapsUrl(store)" target="_blank" rel="noreferrer">
+                    <i class="bi bi-map"></i>
+                    地圖
                   </a>
+                  <span v-if="store.distanceKm !== null && store.distanceKm !== undefined" class="distance">
+                    {{ formatDistance(store.distanceKm) }}
+                  </span>
+                </div>
+              </article>
+            </div>
+
+            <aside class="store-detail" aria-label="門市詳細資料">
+              <div v-if="detailLoading" class="loading-state compact">
+                <span class="spinner-border spinner-border-sm"></span>
+                <span>載入詳細資訊</span>
+              </div>
+
+              <template v-else-if="selectedStore">
+                <div class="detail-image">
+                  <img :src="detailHeroImage" :alt="selectedStore.storeName" />
                 </div>
 
-                <div class="insight-grid">
-                  <div class="insight-item">
-                    <span>今日時段</span>
-                    <strong v-if="todayHoursText">{{ todayHoursText }}</strong>
-                    <strong v-else>尚未設定</strong>
+                <div class="detail-body">
+                  <div class="detail-heading">
+                    <p>{{ storeLocation(selectedStore) }}</p>
+                    <h2>{{ selectedStore.storeName }}</h2>
+                    <span :class="['status-pill', selectedStore.openNow ? 'open' : 'closed']">
+                      {{ openStatusText(selectedStore) }}
+                    </span>
                   </div>
-                  <div class="insight-item">
-                    <span>可用桌數</span>
-                    <strong>{{ tableSummary.tableCount }} 桌</strong>
-                  </div>
-                  <div class="insight-item">
-                    <span>座位容量</span>
-                    <strong>{{ tableSummary.seats || "待設定" }}</strong>
-                  </div>
-                  <div class="insight-item">
-                    <span>用餐區域</span>
-                    <strong>{{ tableSummary.zones }}</strong>
-                  </div>
-                </div>
 
-                <div v-if="nextHoliday" class="holiday-note">
-                  <i class="bi bi-calendar-x"></i>
-                  {{ formatDate(nextHoliday.holidayDate) }} {{ nextHoliday.reason || "門市公休" }}
-                </div>
+                  <p class="detail-address">{{ selectedStore.address }}</p>
 
-                <dl class="info-list">
-                  <div>
-                    <dt>鄰近交通</dt>
-                    <dd>{{ selectedStore.mrtInfo || "尚未提供" }}</dd>
-                  </div>
-                  <div>
-                    <dt>停車資訊</dt>
-                    <dd>{{ selectedStore.parkingInfo || "尚未提供" }}</dd>
-                  </div>
-                  <div>
-                    <dt>門市特色</dt>
-                    <dd>{{ selectedStore.description || "歡迎到店享用精緻餐點。" }}</dd>
-                  </div>
-                </dl>
-
-                <div class="map-panel">
-                  <iframe
-                    v-if="mapEmbedUrl"
-                    :src="mapEmbedUrl"
-                    loading="lazy"
-                    referrerpolicy="no-referrer-when-downgrade"
-                    title="門市地圖"
-                  ></iframe>
-                </div>
-
-                <div class="hours-block">
-                  <div class="section-heading">
-                    <h3>營業時間</h3>
-                    <button
-                      v-if="hasMoreHours"
-                      class="text-action"
-                      type="button"
-                      @click="toggleHours"
-                    >
-                      {{ showFullHours ? "收起" : "完整時段" }}
+                  <div class="detail-actions">
+                    <button class="primary-action" type="button" @click="goReservation(selectedStore)">
+                      <i class="bi bi-calendar-check"></i>
+                      線上訂位
                     </button>
+                    <button class="secondary-action" type="button" @click="goOrder(selectedStore)">
+                      <i class="bi bi-bag-check"></i>
+                      外帶自取
+                    </button>
+                    <a v-if="selectedStore.phone" class="icon-action" :href="`tel:${selectedStore.phone}`">
+                      <i class="bi bi-telephone"></i>
+                    </a>
                   </div>
-                  <div v-if="visibleHours.length" class="hours-list">
-                    <div
-                      v-for="hour in visibleHours"
-                      :key="hour.hourId || `${hour.dayOfWeek}-${hour.mealPeriod}`"
-                    >
-                      <span>
-                        {{ showFullHours ? hour.dayName : "今日" }}
-                        {{ mealPeriodLabel(hour.mealPeriod) }}
-                      </span>
-                      <strong v-if="isHourClosed(hour)">公休</strong>
-                      <strong v-else>{{ formatTime(hour.openTime) }} - {{ formatTime(hour.closeTime) }}</strong>
+
+                  <div class="detail-facts">
+                    <div>
+                      <span>今日營業</span>
+                      <strong v-if="todayHoursText">{{ todayHoursText }}</strong>
+                      <strong v-else>尚未設定</strong>
+                    </div>
+                    <div>
+                      <span>座位資訊</span>
+                      <strong>{{ tableSummary.tableCount }} 桌・{{ tableSummary.seats || "待設定" }} 席</strong>
+                    </div>
+                    <div>
+                      <span>用餐區域</span>
+                      <strong>{{ tableSummary.zones }}</strong>
                     </div>
                   </div>
-                  <p v-else class="muted-text">營業時間尚未設定</p>
-                </div>
-              </div>
-            </template>
 
-            <div v-else class="empty-state detail-empty">
-              <i class="bi bi-shop-window"></i>
-              <strong>選擇門市查看詳細資訊</strong>
-            </div>
-          </aside>
-        </div>
+                  <div v-if="nextHoliday" class="holiday-note">
+                    <i class="bi bi-calendar-x"></i>
+                    {{ formatDate(nextHoliday.holidayDate) }} {{ nextHoliday.reason || "門市公休" }}
+                  </div>
+
+                  <dl class="info-list">
+                    <div>
+                      <dt>電話</dt>
+                      <dd>{{ selectedStore.phone || "尚未提供" }}</dd>
+                    </div>
+                    <div>
+                      <dt>交通</dt>
+                      <dd>{{ selectedStore.mrtInfo || "尚未提供" }}</dd>
+                    </div>
+                    <div>
+                      <dt>停車</dt>
+                      <dd>{{ selectedStore.parkingInfo || "尚未提供" }}</dd>
+                    </div>
+                  </dl>
+
+                  <p v-if="selectedStore.description" class="detail-description">
+                    {{ selectedStore.description }}
+                  </p>
+
+                  <div v-if="selectedStore.featureTags?.length" class="detail-tags">
+                    <span
+                      v-for="feature in selectedStore.featureTags"
+                      :key="feature.featureKey"
+                    >
+                      {{ feature.featureLabel }}
+                    </span>
+                  </div>
+
+                  <div v-if="galleryImages.length > 1" class="image-strip" aria-label="門市圖片">
+                    <button
+                      v-for="(imageUrl, index) in galleryImages"
+                      :key="imageUrl"
+                      type="button"
+                      :class="['image-thumb', selectedImageIndex === index ? 'active' : '']"
+                      @click="selectGalleryImage(index)"
+                    >
+                      <img :src="imageUrl" :alt="`${selectedStore.storeName} 圖片 ${index + 1}`" />
+                    </button>
+                  </div>
+
+                  <div class="hours-block">
+                    <div class="section-heading">
+                      <h3>營業時間</h3>
+                      <button
+                        v-if="hasMoreHours"
+                        class="text-action"
+                        type="button"
+                        @click="toggleHours"
+                      >
+                        {{ showFullHours ? "收起" : "完整時段" }}
+                      </button>
+                    </div>
+                    <div v-if="visibleHours.length" class="hours-list">
+                      <div
+                        v-for="hour in visibleHours"
+                        :key="hour.hourId || `${hour.dayOfWeek}-${hour.mealPeriod}`"
+                      >
+                        <span>
+                          {{ showFullHours ? hour.dayName : "今日" }}
+                          {{ mealPeriodLabel(hour.mealPeriod) }}
+                        </span>
+                        <strong v-if="isHourClosed(hour)">公休</strong>
+                        <strong v-else>{{ formatTime(hour.openTime) }} - {{ formatTime(hour.closeTime) }}</strong>
+                      </div>
+                    </div>
+                    <p v-else class="muted-text">營業時間尚未設定</p>
+                  </div>
+
+                  <div class="map-panel">
+                    <iframe
+                      v-if="mapEmbedUrl"
+                      :src="mapEmbedUrl"
+                      loading="lazy"
+                      referrerpolicy="no-referrer-when-downgrade"
+                      title="門市地圖"
+                    ></iframe>
+                  </div>
+                </div>
+              </template>
+
+              <div v-else class="empty-state detail-empty">
+                <i class="bi bi-shop-window"></i>
+                <strong>選擇門市查看詳細資訊</strong>
+              </div>
+            </aside>
+          </div>
+        </section>
       </div>
     </section>
   </main>
@@ -784,98 +821,72 @@ onMounted(async () => {
 <style scoped>
 .store-page {
   min-height: 100vh;
-  background: #f7f3ee;
-  color: #344051;
+  background: #f8f6f2;
+  color: #211f1c;
 }
 
 .store-hero {
-  min-height: 340px;
-  padding: 138px 0 62px;
+  position: relative;
+  min-height: 520px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  background: #11100e;
+}
+
+.store-hero__image {
+  position: absolute;
+  inset: 0;
   background:
-    linear-gradient(90deg, rgba(22, 28, 34, 0.76), rgba(22, 28, 34, 0.2)),
-    url("https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1800&q=80");
+    linear-gradient(90deg, rgba(10, 10, 9, 0.82) 0%, rgba(10, 10, 9, 0.45) 48%, rgba(10, 10, 9, 0.1) 100%),
+    url("/store-images/xuri-dining-room.jpg");
   background-position: center;
   background-size: cover;
+  transform: scale(1.01);
 }
 
-.hero-shell {
-  display: flex;
-  align-items: end;
-  min-height: 180px;
+.store-hero__content {
+  position: relative;
+  z-index: 1;
+  padding: 150px 12px 78px;
+  color: #fffaf0;
 }
 
-.hero-content {
-  max-width: 760px;
-  color: #ffffff;
-}
-
-.eyebrow {
-  display: inline-block;
-  margin-bottom: 12px;
-  color: #e5b582;
-  font-size: 13px;
+.eyebrow,
+.result-toolbar p,
+.control-heading span,
+.region-group p,
+.feature-row p {
+  margin: 0;
+  color: #b98a52;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
-.hero-content h1 {
-  margin: 0 0 14px;
-  font-size: 56px;
-  font-weight: 900;
+.store-hero h1 {
+  max-width: 680px;
+  margin: 12px 0 18px;
+  font-size: 64px;
+  font-weight: 800;
+  line-height: 1.05;
   letter-spacing: 0;
 }
 
-.hero-content p {
-  max-width: 660px;
+.hero-lead {
+  max-width: 560px;
   margin: 0;
+  color: rgba(255, 250, 240, 0.86);
   font-size: 18px;
   line-height: 1.8;
 }
 
-.store-content {
-  padding: 36px 0 78px;
-}
-
-.filter-panel {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) 160px 160px auto auto;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 18px;
-}
-
-.search-box,
-.filter-select,
-.sort-select {
-  height: 50px;
-  border: 1px solid #e2d8cf;
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.search-box {
+.hero-actions {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 16px;
-}
-
-.search-box i {
-  color: #9a6b42;
-}
-
-.search-box input {
-  width: 100%;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: #344051;
-}
-
-.filter-select,
-.sort-select {
-  padding: 0 12px;
-  color: #344051;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 30px;
 }
 
 .primary-action,
@@ -883,141 +894,221 @@ onMounted(async () => {
 .ghost-action,
 .toggle-action,
 .icon-action,
-.map-link {
+.hero-action,
+.store-card-actions button,
+.store-card-actions a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-radius: 8px;
+  border-radius: 4px;
   font-weight: 800;
+  line-height: 1;
   text-decoration: none;
   white-space: nowrap;
-  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s, background 0.2s;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
 }
 
 .primary-action,
 .secondary-action,
 .ghost-action,
-.toggle-action {
-  height: 50px;
+.toggle-action,
+.hero-action {
+  min-height: 46px;
   padding: 0 18px;
 }
 
 .primary-action {
-  border: 1px solid #b1642f;
-  background: #b1642f;
+  border: 1px solid #8f1f1d;
+  background: #8f1f1d;
   color: #ffffff;
 }
 
 .secondary-action {
-  border: 1px solid #d7c6b7;
+  border: 1px solid rgba(143, 31, 29, 0.28);
   background: #ffffff;
-  color: #8c552e;
+  color: #6e1b19;
+}
+
+.store-hero .secondary-action {
+  border-color: rgba(255, 250, 240, 0.58);
+  background: rgba(255, 250, 240, 0.08);
+  color: #fffaf0;
 }
 
 .ghost-action {
   border: 1px solid transparent;
   background: transparent;
-  color: #697386;
+  color: #6f665d;
 }
 
 .primary-action:hover,
 .secondary-action:hover,
-.toggle-action:hover {
+.toggle-action:hover,
+.store-card-actions button:hover,
+.store-card-actions a:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(52, 64, 81, 0.12);
 }
 
-.region-row {
+.store-content {
+  padding: 42px 0 86px;
+}
+
+.store-shell {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 18px;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
 }
 
-.region-tab {
-  height: 42px;
-  border: 1px solid #1c2c3d;
-  border-radius: 8px;
-  background: #1c2c3d;
-  color: #ffffff;
+.store-controls {
+  position: sticky;
+  top: 92px;
+  border-top: 3px solid #211f1c;
+  background: #fffdf8;
+  padding: 22px 0 0;
+}
+
+.control-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.control-heading strong {
+  color: #211f1c;
+  font-size: 22px;
+}
+
+.search-field,
+.select-grid label {
+  display: grid;
+  gap: 8px;
+}
+
+.search-field > span,
+.select-grid span {
+  color: #6f665d;
+  font-size: 13px;
   font-weight: 800;
 }
 
-.region-tab.active {
-  border-color: #a2322f;
-  background: #a2322f;
+.search-field div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  border-bottom: 1px solid #d8d0c6;
+}
+
+.search-field i {
+  color: #8f1f1d;
+}
+
+.search-field input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #211f1c;
+}
+
+.select-grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.filter-select,
+.sort-select {
+  height: 44px;
+  width: 100%;
+  border: 1px solid #d8d0c6;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #211f1c;
+  padding: 0 12px;
+}
+
+.control-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.region-group,
+.feature-row,
+.side-note {
+  margin-top: 28px;
+  border-top: 1px solid #e7e0d7;
+  padding-top: 22px;
+}
+
+.region-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.region-tab,
+.feature-chip {
+  min-height: 34px;
+  border: 1px solid #d8d0c6;
+  border-radius: 999px;
+  background: #fffdf8;
+  color: #3b342d;
+  padding: 0 13px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.region-tab.active,
+.feature-chip.active {
+  border-color: #211f1c;
+  background: #211f1c;
+  color: #fffaf0;
 }
 
 .feature-row {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 18px;
 }
 
-.feature-row > span {
-  margin-right: 4px;
-  color: #8c552e;
-  font-size: 14px;
-  font-weight: 900;
+.feature-row p {
+  flex: 0 0 100%;
 }
 
-.feature-chip,
-.store-tags span,
-.detail-tags span {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.feature-chip {
-  min-height: 34px;
-  border: 1px solid #d7c6b7;
-  background: #ffffff;
-  color: #8c552e;
-  padding: 0 12px;
-}
-
-.feature-chip.active {
-  border-color: #a2322f;
-  background: #a2322f;
-  color: #ffffff;
-}
-
-.tools-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.result-summary {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+.side-note {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: baseline;
   gap: 8px;
-  color: #697386;
+  color: #6f665d;
   font-weight: 700;
 }
 
-.result-summary strong {
-  color: #a2322f;
-  font-size: 24px;
+.side-note strong {
+  color: #8f1f1d;
+  font-size: 28px;
 }
 
-.divider {
-  width: 1px;
-  height: 18px;
-  background: #d8cabf;
+.result-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
 }
 
-.nearby-note {
-  color: #8c552e;
+.result-toolbar h2 {
+  margin: 4px 0 0;
+  color: #211f1c;
+  font-size: 32px;
+  font-weight: 800;
 }
 
 .tool-actions {
@@ -1027,159 +1118,172 @@ onMounted(async () => {
 }
 
 .toggle-action {
-  border: 1px solid #d7c6b7;
-  background: #ffffff;
-  color: #8c552e;
+  border: 1px solid #d8d0c6;
+  background: #fffdf8;
+  color: #3b342d;
 }
 
 .toggle-action.active {
-  border-color: #167a3d;
-  background: #e8f7ee;
-  color: #167a3d;
+  border-color: #1f6f44;
+  color: #1f6f44;
 }
 
+.nearby-note,
 .notice-banner {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 20px;
-  border-radius: 8px;
-  background: #fff2d5;
-  padding: 16px;
-  color: #a16012;
+  margin-bottom: 18px;
+  border-left: 3px solid #b98a52;
+  background: #fffdf8;
+  padding: 12px 14px;
+  color: #5b5148;
   font-weight: 700;
+}
+
+.notice-banner {
+  border-left-color: #8f1f1d;
 }
 
 .store-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 400px;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 22px;
   align-items: start;
 }
 
 .store-list {
   display: grid;
-  gap: 14px;
-}
-
-.store-card {
-  width: 100%;
-  border: 1px solid #e4d9ce;
-  border-radius: 8px;
-  background: #ffffff;
-  padding: 18px 20px;
-  text-align: left;
-  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
-}
-
-.store-card:hover,
-.store-card-active {
-  border-color: #b1642f;
-  box-shadow: 0 10px 24px rgba(52, 64, 81, 0.1);
-  transform: translateY(-2px);
-}
-
-.card-topline,
-.store-title-row,
-.meta-row {
-  display: flex;
-  align-items: center;
   gap: 12px;
 }
 
-.card-topline {
-  justify-content: space-between;
-  margin-bottom: 10px;
-  color: #8c552e;
-  font-size: 14px;
-  font-weight: 800;
+.store-card {
+  border: 1px solid #e1d9cf;
+  background: #fffdf8;
 }
 
-.store-title-row {
-  flex-wrap: wrap;
-  margin-bottom: 8px;
+.store-card-active {
+  border-color: #8f1f1d;
+  box-shadow: 0 12px 34px rgba(36, 28, 21, 0.08);
 }
 
-.store-title-row h2 {
-  margin: 0;
-  color: #263445;
-  font-size: 22px;
+.store-card-main {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 16px;
+  border: 0;
+  background: transparent;
+  padding: 18px 18px 12px;
+  color: inherit;
+  text-align: left;
+}
+
+.store-area {
+  color: #8f1f1d;
+  font-size: 13px;
   font-weight: 900;
 }
 
-.address,
-.detail-address,
-.muted-text,
-.empty-state span {
-  color: #697386;
+.store-card-main strong {
+  grid-column: 1 / -1;
+  color: #211f1c;
+  font-size: 23px;
+  font-weight: 800;
 }
 
-.address {
-  margin: 0;
+.store-address {
+  grid-column: 1 / -1;
+  color: #5b5148;
   line-height: 1.7;
 }
 
-.store-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 12px;
-}
-
-.store-tags span {
-  background: #faf3ea;
-  color: #8c552e;
-  padding: 5px 9px;
+.store-meta-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #6f665d;
+  font-size: 14px;
 }
 
 .status-pill {
   display: inline-flex;
   align-items: center;
+  justify-self: start;
   min-height: 28px;
   border-radius: 999px;
   padding: 5px 10px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 900;
+}
+
+.store-card-main .status-pill {
+  justify-self: end;
 }
 
 .status-pill.open {
-  background: #e8f7ee;
-  color: #167a3d;
+  background: #e8f3eb;
+  color: #1f6f44;
 }
 
 .status-pill.closed {
-  background: #f1eeeb;
-  color: #74685f;
+  background: #eee9e2;
+  color: #6f665d;
+}
+
+.store-tags,
+.detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.store-tags {
+  padding: 0 18px 14px;
+}
+
+.store-tags span,
+.detail-tags span {
+  border: 1px solid #e1d9cf;
+  border-radius: 999px;
+  color: #5b5148;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.store-card-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-top: 1px solid #eee8df;
+  padding: 12px 18px;
+}
+
+.store-card-actions button,
+.store-card-actions a {
+  min-height: 36px;
+  border: 1px solid #d8d0c6;
+  background: #ffffff;
+  color: #3b342d;
+  padding: 0 12px;
+  font-size: 13px;
 }
 
 .distance {
-  min-width: 72px;
-  text-align: right;
-  color: #b1642f;
+  margin-left: auto;
+  color: #8f1f1d;
   font-weight: 900;
-}
-
-.meta-row {
-  flex-wrap: wrap;
-  margin-top: 14px;
-  color: #566a7f;
-}
-
-.meta-row span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .store-detail {
   position: sticky;
   top: 92px;
   max-height: calc(100vh - 112px);
-  border: 1px solid #e4d9ce;
-  border-radius: 8px;
   overflow: auto;
-  background: #ffffff;
-  box-shadow: 0 14px 36px rgba(52, 64, 81, 0.1);
+  border: 1px solid #211f1c;
+  background: #fffdf8;
   scrollbar-gutter: stable;
 }
 
@@ -1188,15 +1292,14 @@ onMounted(async () => {
 }
 
 .store-detail::-webkit-scrollbar-thumb {
-  border: 2px solid #ffffff;
+  border: 2px solid #fffdf8;
   border-radius: 999px;
-  background: #d7c6b7;
+  background: #d8d0c6;
 }
 
 .detail-image {
-  position: relative;
-  height: 178px;
-  background: #f2eee9;
+  height: 230px;
+  background: #eee9e2;
 }
 
 .detail-image img {
@@ -1205,32 +1308,147 @@ onMounted(async () => {
   object-fit: cover;
 }
 
-.image-status {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
+.detail-body {
+  padding: 22px;
+}
+
+.detail-heading {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 14px;
+  align-items: start;
+}
+
+.detail-heading p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #8f1f1d;
+  font-weight: 900;
+}
+
+.detail-heading h2 {
+  margin: 0;
+  color: #211f1c;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.detail-address,
+.detail-description,
+.muted-text,
+.empty-state span {
+  color: #5b5148;
+}
+
+.detail-address {
+  margin: 12px 0 0;
+  line-height: 1.7;
+}
+
+.detail-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 46px;
+  gap: 8px;
+  margin: 18px 0;
+}
+
+.icon-action {
+  width: 46px;
+  min-height: 46px;
+  border: 1px solid #d8d0c6;
+  background: #ffffff;
+  color: #6e1b19;
+}
+
+.detail-facts {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid #211f1c;
+  border-bottom: 1px solid #211f1c;
+}
+
+.detail-facts div {
+  display: grid;
+  grid-template-columns: 86px 1fr;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.detail-facts div + div {
+  border-top: 1px solid #e7e0d7;
+}
+
+.detail-facts span,
+.info-list dt {
+  color: #8f1f1d;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.detail-facts strong {
+  color: #211f1c;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.holiday-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0;
+  border-left: 3px solid #b98a52;
+  background: #faf2e5;
+  padding: 10px 12px;
+  color: #74542e;
+  font-weight: 800;
+}
+
+.info-list {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+}
+
+.info-list div {
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  gap: 12px;
+}
+
+.info-list dd {
+  margin: 0;
+  color: #3b342d;
+  line-height: 1.7;
+}
+
+.detail-description {
+  margin: 18px 0 0;
+  line-height: 1.8;
+}
+
+.detail-tags {
+  margin-top: 16px;
 }
 
 .image-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
-  border-top: 1px solid #eee5dd;
-  background: #fbf8f5;
-  padding: 8px 10px;
+  margin-top: 18px;
 }
 
 .image-thumb {
-  height: 50px;
+  height: 58px;
   overflow: hidden;
   border: 2px solid transparent;
-  border-radius: 8px;
-  background: #ffffff;
+  border-radius: 0;
+  background: #eee9e2;
   padding: 0;
 }
 
 .image-thumb.active {
-  border-color: #b1642f;
+  border-color: #8f1f1d;
 }
 
 .image-thumb img {
@@ -1239,152 +1457,9 @@ onMounted(async () => {
   object-fit: cover;
 }
 
-.detail-body {
-  padding: 20px;
-}
-
-.detail-heading {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.detail-heading p {
-  margin: 0 0 6px;
-  color: #8c552e;
-  font-weight: 800;
-}
-
-.detail-heading h2 {
-  margin: 0;
-  color: #263445;
-  font-size: 25px;
-  font-weight: 900;
-}
-
-.map-link,
-.icon-action {
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
-  border: 1px solid #d7c6b7;
-  background: #ffffff;
-  color: #8c552e;
-}
-
-.detail-address {
-  margin: 10px 0 0;
-  line-height: 1.7;
-}
-
-.detail-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 12px;
-}
-
-.detail-tags span {
-  background: #faf3ea;
-  color: #8c552e;
-  padding: 6px 10px;
-}
-
-.detail-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr 42px;
-  gap: 8px;
-  margin: 16px 0;
-}
-
-.link-action {
-  height: 42px;
-  border-radius: 8px;
-  font-size: 14px;
-}
-
-.insight-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.insight-item {
-  border: 1px solid #eee5dd;
-  border-radius: 8px;
-  background: #fbf8f5;
-  padding: 10px;
-}
-
-.insight-item span {
-  display: block;
-  margin-bottom: 5px;
-  color: #8c552e;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.insight-item strong {
-  display: block;
-  color: #263445;
-  font-size: 15px;
-  line-height: 1.4;
-}
-
-.holiday-note {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 14px;
-  border-radius: 8px;
-  background: #fff2d5;
-  padding: 10px 12px;
-  color: #a16012;
-  font-weight: 800;
-}
-
-.info-list {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-}
-
-.info-list div {
-  border-top: 1px solid #eee8e1;
-  padding-top: 10px;
-}
-
-.info-list dt {
-  margin-bottom: 4px;
-  color: #8c552e;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.info-list dd {
-  margin: 0;
-  color: #3f4650;
-  line-height: 1.7;
-}
-
+.hours-block,
 .map-panel {
-  height: 150px;
-  margin-top: 16px;
-  overflow: hidden;
-  border: 1px solid #eee5dd;
-  border-radius: 8px;
-  background: #f2eee9;
-}
-
-.map-panel iframe {
-  width: 100%;
-  height: 100%;
-  border: 0;
-}
-
-.hours-block {
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
 .section-heading {
@@ -1397,7 +1472,7 @@ onMounted(async () => {
 
 .section-heading h3 {
   margin: 0;
-  color: #263445;
+  color: #211f1c;
   font-size: 17px;
   font-weight: 900;
 }
@@ -1405,28 +1480,40 @@ onMounted(async () => {
 .text-action {
   border: 0;
   background: transparent;
-  color: #8c552e;
+  color: #8f1f1d;
   font-size: 13px;
   font-weight: 900;
 }
 
 .hours-list {
   display: grid;
-  gap: 6px;
+  border-top: 1px solid #e7e0d7;
 }
 
 .hours-list div {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  border-radius: 8px;
-  background: #faf7f2;
-  padding: 9px 10px;
-  color: #566a7f;
+  border-bottom: 1px solid #e7e0d7;
+  padding: 10px 0;
+  color: #5b5148;
 }
 
 .hours-list strong {
-  color: #263445;
+  color: #211f1c;
+}
+
+.map-panel {
+  height: 180px;
+  overflow: hidden;
+  border: 1px solid #d8d0c6;
+  background: #eee9e2;
+}
+
+.map-panel iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
 }
 
 .loading-state,
@@ -1435,20 +1522,19 @@ onMounted(async () => {
   display: grid;
   place-items: center;
   gap: 10px;
-  border: 1px dashed #d7c6b7;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #697386;
+  border: 1px dashed #d8d0c6;
+  background: #fffdf8;
+  color: #6f665d;
   text-align: center;
 }
 
 .loading-state.compact {
-  min-height: 260px;
+  min-height: 360px;
 }
 
 .empty-state i {
   font-size: 34px;
-  color: #b1642f;
+  color: #8f1f1d;
 }
 
 .detail-empty {
@@ -1456,74 +1542,72 @@ onMounted(async () => {
   border: 0;
 }
 
-@media (max-width: 1200px) {
-  .filter-panel {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .region-row {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 992px) {
+@media (max-width: 1080px) {
+  .store-shell,
   .store-layout {
     grid-template-columns: 1fr;
   }
 
+  .store-controls,
   .store-detail {
     position: static;
     max-height: none;
   }
 
-  .tools-row {
+  .select-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .store-hero {
+    min-height: 430px;
+  }
+
+  .store-hero__content {
+    padding-top: 130px;
+    padding-bottom: 54px;
+  }
+
+  .store-hero h1 {
+    font-size: 46px;
+  }
+
+  .result-toolbar,
+  .tool-actions {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .tool-actions {
-    flex-wrap: wrap;
-  }
-}
-
-@media (max-width: 576px) {
-  .store-hero {
-    min-height: 300px;
-    padding: 122px 0 48px;
-  }
-
-  .hero-content h1 {
-    font-size: 40px;
-  }
-
-  .hero-content p {
-    font-size: 16px;
-  }
-
-  .filter-panel,
-  .region-row,
-  .image-strip,
-  .insight-grid,
-  .detail-actions {
+  .select-grid,
+  .detail-actions,
+  .image-strip {
     grid-template-columns: 1fr;
-  }
-
-  .image-thumb {
-    height: 72px;
   }
 
   .icon-action {
     width: 100%;
   }
 
-  .card-topline,
-  .hours-list div {
-    align-items: flex-start;
-    flex-direction: column;
+  .store-card-main,
+  .detail-heading,
+  .detail-facts div,
+  .info-list div {
+    grid-template-columns: 1fr;
+  }
+
+  .store-card-actions {
+    align-items: stretch;
+  }
+
+  .store-card-actions button,
+  .store-card-actions a {
+    flex: 1 1 30%;
   }
 
   .distance {
-    text-align: left;
+    flex: 0 0 100%;
+    margin-left: 0;
   }
 }
 </style>

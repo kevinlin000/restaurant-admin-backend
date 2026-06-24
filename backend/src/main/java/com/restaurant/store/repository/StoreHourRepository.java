@@ -8,6 +8,7 @@ import java.util.Optional;
 
 public interface StoreHourRepository extends JpaRepository<StoreHour, Long> {
     List<StoreHour> findByStoreIdOrderByDayOfWeekAscMealPeriodAscOpenTimeAsc(Long storeId);
+    List<StoreHour> findByStoreIdInAndDayOfWeekAndIsClosedFalseOrderByStoreIdAscOpenTimeAsc(List<Long> storeIds, Integer dayOfWeek);
     List<StoreHour> findByStoreIdAndDayOfWeekAndIsClosedFalseOrderByOpenTimeAsc(Long storeId, Integer dayOfWeek);
     Optional<StoreHour> findByHourIdAndStoreId(Long hourId, Long storeId);
     Optional<StoreHour> findByStoreIdAndDayOfWeekAndMealPeriod(Long storeId, Integer dayOfWeek, String mealPeriod);

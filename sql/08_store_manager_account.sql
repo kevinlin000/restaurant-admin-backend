@@ -19,7 +19,7 @@ SELECT
     role_id,
     'storemanager@store.local',
     '$2a$10$rJDF6fkfGR8sCuqi/N6mOuyTqvK0UYIm3Q61GWsbNl/t9.e6HK87.',
-    'storemanager',
+    '店長',
     '0966-666-666',
     '1992-06-15',
     FALSE
