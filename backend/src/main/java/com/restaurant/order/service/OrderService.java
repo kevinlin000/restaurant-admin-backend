@@ -1,6 +1,7 @@
 package com.restaurant.order.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -164,7 +165,7 @@ public class OrderService {
         }
 
         public List<OrderResponse> getAllOrdersForAdmin() {
-                 return orderRepository.findAllByOrderByCreatedAtDesc()
+                return orderRepository.findAllByOrderByCreatedAtDesc()
                                 .stream()
                                 .map(this::convertToResponse)
                                 .toList();
@@ -208,7 +209,11 @@ public class OrderService {
                         throw new BusinessException("訂單狀態必須依流程更新");
                 }
 
-                order.setStatus(newStatus);
+                if ("CANCELLED".equals(newStatus)) {
+                        handleCancelOrder(order, payment);
+                } else {
+                        order.setStatus(newStatus);
+                }
 
                 Order savedOrder = orderRepository.save(order);
 
@@ -347,6 +352,22 @@ public class OrderService {
         }
 
         private record OrderLine(MenuItem menuItem, Integer quantity, BigDecimal unitPrice, BigDecimal subtotal) {
+        }
+
+        private void handleCancelOrder(Order order, Payment payment) {
+                if (payment != null && "PAID".equals(payment.getPaymentStatus())) {
+                        LocalDateTime createdAt = order.getCreatedAt();
+
+                        if (createdAt != null &&
+                                        createdAt.isBefore(LocalDateTime.now().minusDays(30))) {
+                                throw new BusinessException("超過 30 天的訂單不可退款");
+                        }
+
+                        payment.setPaymentStatus("REFUNDED");
+                        paymentRepository.save(payment);
+                }
+
+                order.setStatus("CANCELLED");
         }
 
         private boolean isValidStatusTransition(String currentStatus, String newStatus) {

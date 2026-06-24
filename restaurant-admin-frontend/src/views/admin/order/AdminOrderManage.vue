@@ -5,31 +5,31 @@
 
     <div class="summary-row">
       <div class="summary-card clickable" :class="{ active: quickFilter === 'ALL' }" @click="setQuickFilter('ALL')">
-        <p>全部訂單</p>
+        <p class="card-green">全部訂單</p>
         <h2>{{ totalOrderCount }}</h2>
       </div>
 
       <div class="summary-card clickable" :class="{ active: quickFilter === 'ACTIVE' }"
         @click="setQuickFilter('ACTIVE')">
-        <p>進行中</p>
+        <p class="card-red">進行中</p>
         <h2>{{ activeCount }}</h2>
       </div>
 
       <div class="summary-card clickable" :class="{ active: quickFilter === 'COMPLETED' }"
         @click="setQuickFilter('COMPLETED')">
-        <p>已完成</p>
+        <p class="card-green">已完成</p>
         <h2>{{ completedCount }}</h2>
       </div>
 
       <div class="summary-card clickable" :class="{ active: quickFilter === 'UNPAID' }"
         @click="setQuickFilter('UNPAID')">
-        <p>待付款</p>
+        <p class="card-red">待付款</p>
         <h2>{{ unpaidCount }}</h2>
       </div>
 
       <div class="summary-card clickable" @click="setQuickFilter('REVENUE')"
         :class="{ active: quickFilter === 'REVENUE' }">
-        <p>{{ revenueTitle }}</p>
+        <p class="card-green">{{ revenueTitle }}</p>
         <h2>${{ filteredRevenue }}</h2>
       </div>
     </div>
@@ -41,13 +41,21 @@
         <div class="search-row">
           <input v-model="keyword" class="search-input" type="text" placeholder="搜尋訂單編號 / 會員編號" />
 
-          <select v-model="dateFilter" class="date-select">
+          <select v-model="dateFilter" class="date-select" @change="onQuickDateChange">
             <option value="">全部日期</option>
             <option value="TODAY">今天</option>
             <option value="YESTERDAY">昨天</option>
             <option value="WEEK">近 1 週</option>
             <option value="MONTH">近 1 個月</option>
           </select>
+
+          <div class="date-range-box">
+            <input v-model="startDate" class="date-range-input" type="date" @change="onCustomDateChange" />
+
+            <span class="date-range-text">到</span>
+
+            <input v-model="endDate" class="date-range-input" type="date" @change="onCustomDateChange" />
+          </div>
         </div>
         <div class="filter-row">
           <select v-model="paymentStatusFilter">
@@ -62,6 +70,12 @@
             <option value="CASH">現金</option>
             <option value="CREDIT_CARD">信用卡</option>
             <option value="LINE_PAY">LINE PAY</option>
+          </select>
+
+          <select v-model="orderTypeFilter">
+            <option value="">全部類型</option>
+            <option value="DINE_IN">內用</option>
+            <option value="TAKEOUT">外帶</option>
           </select>
 
           <select v-model="statusFilter">
@@ -116,8 +130,16 @@
         <td>{{ order.userId }}</td>
         <td>{{ formatOrderType(order.orderType) }}</td>
         <td>${{ order.finalAmount }}</td>
-        <td>{{ formatPaymentMethod(order.paymentMethod) }}</td>
-        <td>{{ formatPaymentStatus(order.paymentStatus) }}</td>
+        <td>
+          <span class="payment-method-badge" :class="getPaymentMethodClass(order.paymentMethod)">
+            {{ formatPaymentMethod(order.paymentMethod) }}
+          </span>
+        </td>
+        <td>
+          <span class="payment-badge" :class="getPaymentStatusClass(order.paymentStatus)">
+            {{ formatPaymentStatus(order.paymentStatus) }}
+          </span>
+        </td>
         <td>
           <select class="status-select" :class="getStatusClass(order.status)" :value="order.status"
             :disabled="order.status === 'COMPLETED' || order.status === 'CANCELLED'"
@@ -161,19 +183,84 @@
     <div class="modal">
       <div class="modal-header">
         <h2>訂單明細 #{{ selectedOrder.orderId }}</h2>
-        <button type="button" @click="selectedOrder = null">×</button>
+
+        <div class="modal-actions">
+          <button type="button" class="print-btn" @click="printOrder">
+            🖨️ 列印
+          </button>
+
+          <button type="button" class="close-btn" @click="selectedOrder = null">
+            ×
+          </button>
+        </div>
       </div>
 
       <div class="detail-grid">
-        <p><strong>會員編號：</strong>{{ selectedOrder.userId }}</p>
-        <p><strong>門市編號：</strong>{{ selectedOrder.storeId }}</p>
-        <p><strong>桌號：</strong>{{ selectedOrder.tableId || '無' }}</p>
-        <p><strong>訂單類型：</strong>{{ formatOrderType(selectedOrder.orderType) }}</p>
-        <p><strong>付款方式：</strong>{{ formatPaymentMethod(selectedOrder.paymentMethod) }}</p>
-        <p><strong>付款狀態：</strong>{{ formatPaymentStatus(selectedOrder.paymentStatus) }}</p>
-        <p><strong>訂單狀態：</strong>{{ formatOrderStatus(selectedOrder.status) }}</p>
-        <p><strong>發票類型：</strong>{{ selectedOrder.invoiceType || 'NONE' }}</p>
-        <p><strong>載具 / 統編：</strong>{{ selectedOrder.carrierNumber || '無' }}</p>
+
+        <div class="detail-item">
+          <span class="detail-label">會員編號：</span>
+          <span class="detail-value">{{ selectedOrder.userId }}</span>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-label">門市編號：</span>
+          <span class="detail-value">{{ selectedOrder.storeId }}</span>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-label">桌號：</span>
+          <span class="detail-value">{{ selectedOrder.tableId || '-' }}</span>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-label">訂單類型：</span>
+          <span class="detail-value">
+            {{ formatOrderType(selectedOrder.orderType) }}
+          </span>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-label">付款方式：</span>
+          <span class="detail-value">
+            {{ formatPaymentMethod(selectedOrder.paymentMethod) }}
+          </span>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-label">付款狀態：</span>
+          <span class="payment-badge" :class="getPaymentStatusClass(selectedOrder.paymentStatus)">
+            {{ formatPaymentStatus(selectedOrder.paymentStatus) }}
+          </span>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-label">訂單狀態：</span>
+          <span class="order-status-badge" :class="getStatusClass(selectedOrder.status)">
+            {{ formatOrderStatus(selectedOrder.status) }}
+          </span>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-label">建立時間：</span>
+          <span class="detail-value">
+            {{ formatDate(selectedOrder.createdAt) }}
+          </span>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-label">發票類型：</span>
+          <span class="detail-value">
+            {{ selectedOrder.invoiceType || 'NONE' }}
+          </span>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-label">載具 / 統編：</span>
+          <span class="detail-value">
+            {{ selectedOrder.carrierNumber || '-' }}
+          </span>
+        </div>
+
       </div>
 
       <h3>餐點內容</h3>
@@ -236,6 +323,9 @@ const pageSize = ref(10)
 const currentPage = ref(1)
 const quickFilter = ref('ALL')
 const dateFilter = ref('')
+const orderTypeFilter = ref('')
+const startDate = ref('')
+const endDate = ref('')
 const lastOrderCount = ref(0)
 
 
@@ -262,7 +352,36 @@ onMounted(async () => {
   }
 })
 
+function onCustomDateChange() {
+  dateFilter.value = ''
+  currentPage.value = 1
+}
 
+function onQuickDateChange() {
+  startDate.value = ''
+  endDate.value = ''
+  currentPage.value = 1
+}
+
+
+const getPaymentStatusClass = (status) => {
+  if (status === 'PAID') return 'payment-paid'
+  if (status === 'UNPAID') return 'payment-unpaid'
+  if (status === 'REFUNDED') return 'payment-refunded'
+  return ''
+}
+
+const printOrder = () => {
+  window.print()
+}
+
+
+const getPaymentMethodClass = (method) => {
+  if (method === 'CASH') return 'method-cash'
+  if (method === 'CREDIT_CARD') return 'method-card'
+  if (method === 'LINE_PAY') return 'method-linepay'
+  return 'method-unknown'
+}
 const isStatusLocked = (order) => {
   return order.status === 'COMPLETED' ||
     order.status === 'CANCELLED'
@@ -285,7 +404,7 @@ const todayRevenue = computed(() => {
 const setQuickFilter = (type) => {
   quickFilter.value = type
   currentPage.value = 1
-   if (type === 'REVENUE' && !dateFilter.value) {
+  if (type === 'REVENUE' && !dateFilter.value) {
     dateFilter.value = 'TODAY'
   }
 }
@@ -310,6 +429,30 @@ const revenueTitle = computed(() => {
 
 const dateFilteredOrders = computed(() => {
   let result = [...orders.value]
+
+  if (startDate.value || endDate.value) {
+    if (startDate.value) {
+      const start = new Date(startDate.value)
+      start.setHours(0, 0, 0, 0)
+
+      result = result.filter(order => {
+        if (!order.createdAt) return false
+        return new Date(order.createdAt) >= start
+      })
+    }
+
+    if (endDate.value) {
+      const end = new Date(endDate.value)
+      end.setHours(23, 59, 59, 999)
+
+      result = result.filter(order => {
+        if (!order.createdAt) return false
+        return new Date(order.createdAt) <= end
+      })
+    }
+
+    return result
+  }
 
   if (!dateFilter.value) return result
 
@@ -349,43 +492,14 @@ const dateFilteredOrders = computed(() => {
 })
 
 const filteredRevenue = computed(() => {
-  let result = [...orders.value]
+  let result = [...dateFilteredOrders.value]
 
-  if (dateFilter.value) {
-    const now = new Date()
-
+  if (!dateFilter.value && !startDate.value && !endDate.value) {
+    const today = new Date()
     result = result.filter(order => {
       if (!order.createdAt) return false
-
-      const orderDate = new Date(order.createdAt)
-
-      switch (dateFilter.value) {
-        case 'TODAY':
-          return orderDate.toDateString() === now.toDateString()
-        case 'YESTERDAY': {
-          const yesterday = new Date()
-          yesterday.setDate(yesterday.getDate() - 1)
-          return orderDate.toDateString() === yesterday.toDateString()
-        }
-        case 'WEEK': {
-          const weekAgo = new Date()
-          weekAgo.setDate(weekAgo.getDate() - 7)
-          return orderDate >= weekAgo
-        }
-        case 'MONTH': {
-          const monthAgo = new Date()
-          monthAgo.setDate(monthAgo.getDate() - 30)
-          return orderDate >= monthAgo
-        }
-        default:
-          return true
-      }
+      return new Date(order.createdAt).toDateString() === today.toDateString()
     })
-  } else {
-    const today = new Date()
-    result = result.filter(order =>
-      new Date(order.createdAt).toDateString() === today.toDateString()
-    )
   }
 
   return result
@@ -412,8 +526,8 @@ const filteredOrders = computed(() => {
   }
 
   if (quickFilter.value === 'REVENUE') {
-  result = result.filter(order => order.paymentStatus === 'PAID')
-}
+    result = result.filter(order => order.paymentStatus === 'PAID')
+  }
 
   // if (quickFilter.value === 'TODAY_REVENUE') {
   //   const today = new Date().toLocaleDateString('zh-TW')
@@ -439,7 +553,31 @@ const filteredOrders = computed(() => {
     result = result.filter(order => order.paymentMethod === paymentMethodFilter.value)
   }
 
-  if (dateFilter.value) {
+  if (orderTypeFilter.value) {
+    result = result.filter(order => order.orderType === orderTypeFilter.value)
+  }
+
+  if (startDate.value || endDate.value) {
+    if (startDate.value) {
+      const start = new Date(startDate.value)
+      start.setHours(0, 0, 0, 0)
+
+      result = result.filter(order => {
+        if (!order.createdAt) return false
+        return new Date(order.createdAt) >= start
+      })
+    }
+
+    if (endDate.value) {
+      const end = new Date(endDate.value)
+      end.setHours(23, 59, 59, 999)
+
+      result = result.filter(order => {
+        if (!order.createdAt) return false
+        return new Date(order.createdAt) <= end
+      })
+    }
+  } else if (dateFilter.value) {
     const now = new Date()
 
     result = result.filter(order => {
@@ -450,25 +588,21 @@ const filteredOrders = computed(() => {
       switch (dateFilter.value) {
         case 'TODAY':
           return orderDate.toDateString() === now.toDateString()
-
         case 'YESTERDAY': {
           const yesterday = new Date()
           yesterday.setDate(yesterday.getDate() - 1)
           return orderDate.toDateString() === yesterday.toDateString()
         }
-
         case 'WEEK': {
           const weekAgo = new Date()
           weekAgo.setDate(weekAgo.getDate() - 7)
           return orderDate >= weekAgo
         }
-
         case 'MONTH': {
           const monthAgo = new Date()
           monthAgo.setDate(monthAgo.getDate() - 30)
           return orderDate >= monthAgo
         }
-
         default:
           return true
       }
@@ -524,8 +658,8 @@ const filteredTotalCount = computed(() => {
   }
 
   if (quickFilter.value === 'REVENUE') {
-  result = result.filter(order => order.paymentStatus === 'PAID')
-}
+    result = result.filter(order => order.paymentStatus === 'PAID')
+  }
 
   // if (quickFilter.value === 'TODAY_REVENUE') {
   //   const today = new Date().toLocaleDateString('zh-TW')
@@ -550,7 +684,33 @@ const filteredTotalCount = computed(() => {
   if (paymentMethodFilter.value) {
     result = result.filter(order => order.paymentMethod === paymentMethodFilter.value)
   }
-  if (dateFilter.value) {
+  if (orderTypeFilter.value) {
+    result = result.filter(order => order.orderType === orderTypeFilter.value)
+  }
+  if (startDate.value || endDate.value) {
+
+    if (startDate.value) {
+      const start = new Date(startDate.value)
+      start.setHours(0, 0, 0, 0)
+
+      result = result.filter(order => {
+        if (!order.createdAt) return false
+        return new Date(order.createdAt) >= start
+      })
+    }
+
+    if (endDate.value) {
+      const end = new Date(endDate.value)
+      end.setHours(23, 59, 59, 999)
+
+      result = result.filter(order => {
+        if (!order.createdAt) return false
+        return new Date(order.createdAt) <= end
+      })
+    }
+
+  } else if (dateFilter.value) {
+
     const now = new Date()
 
     result = result.filter(order => {
@@ -633,6 +793,9 @@ const resetFilters = () => {
   pageSize.value = 10
   currentPage.value = 1
   quickFilter.value = 'ALL'
+  orderTypeFilter.value = ''
+  startDate.value = ''
+  endDate.value = ''
 }
 
 const pendingCount = computed(() =>
@@ -663,6 +826,22 @@ const completedCount = computed(() => {
 
 const changeStatus = async (orderId, status) => {
   try {
+    if (status === 'CANCELLED') {
+      const result = await Swal.fire({
+        icon: 'warning',
+        title: '確認取消訂單？',
+        text: '如果訂單已付款，系統會自動改為已退款。',
+        showCancelButton: true,
+        confirmButtonText: '確認取消',
+        cancelButtonText: '不要取消'
+      })
+
+      if (!result.isConfirmed) {
+        await loadOrders()
+        return
+      }
+    }
+
     await updateAdminOrderStatus(orderId, status)
     await loadOrders()
   } catch (error) {
@@ -749,6 +928,125 @@ const formatDate = (date) => {
 </script>
 
 <style scoped>
+.date-range-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 330px;
+  padding: 0 12px;
+  border: 1px solid #ead8c5;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.date-range-input {
+  width: 120px;
+  padding: 9px 0;
+  border: none;
+  outline: none;
+  color: #43546d;
+  background: transparent;
+}
+
+.date-range-text {
+  color: #718096;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.card-green {
+  color: #2f9e44 !important;
+  font-weight: 700 !important;
+}
+
+.card-red {
+  color: #e03131 !important;
+  font-weight: 700 !important;
+}
+
+.payment-method-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.method-cash {
+  background: #f5f5f5;
+  border: 1px solid #d9d9d9;
+  color: #595959;
+}
+
+.method-card {
+  background: #e6f7ff;
+  border: 1px solid #91d5ff;
+  color: #0050b3;
+}
+
+.method-linepay {
+  background: #f6ffed;
+  border: 1px solid #95de64;
+  color: #237804;
+}
+
+.method-unknown {
+  background: #fafafa;
+  border: 1px solid #d9d9d9;
+  color: #8c8c8c;
+}
+
+.payment-badge,
+.order-status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.payment-paid {
+  background: #f6ffed;
+  color: #237804;
+  border: 1px solid #95de64;
+}
+
+.payment-unpaid {
+  background: #fff1f0;
+  color: #cf1322;
+  border: 1px solid #ff7875;
+}
+
+.payment-refunded {
+  background: #f5f5f5;
+  color: #8c8c8c;
+  border: 1px solid #d9d9d9;
+}
+
+.modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.print-btn {
+  background: #e4a775;
+  color: white;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.close-btn {
+  background: transparent;
+  color: #344b68;
+  font-size: 28px;
+  padding: 0;
+}
+
 .summary-card.clickable {
   cursor: pointer;
   transition: 0.2s;
@@ -772,6 +1070,7 @@ const formatDate = (date) => {
 .status-confirmed {
   background: #f6ffed;
   border-color: #95de64;
+
   color: #237804;
 }
 
@@ -1061,9 +1360,11 @@ button:hover {
 
 .modal-header h2 {
   color: #344b68;
+  margin: 0;
+  margin-left: -28px;
 }
 
-.modal-header button {
+.modal-header .close-btn {
   background: transparent;
   color: #344b68;
   font-size: 28px;
@@ -1073,8 +1374,24 @@ button:hover {
 .detail-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  margin: 20px 0;
+  gap: 18px 40px;
+  margin: 24px 0;
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+}
+
+.detail-label {
+  width: 110px;
+  font-weight: 700;
+  color: #344b68;
+  flex-shrink: 0;
+}
+
+.detail-value {
+  color: #43546d;
 }
 
 .total-box {
