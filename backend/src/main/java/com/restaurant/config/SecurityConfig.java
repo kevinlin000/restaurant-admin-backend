@@ -85,7 +85,10 @@ public class SecurityConfig {
                         // ===== 員工管理路由 =====
                         // 建立員工：只給 ADMIN
                         .requestMatchers(HttpMethod.POST, "/api/members/staff").hasAuthority("ROLE_ADMIN")
-                        // 查詢 / 修改 / 刪除員工：給 ADMIN、MANAGER
+                        // 查詢員工清單：給 ADMIN、MANAGER
+                        .requestMatchers(HttpMethod.GET, "/api/members/staff")
+                        .hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
+                        // 查詢 / 修改 / 刪除特定員工：給 ADMIN、MANAGER
                         .requestMatchers("/api/members/staff/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
 
                         // ===== 後台 API =====

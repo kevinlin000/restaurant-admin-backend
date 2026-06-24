@@ -19,8 +19,10 @@ public class StaffCreateRequest {
     @Email(message = "Email 格式不正確")
     private String email;
 
-    @NotBlank(message = "密碼不可為空")
-    @Size(min = 8, max = 20, message = "密碼長度需介於 8 到 20 字元")
+    /**
+     * 新 Email 建立員工帳號時必填。
+     * 若 Email 已是一般會員，系統會保留原會員密碼，此欄可不填。
+     */
     private String password;
 
     @NotBlank(message = "姓名不可為空")
@@ -29,6 +31,12 @@ public class StaffCreateRequest {
 
     @Pattern(regexp = "^09\\d{8}$", message = "手機號碼格式不正確")
     private String phone;
+
+    /**
+     * 新 Email 建立員工帳號時必填。
+     * 若 Email 已是一般會員，未填時會沿用原本會員生日。
+     */
+    private LocalDate birthday;
 
     @NotNull(message = "門市不可為空")
     private Long storeId;

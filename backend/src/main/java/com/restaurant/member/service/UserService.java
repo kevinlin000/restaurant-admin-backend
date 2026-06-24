@@ -56,9 +56,9 @@ public interface UserService {
     StaffResponse getStaff(Long staffId);
 
     /**
-     * 取得所有在職員工清單。
+     * 取得所有員工清單（含離職）。
      * 
-     * @return 在職員工列表
+     * @return 員工列表
      */
     List<StaffResponse> getActiveStaffs();
 

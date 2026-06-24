@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import Swal from "sweetalert2";
 import { createStaff, getStaffList, resignStaff } from "@/api/member";
 import { storeApi } from "@/api/store";
@@ -11,6 +11,7 @@ const staffList = ref([]);
 const stores = ref([]);
 const keyword = ref("");
 const statusFilter = ref("ALL");
+const showPassword = ref(false);
 
 const form = reactive({
   email: "",
@@ -39,6 +40,29 @@ const roleText = {
   MANAGER: "店長",
   ADMIN: "管理員",
   CUSTOMER: "會員",
+};
+
+const staffNoPrefixMap = {
+  STAFF: "S",
+  MANAGER: "M",
+};
+
+const getTodayString = () => new Date().toISOString().slice(0, 10);
+
+const getNextStaffNoByRole = (roleName) => {
+  const prefix = staffNoPrefixMap[roleName] || "S";
+  const pattern = new RegExp(`^${prefix}(\\d+)$`, "i");
+
+  const maxNumber = staffList.value.reduce((max, staff) => {
+    const staffNo = String(staff.staffNo || "").trim();
+    const matched = staffNo.match(pattern);
+    if (!matched) return max;
+
+    const number = Number(matched[1]);
+    return Number.isFinite(number) ? Math.max(max, number) : max;
+  }, 0);
+
+  return `${prefix}${String(maxNumber + 1).padStart(3, "0")}`;
 };
 
 const normalizeApiData = (response) => {
@@ -72,23 +96,7 @@ const filteredStaffList = computed(() => {
   });
 });
 
-const activeStaffList = computed(() =>
-  staffList.value.filter((staff) => staff.status === "ACTIVE"),
-);
-
-const activeCount = computed(() => activeStaffList.value.length);
-
-const staffCount = computed(
-  () => activeStaffList.value.filter((staff) => staff.roleName === "STAFF").length,
-);
-
-const managerCount = computed(
-  () => activeStaffList.value.filter((staff) => staff.roleName === "MANAGER").length,
-);
-
-const resignedCount = computed(
-  () => staffList.value.filter((staff) => staff.status === "RESIGNED").length,
-);
+const nextStaffNo = computed(() => getNextStaffNoByRole(form.roleName));
 
 const resetForm = () => {
   form.email = "";
@@ -97,9 +105,9 @@ const resetForm = () => {
   form.phone = "";
   form.birthday = "";
   form.storeId = stores.value[0]?.storeId || "";
-  form.staffNo = "";
-  form.hireDate = new Date().toISOString().slice(0, 10);
+  form.hireDate = getTodayString();
   form.roleName = "STAFF";
+  form.staffNo = nextStaffNo.value;
 };
 
 const loadData = async () => {
@@ -118,6 +126,8 @@ const loadData = async () => {
     if (!form.storeId && stores.value.length > 0) {
       form.storeId = stores.value[0].storeId;
     }
+
+    form.staffNo = nextStaffNo.value;
   } catch (err) {
     loadError.value =
       err.response?.data?.message || "員工資料載入失敗，請確認後端服務與權限。";
@@ -126,25 +136,33 @@ const loadData = async () => {
   }
 };
 
+const handlePhoneInput = () => {
+  form.phone = String(form.phone || "")
+    .replace(/\D/g, "")
+    .slice(0, 10);
+};
+
 const validateForm = () => {
   if (
     !form.email ||
-    !form.password ||
     !form.name ||
     !form.birthday ||
     !form.storeId ||
     !form.staffNo ||
     !form.hireDate
   ) {
-    return "請完整填寫 Email、密碼、姓名、生日、門市、員工編號與到職日";
+    return "請完整填寫 Email、姓名、生日、門市、員工編號與到職日";
   }
 
   if (!/^\S+@\S+\.\S+$/.test(form.email)) {
     return "Email 格式不正確";
   }
 
-  if (form.password.length < 8 || form.password.length > 20) {
-    return "密碼長度需介於 8 到 20 個字元";
+  if (
+    form.password &&
+    (form.password.length < 8 || form.password.length > 20)
+  ) {
+    return "密碼長度需介於 8 到 20 個字元；既有會員轉員工時可不填";
   }
 
   if (form.phone && !/^09\d{8}$/.test(form.phone)) {
@@ -175,7 +193,7 @@ const handleCreateStaff = async () => {
   try {
     await createStaff({
       email: form.email.trim(),
-      password: form.password,
+      password: form.password || null,
       name: form.name.trim(),
       phone: form.phone.trim() || null,
       birthday: form.birthday,
@@ -187,8 +205,8 @@ const handleCreateStaff = async () => {
 
     await Swal.fire({
       icon: "success",
-      title: "員工已建立",
-      text: "新的員工或店長帳號已新增成功。",
+      title: "設定完成",
+      text: "員工或店長帳號已設定完成；若 Email 已是一般會員，已保留原會員資料。",
       confirmButtonColor: "#e3ac7f",
     });
 
@@ -244,6 +262,13 @@ const formatDate = (dateText) => {
   return String(dateText).replaceAll("-", "/");
 };
 
+watch(
+  () => form.roleName,
+  () => {
+    form.staffNo = nextStaffNo.value;
+  },
+);
+
 onMounted(async () => {
   resetForm();
   await loadData();
@@ -252,80 +277,62 @@ onMounted(async () => {
 
 <template>
   <section class="staff-page">
-    <div class="page-header">
-      <div>
-        <p class="eyebrow">Member 模組</p>
-        <h1>員工管理</h1>
-        <p>管理員可建立員工與店長帳號，並設定離職狀態。</p>
-      </div>
-      <button type="button" class="refresh-btn" :disabled="isLoading" @click="loadData">
-        <i class="bx bx-refresh"></i>
-        {{ isLoading ? "更新中" : "重新整理" }}
-      </button>
-    </div>
-
     <p v-if="loadError" class="alert-box">
       <i class="bx bx-error-circle"></i>
       {{ loadError }}
     </p>
 
-    <div class="summary-grid">
-      <article class="summary-card">
-        <span>在職人員</span>
-        <strong>{{ activeCount }}</strong>
-        <small>目前可使用後台的人員</small>
-      </article>
-      <article class="summary-card">
-        <span>員工人數</span>
-        <strong>{{ staffCount }}</strong>
-        <small>角色為 STAFF 的在職人員</small>
-      </article>
-      <article class="summary-card">
-        <span>店長人數</span>
-        <strong>{{ managerCount }}</strong>
-        <small>角色為 MANAGER 的在職人員</small>
-      </article>
-      <article class="summary-card">
-        <span>離職人員</span>
-        <strong>{{ resignedCount }}</strong>
-        <small>已移除後台權限的人員</small>
-      </article>
-    </div>
-
     <div class="content-grid">
       <section class="card form-card">
-        <h2>新增員工</h2>
-        <p class="card-desc">員工與店長同時也是會員，因此需建立完整會員資料。</p>
+        <h2>員工帳號設定</h2>
+        <p class="card-desc compact-desc">
+          帳號若已是會員，將直接轉為員工或店長職稱，並保留會員資料。
+        </p>
 
         <div class="form-grid">
           <label>
             Email
-            <input v-model.trim="form.email" type="email" placeholder="staff@example.com" />
+            <input v-model.trim="form.email" type="email" />
           </label>
 
           <label>
-            初始密碼
-            <input v-model="form.password" type="password" placeholder="8 到 20 個字元" />
+            初始密碼（新帳號必填）
+            <div class="password-field">
+              <input
+                v-model="form.password"
+                :type="showPassword ? 'text' : 'password'"
+              />
+              <button
+                class="password-toggle"
+                type="button"
+                :aria-label="showPassword ? '隱藏密碼' : '顯示密碼'"
+                @click="showPassword = !showPassword"
+              >
+                <i :class="showPassword ? 'bx bx-hide' : 'bx bx-show'"></i>
+              </button>
+            </div>
           </label>
 
           <label>
             姓名
-            <input v-model.trim="form.name" type="text" placeholder="請輸入姓名" />
+            <input v-model.trim="form.name" type="text" />
           </label>
 
           <label>
             手機
-            <input v-model.trim="form.phone" type="tel" placeholder="0912345678，可不填" />
+            <input
+              v-model.trim="form.phone"
+              type="tel"
+              maxlength="10"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              @input="handlePhoneInput"
+            />
           </label>
 
           <label>
             生日
             <input v-model="form.birthday" type="date" />
-          </label>
-
-          <label>
-            員工編號
-            <input v-model.trim="form.staffNo" type="text" placeholder="例如 S001" />
           </label>
 
           <label>
@@ -337,37 +344,63 @@ onMounted(async () => {
             所屬門市
             <select v-model="form.storeId">
               <option value="" disabled>請選擇門市</option>
-              <option v-for="store in stores" :key="store.storeId" :value="store.storeId">
+              <option
+                v-for="store in stores"
+                :key="store.storeId"
+                :value="store.storeId"
+              >
                 {{ store.storeName }}（#{{ store.storeId }}）
               </option>
             </select>
           </label>
 
           <label>
-            角色
+            職稱
             <select v-model="form.roleName">
-              <option v-for="role in roleOptions" :key="role.value" :value="role.value">
+              <option
+                v-for="role in roleOptions"
+                :key="role.value"
+                :value="role.value"
+              >
                 {{ role.label }}
+              </option>
+            </select>
+          </label>
+
+          <label>
+            員工編號
+            <select v-model="form.staffNo">
+              <option :value="nextStaffNo">
+                {{ nextStaffNo }}
               </option>
             </select>
           </label>
         </div>
 
-        <button class="submit-btn" type="button" :disabled="isSaving" @click="handleCreateStaff">
-          {{ isSaving ? "建立中..." : "建立員工帳號" }}
+        <button
+          class="submit-btn"
+          type="button"
+          :disabled="isSaving"
+          @click="handleCreateStaff"
+        >
+          {{ isSaving ? "設定中..." : "建立／設定員工帳號" }}
         </button>
       </section>
 
       <section class="card list-card">
         <div class="list-header">
           <div>
-            <h2>員工清單</h2>
-            <p class="card-desc">查看員工、店長所屬門市與在職狀態。</p>
+            <h2>員工狀態清單</h2>
+            <p class="card-desc"></p>
           </div>
         </div>
 
         <div class="toolbar">
-          <input v-model.trim="keyword" type="search" placeholder="搜尋姓名、Email、員編、手機" />
+          <input
+            v-model.trim="keyword"
+            type="search"
+            placeholder="搜尋姓名、Email、員編、手機"
+          />
           <select v-model="statusFilter">
             <option value="ALL">全部狀態</option>
             <option value="ACTIVE">在職</option>
@@ -376,14 +409,16 @@ onMounted(async () => {
         </div>
 
         <div v-if="isLoading" class="state-box">載入中...</div>
-        <div v-else-if="filteredStaffList.length === 0" class="state-box">目前沒有符合條件的人員。</div>
+        <div v-else-if="filteredStaffList.length === 0" class="state-box">
+          目前沒有符合條件的人員。
+        </div>
 
         <div v-else class="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>員工資料</th>
-                <th>角色</th>
+                <th>職稱</th>
                 <th>所屬門市</th>
                 <th>到職日</th>
                 <th>狀態</th>
@@ -401,10 +436,15 @@ onMounted(async () => {
                   </small>
                 </td>
                 <td>{{ roleText[staff.roleName] || staff.roleName }}</td>
-                <td>{{ storeNameMap[staff.storeId] || `門市 #${staff.storeId}` }}</td>
+                <td>
+                  {{ storeNameMap[staff.storeId] || `門市 #${staff.storeId}` }}
+                </td>
                 <td>{{ formatDate(staff.hireDate) }}</td>
                 <td>
-                  <span class="status-pill" :class="staff.status?.toLowerCase()">
+                  <span
+                    class="status-pill"
+                    :class="staff.status?.toLowerCase()"
+                  >
                     {{ statusText[staff.status] || staff.status || "-" }}
                   </span>
                 </td>
@@ -434,61 +474,34 @@ onMounted(async () => {
   gap: 22px;
 }
 
-.page-header,
-.card,
-.summary-card {
+.card {
   background: #fff;
   border-radius: 18px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.05);
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-  padding: 30px;
-  background: linear-gradient(135deg, #ffffff 0%, #fff7ef 100%);
-}
-
-.eyebrow {
-  margin: 0 0 8px;
-  color: #e3ac7f;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-}
-
-.page-header h1,
 .card h2 {
   margin: 0;
   color: #566a7f;
   font-weight: 900;
 }
 
-.page-header p,
 .card-desc {
   margin: 9px 0 0;
   color: #7d8b9a;
   line-height: 1.7;
 }
 
-.refresh-btn,
+.compact-desc {
+  font-size: 14px;
+}
+
 .submit-btn,
 .resign-btn {
   border: none;
   border-radius: 12px;
   font-weight: 800;
   cursor: pointer;
-}
-
-.refresh-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 18px;
-  background: #e3ac7f;
-  color: #fff;
-  flex-shrink: 0;
 }
 
 .alert-box {
@@ -501,33 +514,6 @@ onMounted(async () => {
   background: #fff2ef;
   color: #c0392b;
   font-weight: 700;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 16px;
-}
-
-.summary-card {
-  padding: 22px;
-}
-
-.summary-card span,
-.summary-card small {
-  color: #8a99a8;
-}
-
-.summary-card span {
-  font-weight: 900;
-}
-
-.summary-card strong {
-  display: block;
-  margin: 7px 0;
-  color: #566a7f;
-  font-size: 32px;
-  font-weight: 900;
 }
 
 .content-grid {
@@ -563,6 +549,49 @@ select {
   padding: 11px 12px;
   color: #566a7f;
   background: #fff;
+}
+
+.password-field {
+  position: relative;
+  width: 100%;
+}
+
+.password-field input {
+  padding-right: 44px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #8a99a8;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.password-toggle i {
+  font-size: 19px;
+  line-height: 1;
+}
+
+.password-toggle:hover {
+  color: #e3ac7f;
+}
+
+input:disabled,
+select:disabled {
+  background: #f7f2ed;
+  color: #7d8b9a;
+  cursor: not-allowed;
 }
 
 input:focus,
@@ -681,11 +710,6 @@ td small {
 }
 
 @media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
   .form-grid,
   .toolbar {
     grid-template-columns: 1fr;

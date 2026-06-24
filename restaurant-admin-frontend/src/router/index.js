@@ -122,7 +122,7 @@ const routers = [
         path: "reservation-time-setting",
         name: "AdminReservationTimeSetting",
         component: AdminReservationTimeSetting,
-        meta: { roles: MANAGER_ROLES },
+        meta: { roles: ADMIN_ROLES },
       },
       {
         path: "menu-create",

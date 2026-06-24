@@ -105,30 +105,93 @@ public class AuthServiceImpl implements AuthService {
                                 .build();
         }
 
-        // -----Staff 帳號建立（後台管理者幫員工建立核心 User + 1:1 Staff）-----
+        // -----Staff 帳號建立（後台管理者建立新員工，或將既有會員轉為員工 / 店長）-----
         @Override
         @Transactional
         public StaffResponse createStaff(StaffCreateRequest request) {
 
                 String email = normalizeEmail(request.getEmail());
+                String roleName = normalizeRoleName(request.getRoleName());
+                String staffNo = normalizeText(request.getStaffNo());
+                String phone = normalizeNullableText(request.getPhone());
+                String name = normalizeNullableText(request.getName());
+                String password = normalizeNullableText(request.getPassword());
 
-                if (userRepository.existsByEmail(email)) {
-                        throw new BusinessException("此 Email 已被使用");
+                if (email == null || email.isBlank()) {
+                        throw new BusinessException("Email 不可為空");
                 }
 
-                Role role = roleRepository.findByRoleName(request.getRoleName())
-                                .orElseThrow(() -> new BusinessException("指定的系統角色不存在：" + request.getRoleName()));
+                if (roleName == null || !("STAFF".equals(roleName) || "MANAGER".equals(roleName))) {
+                        throw new BusinessException("員工管理僅能建立員工或店長帳號");
+                }
+
+                if (staffNo == null || staffNo.isBlank()) {
+                        throw new BusinessException("員工編號不可為空");
+                }
+
+                if (request.getStoreId() == null) {
+                        throw new BusinessException("門市不可為空");
+                }
+
+                if (request.getHireDate() == null) {
+                        throw new BusinessException("到職日不可為空");
+                }
+
+                Role role = roleRepository.findByRoleName(roleName)
+                                .orElseThrow(() -> new BusinessException("指定的系統角色不存在：" + roleName));
 
                 Store store = Store.builder()
                                 .storeId(request.getStoreId())
                                 .build();
 
+                User existingUser = userRepository.findByEmail(email).orElse(null);
+
+                validateStaffNoUsable(staffNo, existingUser);
+                validatePhoneUsable(phone, existingUser);
+
+                if (existingUser == null) {
+                        return createNewStaffUser(request, email, password, name, phone, role, store, staffNo);
+                }
+
+                return promoteExistingUserToStaff(request, existingUser, role, store, staffNo, phone, name);
+        }
+
+        /**
+         * Email 不存在時：建立全新的 User + Staff。
+         */
+        private StaffResponse createNewStaffUser(
+                        StaffCreateRequest request,
+                        String email,
+                        String password,
+                        String name,
+                        String phone,
+                        Role role,
+                        Store store,
+                        String staffNo) {
+
+                if (password == null || password.isBlank()) {
+                        throw new BusinessException("新員工帳號需設定初始密碼");
+                }
+
+                if (password.length() < 8 || password.length() > 20) {
+                        throw new BusinessException("密碼長度需介於 8 到 20 字元");
+                }
+
+                if (name == null || name.isBlank()) {
+                        throw new BusinessException("姓名不可為空");
+                }
+
+                if (request.getBirthday() == null) {
+                        throw new BusinessException("生日不可為空");
+                }
+
                 User user = User.builder()
                                 .role(role)
                                 .email(email)
-                                .passwordHash(passwordEncoder.encode(request.getPassword()))
-                                .name(request.getName())
-                                .phone(request.getPhone())
+                                .passwordHash(passwordEncoder.encode(password))
+                                .name(name)
+                                .phone(phone)
+                                .birthday(request.getBirthday())
                                 .build();
 
                 userRepository.save(user);
@@ -136,19 +199,136 @@ public class AuthServiceImpl implements AuthService {
                 Staff staff = Staff.builder()
                                 .user(user)
                                 .store(store)
-                                .staffNo(request.getStaffNo())
+                                .staffNo(staffNo)
                                 .hireDate(request.getHireDate())
+                                .status(Staff.StaffStatus.ACTIVE)
                                 .build();
 
                 staffRepository.save(staff);
 
-                // 員工 / 店長 / 管理員也是 User，也可能到店消費與累積點數，
-                // 因此建立員工帳號時也補一筆 members 個人會員資料。
-                memberProfileRepository.save(MemberProfile.builder()
-                                .user(user)
-                                .build());
+                ensureMemberProfile(user);
 
                 return toStaffResponse(user, staff);
+        }
+
+        /**
+         * Email 已存在時：若是一般會員，轉為 STAFF / MANAGER，保留原會員密碼、點數與會員資料。
+         */
+        private StaffResponse promoteExistingUserToStaff(
+                        StaffCreateRequest request,
+                        User user,
+                        Role role,
+                        Store store,
+                        String staffNo,
+                        String phone,
+                        String name) {
+
+                String currentRoleName = user.getRole() != null ? user.getRole().getRoleName() : null;
+
+                if ("ADMIN".equals(currentRoleName)) {
+                        throw new BusinessException("管理員帳號不可轉為員工或店長");
+                }
+
+                Staff existingStaff = staffRepository.findByUser_UserId(user.getUserId()).orElse(null);
+
+                if (existingStaff != null && existingStaff.getStatus() == Staff.StaffStatus.ACTIVE) {
+                        throw new BusinessException("此會員已是員工或店長");
+                }
+
+                // 保留原會員密碼與點數，只補齊或更新員工需要的基本資料。
+                if (name != null && !name.isBlank()) {
+                        user.setName(name);
+                }
+
+                if (phone != null) {
+                        user.setPhone(phone);
+                }
+
+                if (request.getBirthday() != null) {
+                        user.setBirthday(request.getBirthday());
+                }
+
+                if (user.getName() == null || user.getName().isBlank()) {
+                        throw new BusinessException("姓名不可為空");
+                }
+
+                if (user.getBirthday() == null) {
+                        throw new BusinessException("生日不可為空");
+                }
+
+                user.setRole(role);
+                userRepository.save(user);
+
+                Staff staff;
+                if (existingStaff != null) {
+                        // 曾經離職的人員重新入職：沿用同一筆 staff，改回 ACTIVE。
+                        staff = existingStaff;
+                        staff.setStore(store);
+                        staff.setStaffNo(staffNo);
+                        staff.setHireDate(request.getHireDate());
+                        staff.setStatus(Staff.StaffStatus.ACTIVE);
+                } else {
+                        staff = Staff.builder()
+                                        .user(user)
+                                        .store(store)
+                                        .staffNo(staffNo)
+                                        .hireDate(request.getHireDate())
+                                        .status(Staff.StaffStatus.ACTIVE)
+                                        .build();
+                }
+
+                staffRepository.save(staff);
+                ensureMemberProfile(user);
+
+                return toStaffResponse(user, staff);
+        }
+
+        /**
+         * 員工編號不可與其他員工重複；同一位離職員工復職時可沿用自己的員編。
+         */
+        private void validateStaffNoUsable(String staffNo, User targetUser) {
+                Staff staff = staffRepository.findByStaffNo(staffNo).orElse(null);
+                if (staff == null) {
+                        return;
+                }
+
+                if (targetUser != null && staff.getUser() != null
+                                && staff.getUser().getUserId().equals(targetUser.getUserId())) {
+                        return;
+                }
+
+                throw new BusinessException("此員工編號已被使用");
+        }
+
+        /**
+         * 手機不可與其他帳號重複；既有會員升級員工時可沿用自己的手機。
+         */
+        private void validatePhoneUsable(String phone, User targetUser) {
+                if (phone == null || phone.isBlank()) {
+                        return;
+                }
+
+                User user = userRepository.findByPhone(phone).orElse(null);
+                if (user == null) {
+                        return;
+                }
+
+                if (targetUser != null && user.getUserId().equals(targetUser.getUserId())) {
+                        return;
+                }
+
+                throw new BusinessException("此手機號碼已被使用");
+        }
+
+        /**
+         * 員工 / 店長也是會員；既有會員升級時要保留原本會員資料，新員工則補建會員資料。
+         */
+        private void ensureMemberProfile(User user) {
+                memberProfileRepository.findByUserUserId(user.getUserId())
+                                .orElseGet(() -> memberProfileRepository.save(
+                                                MemberProfile.builder()
+                                                                .user(user)
+                                                                .build()));
         }
 
         // -----統一登入入口（驗證並依據角色簽發 JWT 通行證）-----
@@ -156,7 +336,7 @@ public class AuthServiceImpl implements AuthService {
         @Transactional(readOnly = true)
         public LoginResponse login(LoginRequest request) {
 
-                User user = userRepository.findByEmail(request.getEmail())
+                User user = userRepository.findByEmail(normalizeEmail(request.getEmail()))
                                 .orElseThrow(() -> new BusinessException("找不到帳號"));
 
                 boolean passwordMatched = passwordEncoder.matches(
@@ -282,6 +462,19 @@ public class AuthServiceImpl implements AuthService {
                 return email == null ? null : email.trim().toLowerCase();
         }
 
+        private String normalizeRoleName(String roleName) {
+                return roleName == null ? null : roleName.trim().toUpperCase();
+        }
+
+        private String normalizeText(String text) {
+                return text == null ? null : text.trim();
+        }
+
+        private String normalizeNullableText(String text) {
+                String normalized = normalizeText(text);
+                return normalized == null || normalized.isBlank() ? null : normalized;
+        }
+
         /**
          * 驗證碼只保留前後去空白後的內容，避免複製信件時帶到空白。
          */
@@ -306,6 +499,7 @@ public class AuthServiceImpl implements AuthService {
                 res.setEmail(user.getEmail());
                 res.setName(user.getName());
                 res.setPhone(user.getPhone());
+                res.setBirthday(user.getBirthday());
                 res.setRoleName(user.getRole().getRoleName());
                 res.setStoreId(staff.getStore().getStoreId());
                 res.setStaffNo(staff.getStaffNo());

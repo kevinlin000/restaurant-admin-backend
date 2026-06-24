@@ -376,11 +376,13 @@ const passwordError = ref("");
 const isChangingPassword = ref(false);
 
 const loadMemberPageData = async () => {
-  const [profileRes, pointRes] = await Promise.all([
-    getProfile(),
-    getPointBalance(),
-  ]);
+  // 先取得個人資料，再取得點數。
+  // 這樣可避免 STAFF / MANAGER 舊測試帳號第一次進會員中心時，
+  // /me 與 /points 同時嘗試補建 members 資料造成唯一鍵衝突。
+  const profileRes = await getProfile();
   const profileData = profileRes.data.data;
+
+  const pointRes = await getPointBalance();
   const pointData = pointRes.data.data;
 
   pointInfo.value = {
@@ -637,7 +639,6 @@ const formatBirthday = (birthday) => {
   if (!birthday) return "未提供";
   return String(birthday).replaceAll("-", "/");
 };
-
 </script>
 
 <style scoped>

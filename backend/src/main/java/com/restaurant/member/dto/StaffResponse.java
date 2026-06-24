@@ -14,6 +14,7 @@ public class StaffResponse {
     private String email;
     private String name;
     private String phone;
+    private LocalDate birthday;
     private String roleName;
     private Long storeId;
     private String staffNo;

@@ -11,6 +11,12 @@ public interface StaffRepository extends JpaRepository<Staff, Long> {
 
     Optional<Staff> findByStaffNo(String staffNo);
 
+    boolean existsByStaffNo(String staffNo);
+
+    @Override
+    @EntityGraph(attributePaths = { "store", "user", "user.role" })
+    List<Staff> findAll();
+
     Optional<Staff> findByUser_UserId(Long userId);
 
     @EntityGraph(attributePaths = { "store", "user" })

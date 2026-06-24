@@ -107,7 +107,7 @@ const sidebarGroups = computed(() => [
       {
         label: "訂位日期＆時段",
         path: "/admin/reservation-time-setting",
-        roles: ["MANAGER", "ADMIN"],
+        roles: ["STAFF", "MANAGER", "ADMIN"],
       },
     ],
   },

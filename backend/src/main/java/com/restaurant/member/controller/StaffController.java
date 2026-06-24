@@ -17,7 +17,7 @@ public class StaffController {
     private final UserService userService;
 
     /**
-     * 查詢所有在職員工
+     * 查詢所有員工（含離職）
      * GET /api/members/staff
      */
     @GetMapping

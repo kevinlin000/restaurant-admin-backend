@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from "vue";
+import { RouterLink } from "vue-router";
 
 const getUserInfo = () => {
   try {
@@ -34,30 +35,35 @@ const availableFeatures = computed(() => {
       title: "訂位管理",
       icon: "bx bx-calendar-check",
       description: "查看顧客訂位資料與現場安排。",
+      path: "/admin/reservation",
       roles: ["STAFF", "MANAGER", "ADMIN"],
     },
     {
       title: "訂單管理",
       icon: "bx bx-cart",
       description: "查看顧客訂單與處理狀態。",
+      path: "/admin/order-manage",
       roles: ["STAFF", "MANAGER", "ADMIN"],
     },
     {
       title: "分店管理",
       icon: "bx bx-store",
       description: "維護分店資訊與桌位設定。",
+      path: "/admin/store",
       roles: ["MANAGER", "ADMIN"],
     },
     {
       title: "菜單管理",
       icon: "bx bx-food-menu",
       description: "管理分類、價格與上下架狀態。",
+      path: "/admin/menu-setting",
       roles: ["ADMIN"],
     },
     {
       title: "員工管理",
       icon: "bx bx-group",
       description: "新增員工與店長，管理離職狀態。",
+      path: "/admin/member",
       roles: ["ADMIN"],
     },
   ];
@@ -67,11 +73,11 @@ const availableFeatures = computed(() => {
 
 const roleSummary = computed(() => {
   if (roleName.value === "STAFF") {
-    return "員工可處理訂位與訂單相關作業。";
+    return "可處理訂位與訂單相關作業。";
   }
 
   if (roleName.value === "MANAGER") {
-    return "店長可處理門市訂位、訂單與分店資料。";
+    return "可處理門市訂位、訂單與分店資料。";
   }
 
   if (roleName.value === "ADMIN") {
@@ -89,8 +95,6 @@ const roleSummary = computed(() => {
         {{ displayName }}，您現在的權限身分是
         <span class="role-pill">{{ roleText }}</span>
       </p>
-
-      <p class="hero-desc">您可以使用以下功能。</p>
     </section>
 
     <section class="feature-panel">
@@ -106,19 +110,21 @@ const roleSummary = computed(() => {
         class="feature-grid"
         :class="{ 'is-admin-grid': isAdmin }"
       >
-        <article
+        <RouterLink
           v-for="feature in availableFeatures"
           :key="feature.title"
           class="feature-card"
+          :to="feature.path"
         >
           <div class="feature-icon">
             <i :class="feature.icon"></i>
           </div>
-          <div>
+          <div class="feature-content">
             <h3>{{ feature.title }}</h3>
             <p>{{ feature.description }}</p>
           </div>
-        </article>
+          <i class="bx bx-chevron-right feature-arrow"></i>
+        </RouterLink>
       </div>
 
       <div v-else class="empty-state">
@@ -173,13 +179,6 @@ const roleSummary = computed(() => {
   white-space: nowrap;
 }
 
-.hero-desc {
-  margin: 16px 0 0;
-  color: #7f8fa0;
-  font-size: 16px;
-  font-weight: 700;
-}
-
 .feature-panel {
   padding: 30px 32px 34px;
 }
@@ -217,14 +216,51 @@ const roleSummary = computed(() => {
 }
 
 .feature-card {
+  position: relative;
   display: flex;
   gap: 12px;
   align-items: flex-start;
   min-height: 116px;
-  padding: 18px;
+  padding: 18px 34px 18px 18px;
   border: 1px solid #f1d8c4;
   border-radius: 16px;
   background: #fffdfb;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: 0.22s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-3px);
+  border-color: #e3ac7f;
+  box-shadow: 0 12px 24px rgba(227, 172, 127, 0.18);
+  background: #fff8f1;
+}
+
+.feature-card:hover .feature-icon {
+  background: #e3ac7f;
+  color: #fff;
+}
+
+.feature-card:hover .feature-arrow {
+  opacity: 1;
+  transform: translateX(3px);
+}
+
+.feature-content {
+  min-width: 0;
+}
+
+.feature-arrow {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #e3ac7f;
+  font-size: 24px;
+  opacity: 0.5;
+  transition: 0.22s ease;
 }
 
 .feature-icon {
@@ -237,6 +273,7 @@ const roleSummary = computed(() => {
   border-radius: 13px;
   background: #fff1e5;
   color: #e3ac7f;
+  transition: 0.22s ease;
 }
 
 .feature-icon i {
