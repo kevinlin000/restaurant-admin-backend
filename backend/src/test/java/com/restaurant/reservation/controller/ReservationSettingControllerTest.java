@@ -2,8 +2,8 @@ package com.restaurant.reservation.controller;
 
 import com.restaurant.reservation.dto.TimeSlotRequest;
 import com.restaurant.reservation.entity.TimeSlot;
+import com.restaurant.reservation.service.ReservationAdminAccessService;
 import com.restaurant.reservation.service.ReservationSettingService;
-import com.restaurant.store.service.StoreAdminAccessService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -25,7 +25,7 @@ class ReservationSettingControllerTest {
     private ReservationSettingService reservationSettingService;
 
     @Mock
-    private StoreAdminAccessService storeAdminAccessService;
+    private ReservationAdminAccessService reservationAdminAccessService;
 
     @Mock
     private Authentication authentication;
@@ -40,7 +40,7 @@ class ReservationSettingControllerTest {
 
         reservationSettingController.getTimeSlots(2L, date, authentication);
 
-        verify(storeAdminAccessService).requireStoreAccess(authentication, 2L);
+        verify(reservationAdminAccessService).requireStoreAccess(authentication, 2L);
         verify(reservationSettingService).getTimeSlots(2L, date);
     }
 
@@ -52,8 +52,9 @@ class ReservationSettingControllerTest {
 
         reservationSettingController.updateTimeSlot(50L, request, authentication);
 
-        verify(storeAdminAccessService).requireStoreAccess(authentication, 2L);
-        verify(storeAdminAccessService).requireStoreAccess(authentication, 3L);
+        verify(reservationAdminAccessService).requireManagerOrAdmin(authentication);
+        verify(reservationAdminAccessService).requireStoreAccess(authentication, 2L);
+        verify(reservationAdminAccessService).requireStoreAccess(authentication, 3L);
         verify(reservationSettingService).updateTimeSlot(50L, request);
     }
 
@@ -64,7 +65,7 @@ class ReservationSettingControllerTest {
 
         reservationSettingController.getCapacity(50L, authentication);
 
-        verify(storeAdminAccessService).requireStoreAccess(authentication, 2L);
+        verify(reservationAdminAccessService).requireStoreAccess(authentication, 2L);
         verify(reservationSettingService).getCapacity(50L);
     }
 

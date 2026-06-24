@@ -2,8 +2,8 @@ package com.restaurant.reservation.controller;
 
 import com.restaurant.reservation.dto.AssignTableRequest;
 import com.restaurant.reservation.dto.ReservationResponse;
+import com.restaurant.reservation.service.ReservationAdminAccessService;
 import com.restaurant.reservation.service.ReservationAdminService;
-import com.restaurant.store.service.StoreAdminAccessService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -23,7 +23,7 @@ class ReservationAdminControllerTest {
     private ReservationAdminService reservationAdminService;
 
     @Mock
-    private StoreAdminAccessService storeAdminAccessService;
+    private ReservationAdminAccessService reservationAdminAccessService;
 
     @Mock
     private Authentication authentication;
@@ -37,7 +37,7 @@ class ReservationAdminControllerTest {
 
         reservationAdminController.getReservationList(2L, authentication);
 
-        verify(storeAdminAccessService).requireStoreAccess(authentication, 2L);
+        verify(reservationAdminAccessService).requireStoreAccess(authentication, 2L);
         verify(reservationAdminService).getReservationList(2L);
     }
 
@@ -51,7 +51,7 @@ class ReservationAdminControllerTest {
 
         reservationAdminController.assignTables(request, authentication);
 
-        verify(storeAdminAccessService).requireStoreAccess(authentication, 2L);
+        verify(reservationAdminAccessService).requireStoreAccess(authentication, 2L);
         verify(reservationAdminService).assignTables(request);
     }
 
@@ -62,7 +62,7 @@ class ReservationAdminControllerTest {
 
         reservationAdminController.checkIn(30L, authentication);
 
-        verify(storeAdminAccessService).requireStoreAccess(authentication, 2L);
+        verify(reservationAdminAccessService).requireStoreAccess(authentication, 2L);
         verify(reservationAdminService).checkIn(30L);
     }
 }
