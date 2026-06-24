@@ -223,9 +223,11 @@ CREATE TABLE time_slot (
     slot_id         BIGINT AUTO_INCREMENT PRIMARY KEY,
     store_id        BIGINT NOT NULL,
     reservation_date DATE NOT NULL COMMENT '可訂日期',
+    day_of_week     INT COMMENT '1=週一...7=週日',
     start_time      TIME NOT NULL COMMENT '時段開始',
     end_time        TIME NOT NULL COMMENT '時段結束',
     is_open         BOOLEAN NOT NULL DEFAULT TRUE COMMENT '是否開放訂位',
+    is_rule_generated BOOLEAN NOT NULL DEFAULT FALSE COMMENT '是否由星期規則批次產生',
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (store_id) REFERENCES store(store_id),
     UNIQUE KEY uk_time_slot (store_id, reservation_date, start_time)

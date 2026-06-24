@@ -35,6 +35,7 @@ public class ReservationResponse {
     private String customerName;
     private String customerPhone;
     private String customerEmail;
+    private String accessToken;
 
     // 已分配桌位 ID、桌號 -> 訂位總覽、訂位名單、分配桌位頁顯示。
     private List<Long> tableIds;

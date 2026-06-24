@@ -35,6 +35,9 @@ public class TimeSlot {
     @Column(name = "reservation_date", nullable = false)
     private LocalDate reservationDate;
 
+    @Column(name = "day_of_week")
+    private Integer dayOfWeek;
+
     @Column(name = "start_time", nullable = false)
     private LocalTime startTime;
 
@@ -45,6 +48,10 @@ public class TimeSlot {
     @Column(name = "is_open", nullable = false)
     @Builder.Default
     private Boolean isOpen = true;
+
+    @Column(name = "is_rule_generated", nullable = false)
+    @Builder.Default
+    private Boolean ruleGenerated = false;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

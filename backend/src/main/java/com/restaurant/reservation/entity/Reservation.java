@@ -66,6 +66,9 @@ public class Reservation {
     @Column(name = "customer_email", length = 100)
     private String customerEmail;
 
+    @Column(name = "access_token", length = 64, unique = true)
+    private String accessToken;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

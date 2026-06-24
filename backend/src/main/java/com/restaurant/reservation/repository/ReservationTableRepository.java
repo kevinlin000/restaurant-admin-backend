@@ -10,6 +10,9 @@ public interface ReservationTableRepository extends JpaRepository<ReservationTab
     // 查已分配的桌位名單
     List<ReservationTable> findByReservationId(Long reservationId);
 
+    // 檢查同一時段其他訂位已使用的桌位
+    List<ReservationTable> findByReservationIdIn(List<Long> reservationIds);
+
     // ＊保留給檢查桌位是否被使用的＊
     boolean existsByTableId(Long tableId);
 

@@ -300,7 +300,6 @@ const logout = () => {
             </ul>
           </template>
         </li>
-
       </ul>
     </aside>
 
