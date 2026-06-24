@@ -48,12 +48,98 @@ public class PaymentService {
         }
 
         payment.setPaymentStatus("PAID");
+        payment.setPaidAt(LocalDateTime.now());
         paymentRepository.save(payment);
 
-        order.setStatus("PAID");
+        order.setStatus("CONFIRMED");
         orderRepository.save(order);
 
     }
+
+    public String buildPaymentSuccessHtml(Long orderId) {
+    String detailUrl = "http://localhost:5173/admin/order-manage?orderId=" + orderId;
+
+    return """
+            <!DOCTYPE html>
+            <html lang="zh-TW">
+            <head>
+                <meta charset="UTF-8">
+                <title>付款成功</title>
+                <style>
+                    body {
+                        margin: 0;
+                        min-height: 100vh;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        background: #f8f3ed;
+                        font-family: "Microsoft JhengHei", Arial, sans-serif;
+                        color: #344b68;
+                    }
+                    .card {
+                        width: 520px;
+                        background: white;
+                        border-radius: 24px;
+                        padding: 44px 36px;
+                        text-align: center;
+                        box-shadow: 0 18px 45px rgba(100, 80, 50, 0.15);
+                    }
+                    .icon {
+                        width: 76px;
+                        height: 76px;
+                        margin: 0 auto 20px;
+                        border-radius: 50%;
+                        background: #e8f8ef;
+                        color: #22a06b;
+                        font-size: 42px;
+                        line-height: 76px;
+                    }
+                    h1 {
+                        margin: 0 0 12px;
+                        font-size: 34px;
+                    }
+                    p {
+                        margin: 10px 0;
+                        color: #718096;
+                        font-size: 16px;
+                    }
+                    .order-id {
+                        margin: 24px 0;
+                        padding: 14px;
+                        border-radius: 14px;
+                        background: #fff6ef;
+                        color: #344b68;
+                        font-weight: 700;
+                    }
+                    a {
+                        display: inline-block;
+                        margin-top: 12px;
+                        padding: 13px 24px;
+                        border-radius: 12px;
+                        background: #e4a775;
+                        color: white;
+                        text-decoration: none;
+                        font-weight: 700;
+                    }
+                    a:hover {
+                        background: #d9945f;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <div class="icon">✓</div>
+                    <h1>付款成功</h1>
+                    <p>付款已完成，訂單已成立。</p>
+                    <div class="order-id">訂單編號：#{{ORDER_ID}}</div>
+                    <a href="{{DETAIL_URL}}">查看訂單明細</a>
+                </div>
+            </body>
+            </html>
+            """
+            .replace("{{ORDER_ID}}", String.valueOf(orderId))
+            .replace("{{DETAIL_URL}}", detailUrl);
+}
 
     public String createEcpayCheckoutForm(Long orderId) {
         // 1. 查訂單
@@ -64,7 +150,7 @@ public class PaymentService {
         // 2. 組綠界參數
         Map<String, String> params = new HashMap<>();
         params.put("MerchantID", "3002607");
-       String tradeNo = "OD" + orderId + "T" + System.currentTimeMillis() % 1000000;
+        String tradeNo = "OD" + orderId + "T" + System.currentTimeMillis() % 1000000;
         params.put("MerchantTradeNo", tradeNo);
         params.put("MerchantTradeDate",
                 LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss")));
@@ -80,8 +166,8 @@ public class PaymentService {
         params.put("ReturnURL",
                 "http://localhost:8080/api/payments/ecpay/callback");
 
-       params.put("OrderResultURL",
-        "http://localhost:8080/api/payments/ecpay/result?orderId=" + orderId);
+        params.put("OrderResultURL",
+                "http://localhost:8080/api/payments/ecpay/result?orderId=" + orderId);
 
         params.put("ChoosePayment", "Credit");
 
@@ -106,7 +192,7 @@ public class PaymentService {
         }
 
         html.append("<script>document.getElementById('ecpayForm').submit();</script>");
-        
+
         html.append("</form>");
         html.append("</body></html>");
 
@@ -159,20 +245,21 @@ public class PaymentService {
 
     public void handleEcpayCallback(Map<String, String> params) {
 
-    String rtnCode = params.get("RtnCode");
-    String merchantTradeNo = params.get("MerchantTradeNo");
+        String rtnCode = params.get("RtnCode");
+        String merchantTradeNo = params.get("MerchantTradeNo");
 
-    if (!"1".equals(rtnCode)) {
-        throw new RuntimeException("付款失敗：" + params.get("RtnMsg"));
+        if (!"1".equals(rtnCode)) {
+            throw new RuntimeException("付款失敗：" + params.get("RtnMsg"));
+        }
+
+        String orderIdText = merchantTradeNo
+                .substring(2, merchantTradeNo.indexOf("T"));
+
+        Long orderId = Long.valueOf(orderIdText);
+
+        simulatePaymentSuccess(orderId);
     }
 
-    String orderIdText = merchantTradeNo
-            .substring(2, merchantTradeNo.indexOf("T"));
-
-    Long orderId = Long.valueOf(orderIdText);
-
-    simulatePaymentSuccess(orderId);
-}
     public String createLinePayRequest(Long orderId) {
         return "LINE Pay 測試付款頁 orderId = " + orderId;
     }
