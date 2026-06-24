@@ -4,19 +4,33 @@
     <p class="subtitle">查看訂單、付款狀態與出餐流程。</p>
 
     <div class="summary-row">
-      <div class="summary-card">
+      <div class="summary-card clickable" :class="{ active: quickFilter === 'ALL' }" @click="setQuickFilter('ALL')">
         <p>全部訂單</p>
         <h2>{{ orders.length }}</h2>
       </div>
 
-      <div class="summary-card">
+      <div class="summary-card clickable" :class="{ active: quickFilter === 'ACTIVE' }"
+        @click="setQuickFilter('ACTIVE')">
         <p>進行中</p>
         <h2>{{ activeCount }}</h2>
       </div>
 
-      <div class="summary-card">
+      <div class="summary-card clickable" :class="{ active: quickFilter === 'COMPLETED' }"
+        @click="setQuickFilter('COMPLETED')">
         <p>已完成</p>
         <h2>{{ completedCount }}</h2>
+      </div>
+
+      <div class="summary-card clickable" :class="{ active: quickFilter === 'UNPAID' }"
+        @click="setQuickFilter('UNPAID')">
+        <p>待付款</p>
+        <h2>{{ unpaidCount }}</h2>
+      </div>
+
+      <div class="summary-card clickable" @click="setQuickFilter('TODAY_REVENUE')"
+:class="{ active: quickFilter === 'TODAY_REVENUE' }">
+        <p>今日營收</p>
+        <h2>${{ todayRevenue }}</h2>
       </div>
     </div>
 
@@ -25,8 +39,20 @@
         <h2>訂單列表</h2>
 
         <div class="filter-panel">
-          <input v-model="keyword" class="search-input" type="text" placeholder="搜尋訂單編號 / 會員編號" />
+         <input
+    v-model="keyword"
+    class="search-input"
+    type="text"
+    placeholder="搜尋訂單編號 / 會員編號"
+  />
 
+  <select v-model="dateFilter" class="date-select">
+    <option value="">全部日期</option>
+    <option value="TODAY">今天</option>
+    <option value="YESTERDAY">昨天</option>
+    <option value="WEEK">近 7 天</option>
+    <option value="MONTH">近 30 天</option>
+  </select>
           <div class="filter-row">
             <select v-model="paymentStatusFilter">
               <option value="">全部付款狀態</option>
@@ -97,9 +123,9 @@
           <td>{{ formatPaymentMethod(order.paymentMethod) }}</td>
           <td>{{ formatPaymentStatus(order.paymentStatus) }}</td>
           <td>
-            <select class="status-select" :value="order.status" :disabled="order.status === 'COMPLETED' ||
-              order.status === 'CANCELLED'
-              " @change="changeStatus(order.orderId, $event.target.value)">
+            <select class="status-select" :class="getStatusClass(order.status)" :value="order.status"
+              :disabled="order.status === 'COMPLETED' || order.status === 'CANCELLED'"
+              @change="changeStatus(order.orderId, $event.target.value)">
               <option value="PENDING">⏳ 待處理</option>
               <option value="CONFIRMED">✅ 已確認</option>
               <option value="PREPARING">👨‍🍳 製作中</option>
@@ -211,6 +237,10 @@ const route = useRoute()
 const sortType = ref('NEWEST')
 const pageSize = ref(10)
 const currentPage = ref(1)
+const quickFilter = ref('ALL')
+const dateFilter = ref('')
+const lastOrderCount = ref(0)
+
 
 onMounted(async () => {
   await loadOrders()
@@ -239,6 +269,26 @@ const isStatusLocked = (order) => {
   return order.status === 'COMPLETED' ||
     order.status === 'CANCELLED'
 }
+const unpaidCount = computed(() => {
+  return orders.value.filter(order => order.paymentStatus === 'UNPAID').length
+})
+
+const todayRevenue = computed(() => {
+  const today = new Date().toLocaleDateString('zh-TW')
+
+  return orders.value
+    .filter(order => {
+      if (!order.createdAt) return false
+      const orderDate = new Date(order.createdAt).toLocaleDateString('zh-TW')
+      return orderDate === today && order.paymentStatus === 'PAID'
+    })
+    .reduce((sum, order) => sum + Number(order.finalAmount || 0), 0)
+})
+const setQuickFilter = (type) => {
+  quickFilter.value = type
+  currentPage.value = 1
+}
+
 
 const loadOrders = async () => {
   try {
@@ -250,8 +300,37 @@ const loadOrders = async () => {
   }
 }
 
+
+
 const filteredOrders = computed(() => {
   let result = [...orders.value]
+
+  if (quickFilter.value === 'ACTIVE') {
+    result = result.filter(order =>
+      order.status !== 'COMPLETED' &&
+      order.status !== 'CANCELLED'
+    )
+  }
+
+  if (quickFilter.value === 'COMPLETED') {
+    result = result.filter(order => order.status === 'COMPLETED')
+  }
+
+  if (quickFilter.value === 'UNPAID') {
+    result = result.filter(order => order.paymentStatus === 'UNPAID')
+  }
+
+  if (quickFilter.value === 'TODAY_REVENUE') {
+  const today = new Date().toLocaleDateString('zh-TW')
+
+  result = result.filter(order => {
+    if (!order.createdAt) return false
+
+    const orderDate = new Date(order.createdAt).toLocaleDateString('zh-TW')
+
+    return orderDate === today && order.paymentStatus === 'PAID'
+  })
+}
 
   if (statusFilter.value) {
     result = result.filter(order => order.status === statusFilter.value)
@@ -298,6 +377,22 @@ const filteredOrders = computed(() => {
 
 const filteredTotalCount = computed(() => {
   let result = [...orders.value]
+  if (quickFilter.value === 'ACTIVE') {
+    result = result.filter(order =>
+      order.status !== 'COMPLETED' &&
+      order.status !== 'CANCELLED'
+    )
+  }
+
+  if (quickFilter.value === 'COMPLETED') {
+    result = result.filter(order => order.status === 'COMPLETED')
+  }
+
+  if (quickFilter.value === 'UNPAID') {
+    result = result.filter(order => order.paymentStatus === 'UNPAID')
+  }
+  
+
 
   if (statusFilter.value) {
     result = result.filter(order => order.status === statusFilter.value)
@@ -323,6 +418,16 @@ const filteredTotalCount = computed(() => {
   return result.length
 })
 
+const getStatusClass = (status) => {
+  if (status === 'PENDING') return 'status-pending'
+  if (status === 'CONFIRMED') return 'status-confirmed'
+  if (status === 'PREPARING') return 'status-preparing'
+  if (status === 'READY') return 'status-ready'
+  if (status === 'COMPLETED') return 'status-completed'
+  if (status === 'CANCELLED') return 'status-cancelled'
+  return ''
+}
+
 const totalPages = computed(() => {
   return Math.max(1, Math.ceil(filteredTotalCount.value / Number(pageSize.value)))
 })
@@ -347,6 +452,7 @@ const resetFilters = () => {
   sortType.value = 'NEWEST'
   pageSize.value = 10
   currentPage.value = 1
+  quickFilter.value = 'ALL'
 }
 
 const pendingCount = computed(() =>
@@ -459,6 +565,96 @@ const formatDate = (date) => {
 </script>
 
 <style scoped>
+.summary-card.clickable {
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.summary-card.clickable:hover {
+  transform: translateY(-2px);
+}
+
+.summary-card.active {
+  border: 2px solid #e4a775;
+  background: #fff8f2;
+}
+
+.status-preparing {
+  background: #fffbe6;
+  border-color: #ffd666;
+  color: #d48806;
+}
+
+.status-confirmed {
+  background: #f6ffed;
+  border-color: #95de64;
+  color: #237804;
+}
+
+.status-pending {
+  background: #ffeaea;
+  border: 1px solid #ff4d4f;
+  color: #cf1322;
+  font-weight: 600;
+}
+
+.status-ready {
+  background: #e6f7ff;
+  border-color: #91d5ff;
+  color: #0050b3;
+}
+
+.status-completed {
+  background: #f5f5f5;
+  border-color: #d9d9d9;
+  color: #8c8c8c;
+}
+
+.status-cancelled {
+  background: #f5f5f5;
+  border-color: #d9d9d9;
+  color: #8c8c8c;
+}
+
+.status-select option {
+  background: #fff;
+  color: #344b68;
+}
+
+thead th {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+thead tr {
+  border-bottom: 2px solid #e4a775;
+}
+
+thead {
+  background: #eee3d8;
+}
+
+tbody tr:nth-child(even) {
+  background: #fcfaf8;
+}
+
+tbody tr {
+  transition: all 0.2s ease;
+}
+
+tbody tr:hover {
+  background: #f3e7db;
+  border-left: 4px solid #e4a775;
+}
+
+tbody tr {
+  border-left: 4px solid transparent;
+}
+
+.view-btn:hover {
+  transform: translateY(-1px);
+}
+
 .search-row {
   margin-bottom: 10px;
   background: transparent;
@@ -557,7 +753,7 @@ h1 {
 
 .summary-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 18px;
   margin: 24px 0;
 }
