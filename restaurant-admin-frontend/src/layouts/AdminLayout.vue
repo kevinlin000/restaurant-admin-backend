@@ -12,6 +12,7 @@ const openMenu = ref({
   menu: false,
   order: false,
   store: false,
+  content: false,
   member: false,
 });
 
@@ -113,6 +114,12 @@ const adminDropdownItems = computed(() => [
     path: "/admin/store",
     icon: "bx bx-buildings",
     roles: ["ADMIN"],
+  },
+  {
+    label: "最新消息",
+    path: "/admin/news",
+    icon: "bx bx-news",
+    roles: ["MANAGER", "ADMIN"],
   },
 ]);
 
@@ -364,6 +371,28 @@ const logout = () => {
                 @click.prevent="goTo('/admin/store', ['MANAGER', 'ADMIN'])"
               >
                 分店與桌位
+              </a>
+            </li>
+          </ul>
+        </li>
+
+        <!-- 品牌內容：店長 / 管理員 -->
+        <li class="menu-group">
+          <div class="menu-title" @click="toggleMenu('content')">
+            <div>
+              <i class="bx bx-news"></i>
+              品牌內容
+            </div>
+            <i class="bx bx-chevron-down"></i>
+          </div>
+
+          <ul v-show="openMenu.content" class="submenu">
+            <li>
+              <a
+                href="#"
+                @click.prevent="goTo('/admin/news', ['MANAGER', 'ADMIN'])"
+              >
+                最新消息
               </a>
             </li>
           </ul>

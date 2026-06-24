@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
+import { newsApi } from "@/api/news";
 
 import heroImage from "@/assets/images/sashimi.jpg";
 import seasonalImage from "@/assets/images/salmon-sashimi.jpg";
@@ -17,7 +18,7 @@ const categories = [
   { label: "會員", value: "member" },
 ];
 
-const newsItems = [
+const fallbackNews = [
   {
     id: 1,
     category: "event",
@@ -107,15 +108,53 @@ const newsItems = [
 ];
 
 const activeCategory = ref("all");
+const newsItems = ref(fallbackNews);
+const newsLoading = ref(false);
+const newsError = ref("");
 
-const featuredNews = computed(() => newsItems.find((item) => item.highlight) || newsItems[0]);
+const imageByCategory = {
+  event: seasonalImage,
+  notice: noticeImage,
+  opening: openingImage,
+  member: memberImage,
+};
+
+const ctaByCategory = {
+  event: { ctaText: "預約席次", ctaTo: "/reservation" },
+  notice: { ctaText: "查看門市", ctaTo: "/store" },
+  opening: { ctaText: "查看門市", ctaTo: "/store" },
+  member: { ctaText: "會員登入", ctaTo: "/login" },
+};
+
+const normalizeCategory = (category) => `${category || "event"}`.toLowerCase();
+
+const normalizeNews = (article) => {
+  const category = normalizeCategory(article.category);
+  const cta = ctaByCategory[category] || ctaByCategory.event;
+  return {
+    id: article.newsId,
+    category,
+    categoryLabel: article.categoryLabel,
+    publishedAt: article.publishedAt?.replaceAll("-", ".") || "",
+    period: article.periodLabel || "長期公告",
+    title: article.title,
+    summary: article.summary,
+    storeScope: article.storeScope,
+    image: article.coverImageUrl || imageByCategory[category] || seasonalImage,
+    highlight: Boolean(article.isFeatured),
+    important: category === "notice",
+    ...cta,
+  };
+};
+
+const featuredNews = computed(() => newsItems.value.find((item) => item.highlight) || newsItems.value[0]);
 
 const filteredNews = computed(() => {
   if (activeCategory.value === "all") {
-    return newsItems;
+    return newsItems.value;
   }
 
-  return newsItems.filter((item) => item.category === activeCategory.value);
+  return newsItems.value.filter((item) => item.category === activeCategory.value);
 });
 
 const listNews = computed(() =>
@@ -124,7 +163,25 @@ const listNews = computed(() =>
 
 const visibleCountLabel = computed(() => `${filteredNews.value.length} 則消息`);
 
-onMounted(() => {
+const loadNews = async () => {
+  newsLoading.value = true;
+  newsError.value = "";
+
+  try {
+    const articles = await newsApi.getPublishedNews();
+    if (articles.length) {
+      newsItems.value = articles.map(normalizeNews);
+    }
+  } catch (error) {
+    newsError.value = "最新消息暫時無法更新，以下顯示精選消息";
+    newsItems.value = fallbackNews;
+  } finally {
+    newsLoading.value = false;
+  }
+};
+
+onMounted(async () => {
+  await loadNews();
   requestAnimationFrame(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   });
@@ -192,6 +249,9 @@ onMounted(() => {
           </div>
           <span class="result-count">{{ visibleCountLabel }}</span>
         </div>
+
+        <div v-if="newsError" class="news-error">{{ newsError }}</div>
+        <div v-if="newsLoading" class="news-error">最新消息載入中</div>
 
         <div class="category-tabs" aria-label="消息分類">
           <button
@@ -440,6 +500,16 @@ onMounted(() => {
   gap: 8px;
   border-bottom: 1px solid #d8cbbd;
   padding-bottom: 16px;
+}
+
+.news-error {
+  border: 1px solid #d8cbbd;
+  border-radius: 6px;
+  background: #fff;
+  color: #8c552e;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  font-weight: 900;
 }
 
 .category-tab {

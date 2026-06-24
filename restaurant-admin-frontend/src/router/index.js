@@ -15,6 +15,7 @@ import AdminMenuCreate from "@/views/admin/menu/menu-create.vue";
 import AdminMenuEdit from "@/views/admin/menu/menu-edit.vue";
 import AdminMenuSetting from "@/views/admin/menu/menu-setting.vue";
 import AdminStore from "@/views/admin/store/store.vue";
+import AdminNews from "@/views/admin/news/news.vue";
 import CustomerMenu from "@/views/customer/menu/menu.vue";
 import CustomerOrder from "@/views/customer/order/order.vue";
 import CustomerStore from "@/views/customer/store/store.vue";
@@ -130,6 +131,11 @@ const routers = [
         path: "store",
         name: "AdminStore",
         component: AdminStore,
+      },
+      {
+        path: "news",
+        name: "AdminNews",
+        component: AdminNews,
       },
     ],
   },
