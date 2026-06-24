@@ -33,6 +33,26 @@ const mealPeriodOptions = [
   { value: "AFTERNOON_TEA", label: "下午茶" },
 ];
 
+const statusOptions = [
+  { value: "OPEN", label: "營業中" },
+  { value: "PREPARING", label: "籌備中" },
+  { value: "PAUSED", label: "暫停營業" },
+  { value: "CLOSED", label: "已關閉" },
+];
+
+const basicForm = reactive({
+  storeName: "",
+  status: "OPEN",
+  phone: "",
+  city: "",
+  district: "",
+  address: "",
+  mainImageUrl: "",
+  mrtInfo: "",
+  parkingInfo: "",
+  description: "",
+});
+
 const tableForm = reactive({
   tableNumber: "",
   tableSize: 2,
@@ -121,6 +141,39 @@ const formatTime = (time) => (time ? `${time}`.slice(0, 5) : "");
 
 const isClosedHour = (hour) => Boolean(hour.closed ?? hour.isClosed);
 
+const formValue = (value) => value ?? "";
+
+const assignBasicForm = (store = {}) => {
+  basicForm.storeName = formValue(store.storeName);
+  basicForm.status = formValue(store.status) || "OPEN";
+  basicForm.phone = formValue(store.phone);
+  basicForm.city = formValue(store.city);
+  basicForm.district = formValue(store.district);
+  basicForm.address = formValue(store.address);
+  basicForm.mainImageUrl = formValue(store.mainImageUrl);
+  basicForm.mrtInfo = formValue(store.mrtInfo);
+  basicForm.parkingInfo = formValue(store.parkingInfo);
+  basicForm.description = formValue(store.description);
+};
+
+const updateStoreInList = (updatedStore) => {
+  stores.value = stores.value.map((store) =>
+    store.storeId === updatedStore.storeId
+      ? {
+          ...store,
+          storeName: updatedStore.storeName,
+          status: updatedStore.status,
+          phone: updatedStore.phone,
+          city: updatedStore.city,
+          district: updatedStore.district,
+          address: updatedStore.address,
+          mainImageUrl: updatedStore.mainImageUrl,
+          mrtInfo: updatedStore.mrtInfo,
+        }
+      : store,
+  );
+};
+
 const loadStores = async () => {
   loadingStores.value = true;
   resetMessages();
@@ -174,6 +227,7 @@ const loadSelectedStoreResources = async () => {
     images.value = unwrap(imagesRes);
     features.value = unwrap(featuresRes);
     tables.value = unwrap(tablesRes);
+    assignBasicForm(selectedStoreDetail.value);
     if (!featureForm.featureKey && !featureForm.featureLabel) {
       featureForm.sortOrder = features.value.length + 1;
     }
@@ -187,6 +241,43 @@ const loadSelectedStoreResources = async () => {
 const selectStore = async (storeId) => {
   selectedStoreId.value = storeId;
   await loadSelectedStoreResources();
+};
+
+const resetBasicForm = () => {
+  if (selectedStore.value) {
+    assignBasicForm(selectedStore.value);
+  }
+};
+
+const saveStoreBasics = async () => {
+  if (!selectedStoreId.value) return;
+  saving.value = true;
+  resetMessages();
+
+  try {
+    const response = await api.put(`/api/admin/stores/${selectedStoreId.value}`, {
+      storeName: basicForm.storeName.trim(),
+      status: basicForm.status,
+      phone: basicForm.phone.trim(),
+      city: basicForm.city.trim(),
+      district: basicForm.district.trim(),
+      address: basicForm.address.trim(),
+      mainImageUrl: basicForm.mainImageUrl.trim(),
+      mrtInfo: basicForm.mrtInfo.trim(),
+      parkingInfo: basicForm.parkingInfo.trim(),
+      description: basicForm.description.trim(),
+    });
+
+    const updatedStore = unwrap(response);
+    selectedStoreDetail.value = updatedStore;
+    updateStoreInList(updatedStore);
+    assignBasicForm(updatedStore);
+    message.value = "門市基本資料已更新";
+  } catch (error) {
+    showError(error, "更新門市基本資料失敗");
+  } finally {
+    saving.value = false;
+  }
 };
 
 const resetTableForm = () => {
@@ -489,29 +580,65 @@ onMounted(loadStores);
           <div v-if="loadingDetail" class="state-box">載入門市設定中</div>
 
           <section v-else-if="activeTab === 'overview'" class="work-section">
-            <div class="field-grid">
-              <div>
-                <span>電話</span>
-                <strong>{{ selectedStore.phone || "未提供" }}</strong>
+            <form class="basic-form" @submit.prevent="saveStoreBasics">
+              <div class="form-section-label">
+                <span>前台基本資料</span>
+                <button class="ghost-btn" type="button" @click="resetBasicForm">還原</button>
               </div>
-              <div>
-                <span>位置</span>
-                <strong>{{ selectedStore.city }} {{ selectedStore.district }}</strong>
-              </div>
-              <div>
-                <span>交通</span>
-                <strong>{{ selectedStore.mrtInfo || "尚未設定" }}</strong>
-              </div>
-              <div>
-                <span>停車</span>
-                <strong>{{ selectedStore.parkingInfo || "尚未設定" }}</strong>
-              </div>
-            </div>
 
-            <div class="text-block">
-              <span>前台文案</span>
-              <p>{{ selectedStore.description || "尚未填寫門市特色。" }}</p>
-            </div>
+              <div class="basic-grid">
+                <label>
+                  門市名稱
+                  <input v-model.trim="basicForm.storeName" maxlength="100" required type="text" />
+                </label>
+                <label>
+                  營運狀態
+                  <select v-model="basicForm.status" required>
+                    <option v-for="option in statusOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </label>
+                <label>
+                  電話
+                  <input v-model.trim="basicForm.phone" maxlength="20" type="text" />
+                </label>
+                <label>
+                  縣市
+                  <input v-model.trim="basicForm.city" maxlength="20" required type="text" />
+                </label>
+                <label>
+                  區域
+                  <input v-model.trim="basicForm.district" maxlength="20" required type="text" />
+                </label>
+                <label class="wide-field">
+                  地址
+                  <input v-model.trim="basicForm.address" maxlength="200" required type="text" />
+                </label>
+                <label class="wide-field">
+                  主圖 URL
+                  <input v-model.trim="basicForm.mainImageUrl" maxlength="500" type="text" />
+                </label>
+                <label class="wide-field">
+                  交通
+                  <input v-model.trim="basicForm.mrtInfo" maxlength="100" type="text" />
+                </label>
+                <label class="wide-field">
+                  停車
+                  <input v-model.trim="basicForm.parkingInfo" maxlength="200" type="text" />
+                </label>
+                <label class="wide-field">
+                  前台文案
+                  <textarea v-model.trim="basicForm.description" rows="5"></textarea>
+                </label>
+              </div>
+
+              <div class="form-actions">
+                <button class="submit-btn" :disabled="saving" type="submit">
+                  {{ saving ? "儲存中" : "儲存基本資料" }}
+                </button>
+              </div>
+            </form>
 
             <div class="text-block">
               <span>前台情境標籤</span>
@@ -597,7 +724,7 @@ onMounted(loadStores);
             <form class="setting-form image-form" @submit.prevent="createImage">
               <label>
                 圖片 URL
-                <input v-model.trim="imageForm.imageUrl" maxlength="500" required type="url" />
+                <input v-model.trim="imageForm.imageUrl" maxlength="500" required type="text" />
               </label>
               <label>
                 圖說
@@ -979,31 +1106,75 @@ onMounted(loadStores);
   padding: 18px;
 }
 
-.field-grid {
+.form-section-label,
+.basic-form,
+.basic-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-top: 1px solid #ddd6cc;
-  border-left: 1px solid #ddd6cc;
 }
 
-.field-grid div {
-  padding: 14px;
-  border-right: 1px solid #ddd6cc;
-  border-bottom: 1px solid #ddd6cc;
+.basic-form {
+  gap: 16px;
 }
 
-.field-grid span,
+.form-section-label {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.form-section-label span,
 .text-block span {
   color: #8f1f1d;
   font-size: 13px;
   font-weight: 900;
 }
 
-.field-grid strong {
-  display: block;
-  margin-top: 6px;
+.basic-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.basic-grid label {
+  display: grid;
+  gap: 6px;
+  color: #625951;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.wide-field {
+  grid-column: 1 / -1;
+}
+
+.basic-grid input,
+.basic-grid select,
+.basic-grid textarea {
+  width: 100%;
+  border: 1px solid #d8d0c6;
+  border-radius: 4px;
+  background: #fff;
   color: #24211e;
-  line-height: 1.5;
+  font: inherit;
+}
+
+.basic-grid input,
+.basic-grid select {
+  height: 40px;
+  padding: 0 10px;
+}
+
+.basic-grid textarea {
+  min-height: 120px;
+  resize: vertical;
+  padding: 10px;
+  line-height: 1.7;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #ddd6cc;
+  padding-top: 14px;
 }
 
 .text-block {
@@ -1088,11 +1259,17 @@ onMounted(loadStores);
 
 .record-row button,
 .table-tile button,
-.image-tile button {
+.image-tile button,
+.ghost-btn {
   border: 0;
   background: transparent;
   color: #b42318;
   font-weight: 900;
+}
+
+.ghost-btn {
+  color: #625951;
+  padding: 0;
 }
 
 .image-grid,
@@ -1229,7 +1406,7 @@ onMounted(loadStores);
     flex-direction: column;
   }
 
-  .field-grid,
+  .basic-grid,
   .metric-strip {
     grid-template-columns: 1fr;
   }
