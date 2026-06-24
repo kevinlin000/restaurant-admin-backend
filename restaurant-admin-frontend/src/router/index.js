@@ -18,6 +18,7 @@ import AdminStore from "@/views/admin/store/store.vue";
 import CustomerMenu from "@/views/customer/menu/menu.vue";
 import CustomerOrder from "@/views/customer/order/order.vue";
 import CustomerStore from "@/views/customer/store/store.vue";
+import CustomerNews from "@/views/customer/news/news.vue";
 // 開發時測試用，正式
 
 const routers = [
@@ -56,6 +57,11 @@ const routers = [
         path: "store",
         name: "CustomerStore",
         component: CustomerStore,
+      },
+      {
+        path: "news",
+        name: "CustomerNews",
+        component: CustomerNews,
       },
       {
         path: "login",
@@ -132,6 +138,9 @@ const routers = [
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: routers,
+  scrollBehavior(to, from, savedPosition) {
+    return savedPosition || { top: 0 };
+  },
 });
 
 const getDefaultPathByRole = (roleName) => {
