@@ -6,7 +6,7 @@
     <div class="summary-row">
       <div class="summary-card clickable" :class="{ active: quickFilter === 'ALL' }" @click="setQuickFilter('ALL')">
         <p>全部訂單</p>
-        <h2>{{ orders.length }}</h2>
+        <h2>{{ totalOrderCount }}</h2>
       </div>
 
       <div class="summary-card clickable" :class="{ active: quickFilter === 'ACTIVE' }"
@@ -27,10 +27,10 @@
         <h2>{{ unpaidCount }}</h2>
       </div>
 
-      <div class="summary-card clickable" @click="setQuickFilter('TODAY_REVENUE')"
-:class="{ active: quickFilter === 'TODAY_REVENUE' }">
-        <p>今日營收</p>
-        <h2>${{ todayRevenue }}</h2>
+      <div class="summary-card clickable" @click="setQuickFilter('REVENUE')"
+        :class="{ active: quickFilter === 'REVENUE' }">
+        <p>{{ revenueTitle }}</p>
+        <h2>${{ filteredRevenue }}</h2>
       </div>
     </div>
 
@@ -38,129 +38,125 @@
       <div class="table-header">
         <h2>訂單列表</h2>
 
-        <div class="filter-panel">
-         <input
-    v-model="keyword"
-    class="search-input"
-    type="text"
-    placeholder="搜尋訂單編號 / 會員編號"
-  />
+        <div class="search-row">
+          <input v-model="keyword" class="search-input" type="text" placeholder="搜尋訂單編號 / 會員編號" />
 
-  <select v-model="dateFilter" class="date-select">
-    <option value="">全部日期</option>
-    <option value="TODAY">今天</option>
-    <option value="YESTERDAY">昨天</option>
-    <option value="WEEK">近 7 天</option>
-    <option value="MONTH">近 30 天</option>
-  </select>
-          <div class="filter-row">
-            <select v-model="paymentStatusFilter">
-              <option value="">全部付款狀態</option>
-              <option value="UNPAID">待付款</option>
-              <option value="PAID">已付款</option>
-              <option value="REFUNDED">已退款</option>
-            </select>
+          <select v-model="dateFilter" class="date-select">
+            <option value="">全部日期</option>
+            <option value="TODAY">今天</option>
+            <option value="YESTERDAY">昨天</option>
+            <option value="WEEK">近 1 週</option>
+            <option value="MONTH">近 1 個月</option>
+          </select>
+        </div>
+        <div class="filter-row">
+          <select v-model="paymentStatusFilter">
+            <option value="">全部付款狀態</option>
+            <option value="UNPAID">待付款</option>
+            <option value="PAID">已付款</option>
+            <option value="REFUNDED">已退款</option>
+          </select>
 
-            <select v-model="paymentMethodFilter">
-              <option value="">全部付款方式</option>
-              <option value="CASH">現金</option>
-              <option value="CREDIT_CARD">信用卡</option>
-              <option value="LINE_PAY">LINE PAY</option>
-            </select>
+          <select v-model="paymentMethodFilter">
+            <option value="">全部付款方式</option>
+            <option value="CASH">現金</option>
+            <option value="CREDIT_CARD">信用卡</option>
+            <option value="LINE_PAY">LINE PAY</option>
+          </select>
 
-            <select v-model="statusFilter">
-              <option value="">全部狀態</option>
-              <option value="PENDING">待處理</option>
-              <option value="CONFIRMED">已確認</option>
-              <option value="PREPARING">製作中</option>
-              <option value="READY">待取餐</option>
-              <option value="COMPLETED">已完成</option>
-              <option value="CANCELLED">已取消</option>
-            </select>
+          <select v-model="statusFilter">
+            <option value="">全部狀態</option>
+            <option value="PENDING">待處理</option>
+            <option value="CONFIRMED">已確認</option>
+            <option value="PREPARING">製作中</option>
+            <option value="READY">待取餐</option>
+            <option value="COMPLETED">已完成</option>
+            <option value="CANCELLED">已取消</option>
+          </select>
 
-            <select v-model="sortType">
-              <option value="NEWEST">最新訂單</option>
-              <option value="OLDEST">最舊訂單</option>
-              <option value="AMOUNT_DESC">金額高到低</option>
-              <option value="AMOUNT_ASC">金額低到高</option>
-            </select>
+          <select v-model="sortType">
+            <option value="NEWEST">最新訂單</option>
+            <option value="OLDEST">最舊訂單</option>
+            <option value="AMOUNT_DESC">金額高到低</option>
+            <option value="AMOUNT_ASC">金額低到高</option>
+          </select>
 
-            <select v-model="pageSize">
-              <option :value="10">每頁 10 筆</option>
-              <option :value="20">每頁 20 筆</option>
-              <option :value="50">每頁 50 筆</option>
-            </select>
+          <select v-model="pageSize">
+            <option :value="10">每頁 10 筆</option>
+            <option :value="20">每頁 20 筆</option>
+            <option :value="50">每頁 50 筆</option>
+          </select>
 
-            <button type="button" class="reset-btn" @click="resetFilters">
-              重設篩選
-            </button>
-          </div>
+          <button type="button" class="reset-btn" @click="resetFilters">
+            重設篩選
+          </button>
         </div>
       </div>
     </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th>訂單編號</th>
-          <th>會員編號</th>
-          <th>類型</th>
-          <th>金額</th>
-          <th>付款方式</th>
-          <th>付款狀態</th>
-          <th>訂單狀態</th>
-          <th>建立時間</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-
-      <tbody>
-        <tr v-for="order in filteredOrders" :key="order.orderId">
-          <td>#{{ order.orderId }}</td>
-          <td>{{ order.userId }}</td>
-          <td>{{ formatOrderType(order.orderType) }}</td>
-          <td>${{ order.finalAmount }}</td>
-          <td>{{ formatPaymentMethod(order.paymentMethod) }}</td>
-          <td>{{ formatPaymentStatus(order.paymentStatus) }}</td>
-          <td>
-            <select class="status-select" :class="getStatusClass(order.status)" :value="order.status"
-              :disabled="order.status === 'COMPLETED' || order.status === 'CANCELLED'"
-              @change="changeStatus(order.orderId, $event.target.value)">
-              <option value="PENDING">⏳ 待處理</option>
-              <option value="CONFIRMED">✅ 已確認</option>
-              <option value="PREPARING">👨‍🍳 製作中</option>
-              <option value="READY">🔔 待取餐</option>
-              <option value="COMPLETED">🎉 已完成</option>
-              <option value="CANCELLED">❌ 已取消</option>
-            </select>
-          </td>
-          <td>{{ formatDate(order.createdAt) }}</td>
-          <td>
-            <button type="button" @click="openDetail(order)">
-              查看
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-
-    <div v-if="filteredOrders.length === 0" class="empty">
-      目前沒有訂單資料
-    </div>
-    <div class="pagination">
-      <button type="button" :disabled="currentPage === 1" @click="goPrevPage">
-        上一頁
-      </button>
-
-      <span>
-        第 {{ currentPage }} / {{ totalPages }} 頁，共 {{ filteredTotalCount }} 筆
-      </span>
-
-      <button type="button" :disabled="currentPage === totalPages" @click="goNextPage">
-        下一頁
-      </button>
-    </div>
   </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>訂單編號</th>
+        <th>會員編號</th>
+        <th>類型</th>
+        <th>金額</th>
+        <th>付款方式</th>
+        <th>付款狀態</th>
+        <th>訂單狀態</th>
+        <th>建立時間</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <tr v-for="order in filteredOrders" :key="order.orderId">
+        <td>#{{ order.orderId }}</td>
+        <td>{{ order.userId }}</td>
+        <td>{{ formatOrderType(order.orderType) }}</td>
+        <td>${{ order.finalAmount }}</td>
+        <td>{{ formatPaymentMethod(order.paymentMethod) }}</td>
+        <td>{{ formatPaymentStatus(order.paymentStatus) }}</td>
+        <td>
+          <select class="status-select" :class="getStatusClass(order.status)" :value="order.status"
+            :disabled="order.status === 'COMPLETED' || order.status === 'CANCELLED'"
+            @change="changeStatus(order.orderId, $event.target.value)">
+            <option value="PENDING">⏳ 待處理</option>
+            <option value="CONFIRMED">✅ 已確認</option>
+            <option value="PREPARING">👨‍🍳 製作中</option>
+            <option value="READY">🔔 待取餐</option>
+            <option value="COMPLETED">🎉 已完成</option>
+            <option value="CANCELLED">❌ 已取消</option>
+          </select>
+        </td>
+        <td>{{ formatDate(order.createdAt) }}</td>
+        <td>
+          <button type="button" @click="openDetail(order)">
+            查看
+          </button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div v-if="filteredOrders.length === 0" class="empty">
+    目前沒有訂單資料
+  </div>
+  <div class="pagination">
+    <button type="button" :disabled="currentPage === 1" @click="goPrevPage">
+      上一頁
+    </button>
+
+    <span>
+      第 {{ currentPage }} / {{ totalPages }} 頁，共 {{ filteredTotalCount }} 筆
+    </span>
+
+    <button type="button" :disabled="currentPage === totalPages" @click="goNextPage">
+      下一頁
+    </button>
+  </div>
+
   <div v-if="selectedOrder" class="modal-mask" @click.self="selectedOrder = null">
     <div class="modal">
       <div class="modal-header">
@@ -227,6 +223,7 @@ import {
   updateAdminOrderStatus
 } from '@/api/orderAdminApi'
 
+
 const orders = ref([])
 const selectedOrder = ref(null)
 const statusFilter = ref('')
@@ -265,12 +262,13 @@ onMounted(async () => {
   }
 })
 
+
 const isStatusLocked = (order) => {
   return order.status === 'COMPLETED' ||
     order.status === 'CANCELLED'
 }
 const unpaidCount = computed(() => {
-  return orders.value.filter(order => order.paymentStatus === 'UNPAID').length
+  return dateFilteredOrders.value.filter(order => order.paymentStatus === 'UNPAID').length
 })
 
 const todayRevenue = computed(() => {
@@ -287,6 +285,9 @@ const todayRevenue = computed(() => {
 const setQuickFilter = (type) => {
   quickFilter.value = type
   currentPage.value = 1
+   if (type === 'REVENUE' && !dateFilter.value) {
+    dateFilter.value = 'TODAY'
+  }
 }
 
 
@@ -300,7 +301,97 @@ const loadOrders = async () => {
   }
 }
 
+const revenueTitle = computed(() => {
+  if (dateFilter.value === 'YESTERDAY') return '昨日營收'
+  if (dateFilter.value === 'WEEK') return '近 7 天營收'
+  if (dateFilter.value === 'MONTH') return '近 30 天營收'
+  return '今日營收'
+})
 
+const dateFilteredOrders = computed(() => {
+  let result = [...orders.value]
+
+  if (!dateFilter.value) return result
+
+  const now = new Date()
+
+  return result.filter(order => {
+    if (!order.createdAt) return false
+
+    const orderDate = new Date(order.createdAt)
+
+    switch (dateFilter.value) {
+      case 'TODAY':
+        return orderDate.toDateString() === now.toDateString()
+
+      case 'YESTERDAY': {
+        const yesterday = new Date()
+        yesterday.setDate(yesterday.getDate() - 1)
+        return orderDate.toDateString() === yesterday.toDateString()
+      }
+
+      case 'WEEK': {
+        const weekAgo = new Date()
+        weekAgo.setDate(weekAgo.getDate() - 7)
+        return orderDate >= weekAgo
+      }
+
+      case 'MONTH': {
+        const monthAgo = new Date()
+        monthAgo.setDate(monthAgo.getDate() - 30)
+        return orderDate >= monthAgo
+      }
+
+      default:
+        return true
+    }
+  })
+})
+
+const filteredRevenue = computed(() => {
+  let result = [...orders.value]
+
+  if (dateFilter.value) {
+    const now = new Date()
+
+    result = result.filter(order => {
+      if (!order.createdAt) return false
+
+      const orderDate = new Date(order.createdAt)
+
+      switch (dateFilter.value) {
+        case 'TODAY':
+          return orderDate.toDateString() === now.toDateString()
+        case 'YESTERDAY': {
+          const yesterday = new Date()
+          yesterday.setDate(yesterday.getDate() - 1)
+          return orderDate.toDateString() === yesterday.toDateString()
+        }
+        case 'WEEK': {
+          const weekAgo = new Date()
+          weekAgo.setDate(weekAgo.getDate() - 7)
+          return orderDate >= weekAgo
+        }
+        case 'MONTH': {
+          const monthAgo = new Date()
+          monthAgo.setDate(monthAgo.getDate() - 30)
+          return orderDate >= monthAgo
+        }
+        default:
+          return true
+      }
+    })
+  } else {
+    const today = new Date()
+    result = result.filter(order =>
+      new Date(order.createdAt).toDateString() === today.toDateString()
+    )
+  }
+
+  return result
+    .filter(order => order.paymentStatus === 'PAID')
+    .reduce((sum, order) => sum + Number(order.finalAmount || 0), 0)
+})
 
 const filteredOrders = computed(() => {
   let result = [...orders.value]
@@ -320,17 +411,21 @@ const filteredOrders = computed(() => {
     result = result.filter(order => order.paymentStatus === 'UNPAID')
   }
 
-  if (quickFilter.value === 'TODAY_REVENUE') {
-  const today = new Date().toLocaleDateString('zh-TW')
-
-  result = result.filter(order => {
-    if (!order.createdAt) return false
-
-    const orderDate = new Date(order.createdAt).toLocaleDateString('zh-TW')
-
-    return orderDate === today && order.paymentStatus === 'PAID'
-  })
+  if (quickFilter.value === 'REVENUE') {
+  result = result.filter(order => order.paymentStatus === 'PAID')
 }
+
+  // if (quickFilter.value === 'TODAY_REVENUE') {
+  //   const today = new Date().toLocaleDateString('zh-TW')
+
+  //   result = result.filter(order => {
+  //     if (!order.createdAt) return false
+
+  //     const orderDate = new Date(order.createdAt).toLocaleDateString('zh-TW')
+
+  //     return orderDate === today && order.paymentStatus === 'PAID'
+  //   })
+  // }
 
   if (statusFilter.value) {
     result = result.filter(order => order.status === statusFilter.value)
@@ -342,6 +437,42 @@ const filteredOrders = computed(() => {
 
   if (paymentMethodFilter.value) {
     result = result.filter(order => order.paymentMethod === paymentMethodFilter.value)
+  }
+
+  if (dateFilter.value) {
+    const now = new Date()
+
+    result = result.filter(order => {
+      if (!order.createdAt) return false
+
+      const orderDate = new Date(order.createdAt)
+
+      switch (dateFilter.value) {
+        case 'TODAY':
+          return orderDate.toDateString() === now.toDateString()
+
+        case 'YESTERDAY': {
+          const yesterday = new Date()
+          yesterday.setDate(yesterday.getDate() - 1)
+          return orderDate.toDateString() === yesterday.toDateString()
+        }
+
+        case 'WEEK': {
+          const weekAgo = new Date()
+          weekAgo.setDate(weekAgo.getDate() - 7)
+          return orderDate >= weekAgo
+        }
+
+        case 'MONTH': {
+          const monthAgo = new Date()
+          monthAgo.setDate(monthAgo.getDate() - 30)
+          return orderDate >= monthAgo
+        }
+
+        default:
+          return true
+      }
+    })
   }
 
   const text = keyword.value.trim()
@@ -391,8 +522,22 @@ const filteredTotalCount = computed(() => {
   if (quickFilter.value === 'UNPAID') {
     result = result.filter(order => order.paymentStatus === 'UNPAID')
   }
-  
 
+  if (quickFilter.value === 'REVENUE') {
+  result = result.filter(order => order.paymentStatus === 'PAID')
+}
+
+  // if (quickFilter.value === 'TODAY_REVENUE') {
+  //   const today = new Date().toLocaleDateString('zh-TW')
+
+  //   result = result.filter(order => {
+  //     if (!order.createdAt) return false
+
+  //     const orderDate = new Date(order.createdAt).toLocaleDateString('zh-TW')
+
+  //     return orderDate === today && order.paymentStatus === 'PAID'
+  //   })
+  // }
 
   if (statusFilter.value) {
     result = result.filter(order => order.status === statusFilter.value)
@@ -405,7 +550,41 @@ const filteredTotalCount = computed(() => {
   if (paymentMethodFilter.value) {
     result = result.filter(order => order.paymentMethod === paymentMethodFilter.value)
   }
+  if (dateFilter.value) {
+    const now = new Date()
 
+    result = result.filter(order => {
+      if (!order.createdAt) return false
+
+      const orderDate = new Date(order.createdAt)
+
+      switch (dateFilter.value) {
+        case 'TODAY':
+          return orderDate.toDateString() === now.toDateString()
+
+        case 'YESTERDAY': {
+          const yesterday = new Date()
+          yesterday.setDate(yesterday.getDate() - 1)
+          return orderDate.toDateString() === yesterday.toDateString()
+        }
+
+        case 'WEEK': {
+          const weekAgo = new Date()
+          weekAgo.setDate(weekAgo.getDate() - 7)
+          return orderDate >= weekAgo
+        }
+
+        case 'MONTH': {
+          const monthAgo = new Date()
+          monthAgo.setDate(monthAgo.getDate() - 30)
+          return orderDate >= monthAgo
+        }
+
+        default:
+          return true
+      }
+    })
+  }
   const text = keyword.value.trim()
 
   if (text) {
@@ -449,6 +628,7 @@ const resetFilters = () => {
   paymentStatusFilter.value = ''
   paymentMethodFilter.value = ''
   statusFilter.value = ''
+  dateFilter.value = ''
   sortType.value = 'NEWEST'
   pageSize.value = 10
   currentPage.value = 1
@@ -467,14 +647,18 @@ const cancelledCount = computed(() =>
   orders.value.filter(order => order.status === 'CANCELLED').length
 )
 
+const totalOrderCount = computed(() => {
+  return dateFilteredOrders.value.length
+})
+
 const activeCount = computed(() => {
-  return orders.value.filter(order =>
+  return dateFilteredOrders.value.filter(order =>
     order.status !== 'COMPLETED' && order.status !== 'CANCELLED'
   ).length
 })
 
 const completedCount = computed(() => {
-  return orders.value.filter(order => order.status === 'COMPLETED').length
+  return dateFilteredOrders.value.filter(order => order.status === 'COMPLETED').length
 })
 
 const changeStatus = async (orderId, status) => {
@@ -656,12 +840,15 @@ tbody tr {
 }
 
 .search-row {
-  margin-bottom: 10px;
-  background: transparent;
-  border: none;
-  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
+.date-select {
+  width: 140px;
+}
 
 .filter-panel {
   display: flex;
@@ -710,11 +897,6 @@ tbody tr {
 
 .search-input {
   width: 320px;
-  padding: 9px 12px;
-  border: 1px solid #ead8c5;
-  border-radius: 10px;
-  color: #43546d;
-  background: #fff;
 }
 
 .status-select:disabled {
