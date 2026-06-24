@@ -82,12 +82,35 @@
 
         <div class="form-group">
           <label>驗證碼</label>
-          <input
-            v-model="forgotForm.verifyCode"
-            type="text"
-            maxlength="6"
-            placeholder="請輸入 6 位數驗證碼"
-          />
+          <div class="code-row">
+            <input
+              v-model="forgotForm.verifyCode"
+              type="text"
+              maxlength="6"
+              placeholder="請輸入 6 位數驗證碼"
+            />
+            <button
+              type="button"
+              class="verify-btn code-verify-btn"
+              @click="verifyResetCode"
+              :disabled="!canVerifyResetCode"
+            >
+              <span v-if="isVerifyingResetCode">驗證中...</span>
+              <span v-else-if="resetCodeVerified">已驗證</span>
+              <span v-else>驗證</span>
+            </button>
+          </div>
+          <p
+            v-if="forgotForm.verifyCode || resetCodeVerified"
+            class="status-text"
+            :class="resetCodeVerified ? 'status-success' : 'status-muted'"
+          >
+            {{
+              resetCodeVerified
+                ? "驗證碼已通過，請設定新密碼"
+                : "請先完成驗證碼驗證"
+            }}
+          </p>
         </div>
 
         <div class="form-group">
@@ -97,6 +120,7 @@
               v-model="forgotForm.newPassword"
               :type="showNewPassword ? 'text' : 'password'"
               placeholder="至少 8 碼，最多 20 碼"
+              :disabled="!resetCodeVerified"
             />
             <span class="eye-icon" @click="showNewPassword = !showNewPassword">
               <i :class="showNewPassword ? 'bi bi-eye' : 'bi bi-eye-slash'"></i>
@@ -119,6 +143,7 @@
               v-model="forgotForm.confirmPassword"
               :type="showConfirmPassword ? 'text' : 'password'"
               placeholder="再次輸入新密碼"
+              :disabled="!resetCodeVerified"
             />
             <span
               class="eye-icon"
@@ -146,7 +171,7 @@
           class="submit-btn"
           type="button"
           @click="handleResetPassword"
-          :disabled="isResettingPassword"
+          :disabled="!canSubmitResetPassword"
         >
           {{ isResettingPassword ? "重設中..." : "重設密碼" }}
         </button>
@@ -156,9 +181,14 @@
 </template>
 
 <script setup>
-import { computed, onUnmounted, reactive, ref } from "vue";
+import { computed, onUnmounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { forgotPassword, login, resetPassword } from "@/api/member";
+import {
+  forgotPassword,
+  login,
+  resetPassword,
+  verifyPasswordResetCode,
+} from "@/api/member";
 import Swal from "sweetalert2";
 
 const router = useRouter();
@@ -172,8 +202,10 @@ const errorMsg = ref("");
 const forgotErrorMsg = ref("");
 const isLoading = ref(false);
 const isSendingCode = ref(false);
+const isVerifyingResetCode = ref(false);
 const isResettingPassword = ref(false);
 const codeSent = ref(false);
+const resetCodeVerified = ref(false);
 const resetCodeCountdown = ref(0);
 let resetCodeTimer = null;
 
@@ -221,6 +253,27 @@ const passwordConfirmed = computed(() => {
   );
 });
 
+const resetCodeFormatValid = computed(() => /^\d{6}$/.test(forgotForm.verifyCode));
+
+const canVerifyResetCode = computed(() => {
+  return (
+    codeSent.value &&
+    forgotEmailValid.value &&
+    resetCodeFormatValid.value &&
+    !resetCodeVerified.value &&
+    !isVerifyingResetCode.value
+  );
+});
+
+const canSubmitResetPassword = computed(() => {
+  return (
+    resetCodeVerified.value &&
+    passwordLengthValid.value &&
+    passwordConfirmed.value &&
+    !isResettingPassword.value
+  );
+});
+
 const startResetCodeCountdown = () => {
   resetCodeCountdown.value = 60;
 
@@ -246,6 +299,27 @@ const stopResetCodeCountdown = () => {
     resetCodeTimer = null;
   }
 };
+
+watch(
+  () => forgotForm.email,
+  () => {
+    codeSent.value = false;
+    resetCodeVerified.value = false;
+    forgotForm.verifyCode = "";
+    forgotForm.newPassword = "";
+    forgotForm.confirmPassword = "";
+    stopResetCodeCountdown();
+  },
+);
+
+watch(
+  () => forgotForm.verifyCode,
+  () => {
+    resetCodeVerified.value = false;
+    forgotForm.newPassword = "";
+    forgotForm.confirmPassword = "";
+  },
+);
 
 onUnmounted(() => {
   stopResetCodeCountdown();
@@ -292,7 +366,10 @@ const sendResetCode = async () => {
     });
 
     codeSent.value = true;
+    resetCodeVerified.value = false;
     forgotForm.verifyCode = "";
+    forgotForm.newPassword = "";
+    forgotForm.confirmPassword = "";
     startResetCodeCountdown();
   } catch (err) {
     forgotErrorMsg.value = err.response?.data?.message || "寄送驗證碼失敗";
@@ -301,21 +378,74 @@ const sendResetCode = async () => {
   }
 };
 
+const verifyResetCode = async () => {
+  forgotErrorMsg.value = "";
+
+  if (!codeSent.value) {
+    forgotErrorMsg.value = "請先發送驗證碼";
+    return;
+  }
+
+  if (!forgotEmailValid.value) {
+    forgotErrorMsg.value = "電子信箱格式不正確";
+    return;
+  }
+
+  if (!resetCodeFormatValid.value) {
+    forgotErrorMsg.value = "請輸入 6 位數字驗證碼";
+    return;
+  }
+
+  isVerifyingResetCode.value = true;
+
+  try {
+    const res = await verifyPasswordResetCode(
+      forgotForm.email,
+      forgotForm.verifyCode,
+    );
+
+    resetCodeVerified.value = true;
+
+    await Swal.fire({
+      icon: "success",
+      title: "驗證成功",
+      text: res.data.message || "請繼續設定新密碼",
+      confirmButtonColor: "#d9a372",
+    });
+  } catch (err) {
+    resetCodeVerified.value = false;
+
+    if (err.response?.status === 401 || err.response?.status === 403) {
+      forgotErrorMsg.value =
+        "驗證碼驗證 API 尚未開放，請重新啟動後端後再試";
+    } else {
+      forgotErrorMsg.value = err.response?.data?.message || "驗證碼錯誤";
+    }
+  } finally {
+    isVerifyingResetCode.value = false;
+  }
+};
+
 const handleResetPassword = async () => {
   forgotErrorMsg.value = "";
 
-  if (
-    !forgotForm.email ||
-    !forgotForm.verifyCode ||
-    !forgotForm.newPassword ||
-    !forgotForm.confirmPassword
-  ) {
-    forgotErrorMsg.value = "請完整填寫所有欄位";
+  if (!forgotForm.email || !forgotForm.verifyCode) {
+    forgotErrorMsg.value = "請先輸入電子信箱與驗證碼";
     return;
   }
 
   if (!codeSent.value) {
     forgotErrorMsg.value = "請先發送驗證碼";
+    return;
+  }
+
+  if (!resetCodeVerified.value) {
+    forgotErrorMsg.value = "請先完成驗證碼驗證";
+    return;
+  }
+
+  if (!forgotForm.newPassword || !forgotForm.confirmPassword) {
+    forgotErrorMsg.value = "請完整填寫新密碼與確認密碼";
     return;
   }
 
@@ -349,6 +479,7 @@ const handleResetPassword = async () => {
     forgotForm.newPassword = "";
     forgotForm.confirmPassword = "";
     codeSent.value = false;
+    resetCodeVerified.value = false;
     stopResetCodeCountdown();
 
     currentView.value = "login";
@@ -362,11 +493,11 @@ const handleResetPassword = async () => {
 };
 
 const getDefaultPathByRole = (roleName) => {
-  if (["CUSTOMER", "STAFF", "MANAGER"].includes(roleName)) {
-    return "/home";
+  if (roleName === "CUSTOMER") {
+    return "/profile";
   }
 
-  if (roleName === "ADMIN") {
+  if (["STAFF", "MANAGER", "ADMIN"].includes(roleName)) {
     return "/admin/home";
   }
 
@@ -400,7 +531,7 @@ const handleLogin = async () => {
       confirmButtonColor: "#d9a372",
     });
 
-    router.push("/");
+    router.push(getDefaultPathByRole(data.roleName));
   } catch (err) {
     errorMsg.value = err.response?.data?.message || "登入失敗，請稍後再試";
   } finally {
@@ -420,9 +551,9 @@ const handleLogin = async () => {
 .login-container {
   display: flex;
   justify-content: center;
-  align-items: center;
-  padding-top: 150px;
-  min-height: 80vh;
+  align-items: flex-start;
+  padding: 180px 16px 60px;
+  min-height: 100vh;
 }
 
 .login-box {
@@ -514,13 +645,15 @@ input:focus {
   text-align: center;
 }
 
-.email-row {
+.email-row,
+.code-row {
   display: flex;
   gap: 10px;
   align-items: stretch;
 }
 
-.email-row input {
+.email-row input,
+.code-row input {
   flex: 1;
 }
 
@@ -542,6 +675,15 @@ input:focus {
   cursor: not-allowed;
 }
 
+.code-verify-btn {
+  width: 92px;
+}
+
+input:disabled {
+  background: #f6f6f6;
+  cursor: not-allowed;
+}
+
 .status-text {
   margin: 7px 0 0;
   font-size: 13px;
@@ -554,6 +696,10 @@ input:focus {
 .status-error,
 .error-msg {
   color: #c0392b;
+}
+
+.status-muted {
+  color: #9aa6b2;
 }
 
 .error-msg {
@@ -616,18 +762,20 @@ input:focus {
 
 @media (max-width: 576px) {
   .login-container {
-    padding: 120px 16px 40px;
+    padding: 140px 16px 40px;
   }
 
   .login-box {
     padding: 36px 24px;
   }
 
-  .email-row {
+  .email-row,
+  .code-row {
     flex-direction: column;
   }
 
-  .verify-btn {
+  .verify-btn,
+  .code-verify-btn {
     width: 100%;
     height: 44px;
   }

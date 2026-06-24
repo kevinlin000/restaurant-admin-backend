@@ -44,6 +44,10 @@ public interface AuthService {
 
     void forgotPassword(String email);
 
+    boolean verifyPasswordResetCode(
+            String email,
+            String code);
+
     void resetPassword(
             String email,
             String code,

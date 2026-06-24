@@ -18,67 +18,31 @@ const dropdownItems = computed(() => {
     return [];
   }
 
-  const profileItem = {
-    label: "個人資料",
-    path: "/profile",
-    icon: "bi-person",
-  };
-
-  if (roleName.value === "CUSTOMER") {
-    return [profileItem];
+  // 前台首頁的下拉選單只呈現「消費者會員」相關功能。
+  // STAFF / MANAGER 雖然有後台權限，但在前台仍視為一般會員顯示。
+  // ADMIN 是共用管理帳號，不提供個人會員頁，因此只保留登出。
+  if (roleName.value === "ADMIN") {
+    return [];
   }
 
-  const items = [
-    ...(roleName.value === "ADMIN" ? [] : [profileItem]),
+  return [
     {
-      label: "後台首頁",
-      path: "/admin/home",
-      icon: "bi-house",
-      roles: ["STAFF", "MANAGER", "ADMIN"],
+      label: "個人資料",
+      path: "/profile",
+      icon: "bi-person",
     },
     {
-      label: "訂位管理",
-      path: "/admin/reservation",
+      label: "訂位紀錄",
+      path: { path: "/profile", query: { tab: "reservations" } },
       icon: "bi-calendar-check",
-      roles: ["STAFF", "MANAGER", "ADMIN"],
     },
     {
-      label: "訂單管理",
-      path: "/admin/order-manage",
+      label: "消費紀錄",
+      path: { path: "/profile", query: { tab: "orders" } },
       icon: "bi-receipt",
-      roles: ["STAFF", "MANAGER", "ADMIN"],
-    },
-    {
-      label: "菜單管理",
-      path: "/admin/menu-setting",
-      icon: "bi-menu-button-wide",
-      roles: ["MANAGER", "ADMIN"],
-    },
-    {
-      label: "店家檔案設定",
-      path: "/admin/profile",
-      icon: "bi-shop",
-      roles: ["MANAGER", "ADMIN"],
-    },
-    {
-      label: "員工管理",
-      path: "/admin/member",
-      icon: "bi-people",
-      roles: ["ADMIN"],
-    },
-    {
-      label: "門市管理",
-      path: "/admin/store",
-      icon: "bi-buildings",
-      roles: ["ADMIN"],
     },
   ];
-
-  return items.filter(
-    (item) => !item.roles || item.roles.includes(roleName.value),
-  );
 });
-
 onMounted(() => {
   loadUserInfo();
   window.addEventListener("login-state-changed", loadUserInfo);
@@ -181,16 +145,21 @@ const logout = async () => {
 
                 <ul class="dropdown-menu dropdown-menu-end">
                   <li v-for="item in dropdownItems" :key="item.label">
-                    <RouterLink class="dropdown-item" :to="item.path">
-                      <i
-                        v-if="item.icon"
-                        :class="['bi', item.icon, 'me-2']"
-                      ></i>
-                      {{ item.label }}
+                    <RouterLink
+                      :class="['dropdown-item', item.menuClass]"
+                      :to="item.path"
+                    >
+                      <i v-if="item.icon" :class="['bi', item.icon]"></i>
+                      <span class="dropdown-text">
+                        <span>{{ item.label }}</span>
+                        <small v-if="item.subtitle">{{ item.subtitle }}</small>
+                      </span>
                     </RouterLink>
                   </li>
 
-                  <li><hr class="dropdown-divider" /></li>
+                  <li v-if="dropdownItems.length">
+                    <hr class="dropdown-divider" />
+                  </li>
 
                   <li>
                     <button
@@ -344,6 +313,55 @@ const logout = async () => {
 .login-btn:hover {
   background: #e3ac7f;
   transform: translateY(-1px);
+}
+
+/* dropdown */
+
+.dropdown-menu {
+  min-width: 230px;
+  padding: 8px;
+  border: 0;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(86, 106, 127, 0.18);
+}
+
+.dropdown-menu .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  color: #566a7f;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.dropdown-menu .dropdown-item i {
+  width: 18px;
+  color: #7a8ca1;
+  font-size: 17px;
+}
+
+.dropdown-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.dropdown-text small {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.dropdown-menu .dropdown-item:hover {
+  background: #f8f3ed;
+  color: #d5905f;
+}
+
+.dropdown-menu .dropdown-item:hover i {
+  color: #d5905f;
 }
 
 /* main */

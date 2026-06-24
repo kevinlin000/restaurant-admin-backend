@@ -21,24 +21,44 @@ export const deleteAccount = () => api.delete("/api/members/me");
 
 // 寄信至Email
 export const sendEmailCode = (email) =>
-  api.post("/api/members/email/send-code", { email });
+  api.post("/api/members/email/send-code", { email: email?.trim() });
 
 export const verifyEmailCode = (email, code) =>
   api.post("/api/members/email/verify-code", {
-    email,
-    code,
+    email: email?.trim(),
+    code: code?.trim(),
   });
 
 // 忘記密碼：寄送驗證碼
 export const forgotPassword = (email) =>
-  api.post("/api/members/password/forgot", { email });
+  api.post("/api/members/password/forgot", { email: email?.trim() });
+
+// 忘記密碼：驗證重設密碼驗證碼
+export const verifyPasswordResetCode = (email, code) =>
+  api.post("/api/members/password/verify-code", {
+    email: email?.trim(),
+    code: code?.trim(),
+  });
 
 // 忘記密碼：重設密碼
 export const resetPassword = (data) =>
-  api.post("/api/members/password/reset", data);
+  api.post("/api/members/password/reset", {
+    ...data,
+    email: data.email?.trim(),
+    code: data.code?.trim(),
+  });
 
 // 查詢會員目前點數
 export const getPointBalance = () => api.get("/api/members/me/points");
 
 // 查詢會員點數紀錄
 export const getPointHistory = () => api.get("/api/members/me/points/history");
+
+// 後台：會員/員工統計摘要
+export const getMemberAdminSummary = () => api.get("/api/admin/members/summary");
+
+// 後台：員工管理
+export const getStaffList = () => api.get("/api/members/staff");
+export const createStaff = (data) => api.post("/api/members/staff", data);
+export const resignStaff = (staffId) =>
+  api.put(`/api/members/staff/${staffId}/resign`);

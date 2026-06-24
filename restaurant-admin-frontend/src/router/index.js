@@ -10,18 +10,29 @@ import CustomerReservation from "@/views/customer/reservation/Reservation.vue";
 import AdminReservationList from "@/views/admin/reservation/ReservationList.vue";
 import AdminReservationTable from "@/views/admin/reservation/ReservationTable.vue";
 import CustomerReservationSuccess from "@/views/customer/reservation/Reservation-success.vue";
-import AdminReservationTimeSetting from '@/views/admin/reservation/ReservationTimeSetting.vue'
+import AdminReservationTimeSetting from "@/views/admin/reservation/ReservationTimeSetting.vue";
 import AdminMenuCreate from "@/views/admin/menu/menu-create.vue";
 import AdminMenuEdit from "@/views/admin/menu/menu-edit.vue";
 import AdminMenuSetting from "@/views/admin/menu/menu-setting.vue";
 import AdminStore from "@/views/admin/store/store.vue";
 import AdminNews from "@/views/admin/news/news.vue";
+import AdminMember from "@/views/admin/member/member.vue";
+import AdminOrderManage from "@/views/admin/order/AdminOrderManage.vue";
 import CustomerMenu from "@/views/customer/menu/menu.vue";
 import CustomerOrder from "@/views/customer/order/order.vue";
 import CustomerStore from "@/views/customer/store/store.vue";
 import CustomerNews from "@/views/customer/news/news.vue";
-import AdminOrderManage from "@/views/admin/order/AdminOrderManage.vue";
-// 開發時測試用，正式
+
+const ROLE = {
+  STAFF: "STAFF",
+  MANAGER: "MANAGER",
+  ADMIN: "ADMIN",
+  CUSTOMER: "CUSTOMER",
+};
+
+const ADMIN_ROLES = [ROLE.STAFF, ROLE.MANAGER, ROLE.ADMIN];
+const MANAGER_ROLES = [ROLE.MANAGER, ROLE.ADMIN];
+const ADMIN_ONLY = [ROLE.ADMIN];
 
 const routers = [
   {
@@ -79,6 +90,7 @@ const routers = [
         path: "profile",
         name: "CustomerProfile",
         component: () => import("@/views/customer/member/profile.vue"),
+        meta: { requiresAuth: true },
       },
     ],
   },
@@ -87,61 +99,79 @@ const routers = [
     name: "AdminLayout",
     redirect: "/admin/home",
     component: AdminLayout,
+    meta: { requiresAuth: true, roles: ADMIN_ROLES },
     children: [
       {
         path: "home",
         name: "AdminHome",
         component: AdminHome,
+        meta: { roles: ADMIN_ROLES },
       },
       {
         path: "reservation",
         name: "AdminReservation",
         component: AdminReservatioin,
+        meta: { roles: ADMIN_ROLES },
       },
       {
         path: "reservation-list",
         name: "AdminReservationList",
         component: AdminReservationList,
+        meta: { roles: ADMIN_ROLES },
       },
       {
         path: "reservation-table",
         name: "AdminReservationTable",
         component: AdminReservationTable,
+        meta: { roles: ADMIN_ROLES },
       },
       {
         path: "reservation-time-setting",
         name: "AdminReservationTimeSetting",
-        component: AdminReservationTimeSetting
+        component: AdminReservationTimeSetting,
+        meta: { roles: ADMIN_ROLES },
       },
       {
         path: "menu-create",
         name: "AdminMenuCreate",
         component: AdminMenuCreate,
+        meta: { roles: MANAGER_ROLES },
       },
       {
         path: "menu-edit/:id",
         name: "AdminMenuEdit",
         component: AdminMenuEdit,
+        meta: { roles: MANAGER_ROLES },
       },
       {
         path: "menu-setting",
         name: "AdminMenuSetting",
         component: AdminMenuSetting,
+        meta: { roles: MANAGER_ROLES },
       },
       {
         path: "order-manage",
         name: "AdminOrderManage",
         component: AdminOrderManage,
+        meta: { roles: ADMIN_ROLES },
+      },
+      {
+        path: "member",
+        name: "AdminMember",
+        component: AdminMember,
+        meta: { roles: ADMIN_ONLY },
       },
       {
         path: "store",
         name: "AdminStore",
         component: AdminStore,
+        meta: { roles: MANAGER_ROLES },
       },
       {
         path: "news",
         name: "AdminNews",
         component: AdminNews,
+        meta: { roles: MANAGER_ROLES },
       },
     ],
   },
@@ -156,11 +186,11 @@ const router = createRouter({
 });
 
 const getDefaultPathByRole = (roleName) => {
-  if (["CUSTOMER", "STAFF", "MANAGER"].includes(roleName)) {
-    return "/home";
+  if (roleName === ROLE.CUSTOMER) {
+    return "/profile";
   }
 
-  if (roleName === "ADMIN") {
+  if (ADMIN_ROLES.includes(roleName)) {
     return "/admin/home";
   }
 
@@ -176,31 +206,50 @@ const getUserInfo = () => {
   }
 };
 
+const getRouteRoles = (to) => {
+  const roleMeta = [...to.matched]
+    .reverse()
+    .find((record) => Array.isArray(record.meta?.roles));
+
+  return roleMeta?.meta?.roles || null;
+};
+
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem("accessToken");
   const userInfo = getUserInfo();
   const roleName = userInfo.roleName;
 
   const isAdminPage = to.path.startsWith("/admin");
-  const isCustomerProfilePage = to.path === "/profile";
+  const isProfilePage = to.path === "/profile";
+  const requiresAuth = to.matched.some((record) => record.meta?.requiresAuth);
+  const allowedRoles = getRouteRoles(to);
 
-  // 未登入不能進會員中心或後台
-  if (!token && (isAdminPage || isCustomerProfilePage)) {
+  if (!token && (requiresAuth || isAdminPage || isProfilePage)) {
     next("/login");
     return;
   }
 
-  // 已登入後，不要再進登入或註冊頁
   if (token && (to.path === "/login" || to.path === "/register")) {
     next(getDefaultPathByRole(roleName));
     return;
   }
 
-  // CUSTOMER 不能進後台
-  if (isAdminPage && roleName === "CUSTOMER") {
+  if (isAdminPage && roleName === ROLE.CUSTOMER) {
     next("/profile");
     return;
   }
+
+  if (isProfilePage && roleName === ROLE.ADMIN) {
+    next("/admin/home");
+    return;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(roleName)) {
+    next(getDefaultPathByRole(roleName));
+    return;
+  }
+
   next();
 });
+
 export default router;

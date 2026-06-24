@@ -1,39 +1,33 @@
 <template>
   <div class="member-page">
     <div class="member-shell">
-      <!-- 載入中 -->
       <div v-if="isLoading" class="state-box">載入中...</div>
 
-      <!-- 錯誤訊息 -->
       <div v-else-if="errorMsg" class="state-box error-msg">
         {{ errorMsg }}
       </div>
 
       <template v-else>
-        <!-- 左側會員摘要 -->
         <aside class="member-sidebar">
           <div class="sidebar-card level-card">
             <p class="sidebar-title">會員等級</p>
-
             <div class="level-badge">{{ memberLevelText }}</div>
           </div>
 
           <div class="sidebar-card point-card">
             <p class="sidebar-title">目前點數</p>
-
             <div class="point-main">
               <span class="point-number">{{ pointInfo.pointBalance }}</span>
               <span class="point-unit">點</span>
             </div>
 
             <p v-if="pointInfo.nextLevel" class="upgrade-note">
-              離升級{{ getLevelText(pointInfo.nextLevel) }}還差
+              距離升級{{ getLevelText(pointInfo.nextLevel) }}還差
               <span class="highlight-point">{{
                 pointInfo.pointsToNextLevel
               }}</span>
               點
             </p>
-
             <p v-else class="upgrade-note">您已達最高等級：鑽石卡會員</p>
 
             <button
@@ -45,21 +39,35 @@
             </button>
           </div>
 
-          <div class="birthday-card">
+          <div class="birthday-card" :class="{ active: isBirthdayMonth }">
             <div class="birthday-title">🎂 生日優惠</div>
             <div class="birthday-text">
-              生日當月於敘日消費，<br />
-              即可獲得焦糖布丁 1 份。
+              生日當月於敘日消費，<br />即可獲得焦糖布丁 1 份。
             </div>
           </div>
         </aside>
 
-        <!-- 右側內容 -->
         <section class="member-content">
-          <!-- 基本資料 -->
-          <template v-if="currentView === 'profile'">
+          <div class="tab-bar">
+            <button
+              v-for="tab in tabs"
+              :key="tab.key"
+              class="tab-btn"
+              :class="{ active: activeTab === tab.key }"
+              type="button"
+              @click="switchTab(tab.key)"
+            >
+              <i :class="tab.icon"></i>
+              {{ tab.label }}
+            </button>
+          </div>
+
+          <template v-if="activeTab === 'profile'">
             <div class="section-header">
-              <h2>會員基本資料</h2>
+              <div>
+                <h2>{{ profileTitle }}</h2>
+                <p v-if="isEditingProfile">{{ profileDescription }}</p>
+              </div>
 
               <button
                 v-if="!isEditingProfile"
@@ -73,12 +81,10 @@
 
             <div class="info-card">
               <div class="info-row">
-                <div class="info-label">會員姓名</div>
-
+                <div class="info-label">{{ nameLabel }}</div>
                 <div v-if="!isEditingProfile" class="info-value">
                   {{ userInfo.name }}
                 </div>
-
                 <div v-else class="edit-field">
                   <input
                     v-model.trim="profileForm.name"
@@ -91,11 +97,9 @@
 
               <div class="info-row">
                 <div class="info-label">電話</div>
-
                 <div v-if="!isEditingProfile" class="info-value">
                   {{ userInfo.phone }}
                 </div>
-
                 <div v-else class="edit-field">
                   <input
                     v-model.trim="profileForm.phone"
@@ -103,7 +107,6 @@
                     placeholder="請輸入手機號碼，例如 0912345678"
                     maxlength="10"
                   />
-
                   <p
                     v-if="profileForm.phone && !isPhoneValid"
                     class="field-error"
@@ -113,12 +116,12 @@
                 </div>
               </div>
 
-              <div class="info-row">
+              <div class="info-row readonly-row">
                 <div class="info-label">Email</div>
                 <div class="info-value">{{ userInfo.email }}</div>
               </div>
 
-              <div class="info-row">
+              <div class="info-row readonly-row">
                 <div class="info-label">生日</div>
                 <div class="info-value">
                   {{ formatBirthday(userInfo.birthday) }}
@@ -129,9 +132,9 @@
                 <div class="info-label">密碼</div>
                 <div class="info-value password-dots">••••••••</div>
                 <button
-                  class="edit-profile-btn"
+                  class="edit-profile-btn outline"
                   type="button"
-                  @click="openPasswordView"
+                  @click="openPasswordModal"
                 >
                   修改密碼
                 </button>
@@ -146,7 +149,6 @@
                 >
                   取消
                 </button>
-
                 <button
                   class="save-profile-btn"
                   type="button"
@@ -159,124 +161,37 @@
             </div>
           </template>
 
-          <!-- 修改密碼 -->
-          <template v-else>
-            <div class="section-header password-header">
-              <button class="back-btn" type="button" @click="backToProfile">
-                返回基本資料
-              </button>
+          <template v-else-if="activeTab === 'reservations'">
+            <div class="section-header">
+              <div>
+                <h2>訂位紀錄</h2>
+                <p>查看會員的訂位紀錄。</p>
+              </div>
             </div>
+            <div class="empty-card">
+              <i class="bx bx-calendar-check"></i>
+              <h3>尚無訂位紀錄</h3>
+              <p>目前沒有可顯示的訂位資料。</p>
+            </div>
+          </template>
 
-            <div class="password-panel">
-              <h2 class="password-title">
-                <i class="bi bi-lock-fill"></i>
-                修改密碼
-              </h2>
-
-              <form
-                class="password-form"
-                @submit.prevent="handleUpdatePassword"
-              >
-                <div class="form-group">
-                  <label>目前密碼</label>
-                  <div class="password-input-wrap">
-                    <input
-                      v-model="passwordForm.oldPassword"
-                      :type="showOldPassword ? 'text' : 'password'"
-                      placeholder="請輸入目前密碼"
-                    />
-                    <span
-                      class="eye-icon"
-                      @click="showOldPassword = !showOldPassword"
-                    >
-                      <i
-                        :class="
-                          showOldPassword ? 'bi bi-eye' : 'bi bi-eye-slash'
-                        "
-                      ></i>
-                    </span>
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label>新密碼</label>
-                  <div class="password-input-wrap">
-                    <input
-                      v-model="passwordForm.newPassword"
-                      :type="showNewPassword ? 'text' : 'password'"
-                      placeholder="請輸入新密碼"
-                    />
-                    <span
-                      class="eye-icon"
-                      @click="showNewPassword = !showNewPassword"
-                    >
-                      <i
-                        :class="
-                          showNewPassword ? 'bi bi-eye' : 'bi bi-eye-slash'
-                        "
-                      ></i>
-                    </span>
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label>確認新密碼</label>
-                  <div class="password-input-wrap">
-                    <input
-                      v-model="passwordForm.confirmPassword"
-                      :type="showConfirmPassword ? 'text' : 'password'"
-                      placeholder="再次輸入新密碼"
-                    />
-                    <span
-                      class="eye-icon"
-                      @click="showConfirmPassword = !showConfirmPassword"
-                    >
-                      <i
-                        :class="
-                          showConfirmPassword ? 'bi bi-eye' : 'bi bi-eye-slash'
-                        "
-                      ></i>
-                    </span>
-                  </div>
-                </div>
-
-                <p v-if="passwordError" class="password-error">
-                  <i class="bi bi-exclamation-circle-fill"></i>
-                  {{ passwordError }}
-                </p>
-
-                <ul class="password-rules">
-                  <li :class="{ passed: isLengthValid }">
-                    <i class="bi bi-check-circle-fill"></i>
-                    密碼長度需為 8 到 20 個字元
-                  </li>
-                  <li :class="{ passed: isConfirmMatched }">
-                    <i class="bi bi-check-circle-fill"></i>
-                    兩次輸入的新密碼需一致
-                  </li>
-                  <li :class="{ passed: isDifferentFromOld }">
-                    <i class="bi bi-check-circle-fill"></i>
-                    新密碼不可與目前密碼相同
-                  </li>
-                </ul>
-
-                <div class="password-actions">
-                  <button
-                    class="submit-btn"
-                    type="submit"
-                    :disabled="!canSubmitPassword || isChangingPassword"
-                  >
-                    {{ isChangingPassword ? "修改中..." : "確認修改" }}
-                  </button>
-                </div>
-              </form>
+          <template v-else-if="activeTab === 'orders'">
+            <div class="section-header">
+              <div>
+                <h2>消費紀錄</h2>
+                <p>查看會員的消費與點數累積紀錄。</p>
+              </div>
+            </div>
+            <div class="empty-card">
+              <i class="bx bx-receipt"></i>
+              <h3>尚無消費紀錄</h3>
+              <p>目前沒有可顯示的消費資料。</p>
             </div>
           </template>
         </section>
       </template>
     </div>
 
-    <!-- 集點規則彈窗 -->
     <div
       v-if="showPointRuleModal"
       class="rule-modal-mask"
@@ -291,33 +206,96 @@
         >
           ×
         </button>
-
         <h3>集點規則</h3>
-
         <div class="rule-content">
           <div class="rule-section">
             <h4>累積規則</h4>
             <p>每消費 $100 即可累積 1 點。</p>
           </div>
-
           <div class="rule-section">
             <h4>會員升級</h4>
             <ul>
-              <li>銅卡會員：0 ~ 29 點，來店消費享95折</li>
-              <li>銀卡會員：30 ~ 59 點，來店消費享9折</li>
-              <li>金卡會員：60 ~ 99 點，來店消費享85折</li>
-              <li>鑽石會員：達到100 點，來店消費享8折</li>
+              <li>銅卡會員：0 ~ 29 點，來店消費享 95 折</li>
+              <li>銀卡會員：30 ~ 59 點，來店消費享 9 折</li>
+              <li>金卡會員：60 ~ 99 點，來店消費享 85 折</li>
+              <li>鑽石會員：達到 100 點，來店消費享 8 折</li>
             </ul>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div
+      v-if="showPasswordModal"
+      class="rule-modal-mask"
+      @click.self="closePasswordModal"
+    >
+      <div class="password-modal">
+        <button
+          class="rule-close-btn"
+          type="button"
+          aria-label="關閉修改密碼"
+          @click="closePasswordModal"
+        >
+          ×
+        </button>
+        <h3>修改密碼</h3>
+        <form class="password-form" @submit.prevent="handleUpdatePassword">
+          <label>
+            目前密碼
+            <input
+              v-model="passwordForm.oldPassword"
+              type="password"
+              placeholder="請輸入目前密碼"
+            />
+          </label>
+          <label>
+            新密碼
+            <input
+              v-model="passwordForm.newPassword"
+              type="password"
+              placeholder="8 到 20 個字元"
+            />
+          </label>
+          <label>
+            確認新密碼
+            <input
+              v-model="passwordForm.confirmPassword"
+              type="password"
+              placeholder="再次輸入新密碼"
+            />
+          </label>
+
+          <p v-if="passwordError" class="field-error">{{ passwordError }}</p>
+
+          <ul class="password-rules">
+            <li :class="{ passed: isLengthValid }">
+              密碼長度需為 8 到 20 個字元
+            </li>
+            <li :class="{ passed: isConfirmMatched }">
+              兩次輸入的新密碼需一致
+            </li>
+            <li :class="{ passed: isDifferentFromOld }">
+              新密碼不可與目前密碼相同
+            </li>
+          </ul>
+
+          <button
+            class="save-profile-btn full"
+            type="submit"
+            :disabled="!canSubmitPassword || isChangingPassword"
+          >
+            {{ isChangingPassword ? "修改中..." : "確認修改" }}
+          </button>
+        </form>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import Swal from "sweetalert2";
 import {
   getPointBalance,
@@ -327,10 +305,43 @@ import {
 } from "@/api/member";
 
 const router = useRouter();
+const route = useRoute();
 const isLoading = ref(true);
 const errorMsg = ref("");
-const currentView = ref("profile");
+const activeTab = ref("profile");
 const showPointRuleModal = ref(false);
+const showPasswordModal = ref(false);
+
+const getStoredUserInfo = () => {
+  try {
+    return JSON.parse(localStorage.getItem("userInfo") || "{}");
+  } catch (error) {
+    localStorage.removeItem("userInfo");
+    return {};
+  }
+};
+
+const roleName = computed(() => getStoredUserInfo()?.roleName || "CUSTOMER");
+
+const profileTitle = computed(() => "會員基本資料");
+const profileDescription = computed(
+  () => "Email與生日會影響帳號與優惠，故不開放自行修改。",
+);
+const nameLabel = computed(() => "會員姓名");
+
+const tabs = computed(() => [
+  { key: "profile", label: "基本資料", icon: "bx bx-user" },
+  { key: "reservations", label: "訂位紀錄", icon: "bx bx-calendar-check" },
+  { key: "orders", label: "消費紀錄", icon: "bx bx-receipt" },
+]);
+
+const validTabKeys = computed(() => tabs.value.map((tab) => tab.key));
+
+const syncActiveTabFromRoute = () => {
+  const tab = String(route.query.tab || "profile");
+  activeTab.value = validTabKeys.value.includes(tab) ? tab : "profile";
+};
+
 const userInfo = ref({
   name: "",
   email: "",
@@ -361,38 +372,17 @@ const passwordForm = ref({
   newPassword: "",
   confirmPassword: "",
 });
-
 const passwordError = ref("");
 const isChangingPassword = ref(false);
 
-const showOldPassword = ref(false);
-const showNewPassword = ref(false);
-const showConfirmPassword = ref(false);
-
-onMounted(async () => {
-  const token = localStorage.getItem("accessToken");
-
-  if (!token) {
-    router.push("/login");
-    return;
-  }
-
-  try {
-    await loadMemberPageData();
-  } catch (err) {
-    errorMsg.value = "無法取得會員資料，請重新登入";
-  } finally {
-    isLoading.value = false;
-  }
-});
-
 const loadMemberPageData = async () => {
-  const [profileRes, pointRes] = await Promise.all([
-    getProfile(),
-    getPointBalance(),
-  ]);
-
+  // 先取得個人資料，再取得點數。
+  // 這樣可避免 STAFF / MANAGER 舊測試帳號第一次進會員中心時，
+  // /me 與 /points 同時嘗試補建 members 資料造成唯一鍵衝突。
+  const profileRes = await getProfile();
   const profileData = profileRes.data.data;
+
+  const pointRes = await getPointBalance();
   const pointData = pointRes.data.data;
 
   pointInfo.value = {
@@ -413,6 +403,41 @@ const loadMemberPageData = async () => {
   };
 };
 
+onMounted(async () => {
+  syncActiveTabFromRoute();
+
+  const token = localStorage.getItem("accessToken");
+  if (!token) {
+    router.push("/login");
+    return;
+  }
+
+  try {
+    await loadMemberPageData();
+  } catch (err) {
+    errorMsg.value = "無法取得會員資料，請重新登入";
+  } finally {
+    isLoading.value = false;
+  }
+});
+
+watch(
+  () => route.query.tab,
+  () => {
+    syncActiveTabFromRoute();
+  },
+);
+
+const switchTab = (tabKey) => {
+  if (!validTabKeys.value.includes(tabKey)) return;
+
+  activeTab.value = tabKey;
+  router.replace({
+    path: "/profile",
+    query: tabKey === "profile" ? {} : { tab: tabKey },
+  });
+};
+
 const getLevelText = (level) => {
   const levels = {
     BRONZE: "銅卡會員",
@@ -420,7 +445,6 @@ const getLevelText = (level) => {
     GOLD: "金卡會員",
     DIAMOND: "鑽石卡會員",
   };
-
   return levels[level] || "一般會員";
 };
 
@@ -432,47 +456,25 @@ const getLevelByPoint = (point) => {
   return "BRONZE";
 };
 
-const memberLevelText = computed(() => {
-  return getLevelText(getLevelByPoint(pointInfo.value.pointBalance));
-});
+const memberLevelText = computed(() =>
+  getLevelText(getLevelByPoint(pointInfo.value.pointBalance)),
+);
 
-const pointUpgradeHint = computed(() => {
-  const nextLevelText = getLevelText(pointInfo.value.nextLevel);
-
-  if (!pointInfo.value.nextLevel) {
-    return "您已達最高等級：鑽石卡會員";
-  }
-
-  return `距離升級${nextLevelText}還差 ${pointInfo.value.pointsToNextLevel} 點`;
-});
-
-const isPhoneValid = computed(() => {
-  return /^09\d{8}$/.test(profileForm.value.phone);
-});
+const isPhoneValid = computed(() => /^09\d{8}$/.test(profileForm.value.phone));
 
 const canSubmitProfile = computed(() => {
   const name = profileForm.value.name.trim();
   const phone = profileForm.value.phone.trim();
-
   const hasChanged =
     name !== userInfo.value.name || phone !== userInfo.value.phone;
-
   return Boolean(name) && isPhoneValid.value && hasChanged;
-});
-
-const birthdayMonth = computed(() => {
-  if (!userInfo.value.birthday) return null;
-
-  return new Date(userInfo.value.birthday).getMonth() + 1;
 });
 
 const isBirthdayMonth = computed(() => {
   if (!userInfo.value?.birthday) return false;
-
-  const birthdayMonth = new Date(userInfo.value.birthday).getMonth() + 1;
+  const month = new Date(userInfo.value.birthday).getMonth() + 1;
   const currentMonth = new Date().getMonth() + 1;
-
-  return birthdayMonth === currentMonth;
+  return month === currentMonth;
 });
 
 const isLengthValid = computed(() => {
@@ -486,10 +488,8 @@ const isConfirmMatched = computed(() => {
 });
 
 const isDifferentFromOld = computed(() => {
-  if (!passwordForm.value.oldPassword || !passwordForm.value.newPassword) {
+  if (!passwordForm.value.oldPassword || !passwordForm.value.newPassword)
     return false;
-  }
-
   return passwordForm.value.oldPassword !== passwordForm.value.newPassword;
 });
 
@@ -509,7 +509,6 @@ const startEditProfile = () => {
     name: userInfo.value.name || "",
     phone: userInfo.value.phone || "",
   };
-
   isEditingProfile.value = true;
 };
 
@@ -518,13 +517,11 @@ const cancelEditProfile = () => {
     name: userInfo.value.name || "",
     phone: userInfo.value.phone || "",
   };
-
   isEditingProfile.value = false;
 };
 
 const handleUpdateProfile = async () => {
   if (!canSubmitProfile.value || isSavingProfile.value) return;
-
   isSavingProfile.value = true;
 
   try {
@@ -532,7 +529,6 @@ const handleUpdateProfile = async () => {
       name: profileForm.value.name.trim(),
       phone: profileForm.value.phone.trim(),
     });
-
     const data = res.data.data;
 
     userInfo.value = {
@@ -549,42 +545,25 @@ const handleUpdateProfile = async () => {
         phone: data.phone,
       }),
     );
-
     window.dispatchEvent(new Event("login-state-changed"));
-
     isEditingProfile.value = false;
 
-    await Swal.fire({
+    Swal.fire({
       icon: "success",
       title: "資料已更新",
-      text: "會員姓名與電話已成功修改",
+      text: "會員姓名與電話已成功修改。",
       confirmButtonColor: "#d9a372",
     });
   } catch (err) {
-    await Swal.fire({
+    Swal.fire({
       icon: "error",
       title: "資料更新失敗",
-      text: err.response?.data?.message || "請稍後再試",
+      text: err.response?.data?.message || "請稍後再試。",
       confirmButtonColor: "#d9a372",
     });
   } finally {
     isSavingProfile.value = false;
   }
-};
-
-const formatBirthday = (birthday) => {
-  if (!birthday) return "未提供";
-  return birthday.replaceAll("-", "/");
-};
-
-const openPasswordView = () => {
-  resetPasswordForm();
-  currentView.value = "password";
-};
-
-const backToProfile = () => {
-  resetPasswordForm();
-  currentView.value = "profile";
 };
 
 const resetPasswordForm = () => {
@@ -593,11 +572,17 @@ const resetPasswordForm = () => {
     newPassword: "",
     confirmPassword: "",
   };
-
   passwordError.value = "";
-  showOldPassword.value = false;
-  showNewPassword.value = false;
-  showConfirmPassword.value = false;
+};
+
+const openPasswordModal = () => {
+  resetPasswordForm();
+  showPasswordModal.value = true;
+};
+
+const closePasswordModal = () => {
+  resetPasswordForm();
+  showPasswordModal.value = false;
 };
 
 const validatePasswordForm = () => {
@@ -609,29 +594,24 @@ const validatePasswordForm = () => {
     passwordError.value = "請完整填寫所有欄位";
     return false;
   }
-
   if (!isLengthValid.value) {
     passwordError.value = "新密碼長度需為 8 到 20 個字元";
     return false;
   }
-
   if (!isConfirmMatched.value) {
     passwordError.value = "兩次輸入的新密碼不一致";
     return false;
   }
-
   if (!isDifferentFromOld.value) {
     passwordError.value = "新密碼不可與目前密碼相同";
     return false;
   }
-
   passwordError.value = "";
   return true;
 };
 
 const handleUpdatePassword = async () => {
-  if (!validatePasswordForm()) return;
-
+  if (!validatePasswordForm() || isChangingPassword.value) return;
   isChangingPassword.value = true;
 
   try {
@@ -640,15 +620,13 @@ const handleUpdatePassword = async () => {
       newPassword: passwordForm.value.newPassword,
     });
 
-    await Swal.fire({
+    closePasswordModal();
+    Swal.fire({
       icon: "success",
-      title: "密碼修改成功",
-      text: "請使用新密碼登入您的帳號",
+      title: "密碼已更新",
+      text: "下次登入請使用新密碼。",
       confirmButtonColor: "#d9a372",
     });
-
-    resetPasswordForm();
-    currentView.value = "profile";
   } catch (err) {
     passwordError.value =
       err.response?.data?.message || "密碼修改失敗，請稍後再試";
@@ -657,594 +635,357 @@ const handleUpdatePassword = async () => {
   }
 };
 
-const logout = async () => {
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("userInfo");
-  window.dispatchEvent(new Event("login-state-changed"));
-
-  await Swal.fire({
-    icon: "success",
-    title: "已登出",
-    text: "期待再次與您見面",
-    timer: 1500,
-    showConfirmButton: false,
-  });
-
-  router.push("/home");
+const formatBirthday = (birthday) => {
+  if (!birthday) return "未提供";
+  return String(birthday).replaceAll("-", "/");
 };
 </script>
 
 <style scoped>
 .member-page {
   min-height: 100vh;
-  padding: 150px 32px 80px;
+  padding: 150px 24px 70px;
   background: #f8f3ed;
-  color: #566a7f;
 }
 
 .member-shell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 28px;
   width: min(1180px, 100%);
   margin: 0 auto;
 }
 
+.member-sidebar,
+.member-content {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.sidebar-card,
+.info-card,
+.empty-card,
+.record-card,
 .state-box {
-  width: min(520px, 100%);
-  margin: 80px auto;
-  padding: 40px;
-  border-radius: 16px;
   background: #fff;
-  text-align: center;
-  box-shadow: 0 8px 24px rgba(86, 106, 127, 0.12);
-}
-
-.error-msg {
-  color: #e11d48;
-}
-
-.member-shell > template,
-.member-shell {
-  position: relative;
-}
-
-.member-content {
-  background: transparent;
-}
-
-.member-sidebar {
-  float: left;
-  width: 240px;
-  padding-top: 8px;
-  padding-right: 10px;
-}
-
-.member-content {
-  margin-left: 280px;
+  border-radius: 18px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.05);
 }
 
 .sidebar-card {
-  width: 240px;
-  margin-bottom: 26px;
-  padding-bottom: 26px;
-  border-bottom: 1px solid #e6ded5;
+  padding: 24px;
 }
 
 .sidebar-title {
-  margin: 0 0 14px;
-  color: #3d4651;
-  font-size: 28px;
-  font-weight: 800;
-  line-height: 1.2;
-  letter-spacing: 0.02em;
+  margin: 0 0 12px;
+  color: #8a99a8;
+  font-weight: 900;
 }
 
 .level-badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 240px;
-  min-height: 52px;
-  box-sizing: border-box;
-  padding: 0 12px;
-  border: 1px solid #ead5c3;
-  border-radius: 9px;
-  background: rgba(255, 250, 247, 0.9);
-  color: #e3ac7f;
-  font-size: 18px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.point-card {
-  padding-top: 0;
+  display: inline-flex;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: #e3ac7f;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 900;
 }
 
 .point-main {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin: 4px 0 12px;
+  margin-top: 4px;
 }
 
 .point-number {
-  color: #e3ac7f;
-  font-size: 48px;
+  color: #566a7f;
+  font-size: 46px;
   font-weight: 900;
-  line-height: 1;
 }
 
-.point-unit {
-  color: #e3ac7f;
-  font-size: 20px;
-  font-weight: 800;
-}
-
-.point-rule {
-  margin: 0 0 10px;
-  color: #6b7c8f;
-  font-size: 16px;
-  line-height: 2;
+.point-unit,
+.upgrade-note {
+  color: #8a99a8;
 }
 
 .upgrade-note {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  margin: 0;
-  color: #7a5f4c;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.8;
+  margin: 10px 0 16px;
+  line-height: 1.7;
 }
 
 .highlight-point {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 30px;
-  height: 30px;
-  margin: 0 2px;
-  border-radius: 999px;
-  background: #e3ac7f;
-  color: #fff;
-  font-size: 18px;
+  color: #e3ac7f;
   font-weight: 900;
-  box-shadow: 0 6px 14px rgba(227, 172, 127, 0.45);
-  animation: pointPulse 1.5s ease-in-out infinite;
 }
 
-@keyframes pointPulse {
-  0%,
-  100% {
-    transform: scale(1);
-    box-shadow: 0 6px 14px rgba(227, 172, 127, 0.45);
-  }
+.point-rule-btn,
+.edit-profile-btn,
+.save-profile-btn,
+.cancel-profile-btn,
+.tab-btn {
+  border: none;
+  border-radius: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
 
-  50% {
-    transform: scale(1.12);
-    box-shadow: 0 9px 20px rgba(227, 172, 127, 0.65);
-  }
+.point-rule-btn,
+.edit-profile-btn,
+.save-profile-btn {
+  background: #e3ac7f;
+  color: #fff;
+}
+
+.point-rule-btn,
+.edit-profile-btn {
+  padding: 10px 14px;
+}
+
+.edit-profile-btn.outline,
+.cancel-profile-btn {
+  background: #fff7ef;
+  color: #d18f5e;
 }
 
 .birthday-card {
-  width: 240px;
-  margin-top: 0;
-  padding: 18px 20px;
-  border-left: 4px solid #e3ac7f;
-  border-radius: 10px;
-  background: rgba(255, 247, 240, 0.92);
-  color: #8a6f5a;
+  padding: 22px;
+  border-radius: 18px;
+  background: #fff7ef;
+  border: 1px dashed #e3ac7f;
+}
+
+.birthday-card.active {
+  background: #fff1e5;
 }
 
 .birthday-title {
+  color: #566a7f;
+  font-weight: 900;
   margin-bottom: 8px;
-  color: #d97706;
-  font-size: 15px;
-  font-weight: 800;
 }
 
 .birthday-text {
-  color: #8a6f5a;
-  font-size: 15px;
-  line-height: 1.75;
+  color: #7d8b9a;
+  line-height: 1.8;
+}
+
+.tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.05);
+}
+
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 15px;
+  background: #fbfaf8;
+  color: #7d8b9a;
+}
+
+.tab-btn.active {
+  background: #e3ac7f;
+  color: #fff;
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 22px;
+  align-items: flex-start;
+  gap: 18px;
 }
 
 .section-header h2 {
   margin: 0;
-  color: #3d4651;
-  font-size: 28px;
-  font-weight: 800;
+  color: #566a7f;
+  font-size: 26px;
+  font-weight: 900;
 }
 
-.save-text {
-  color: #8a6f5a;
-  font-size: 15px;
+.section-header p {
+  margin: 8px 0 0;
+  color: #8a99a8;
+  line-height: 1.7;
 }
 
-.info-card,
-.password-panel {
-  min-height: 560px;
-  padding: 38px 42px;
-  border: 1px solid #e6ded5;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 10px 24px rgba(86, 106, 127, 0.08);
+.info-card {
+  margin-top: 6px;
+  padding: 26px;
 }
 
 .info-row {
   display: grid;
-  grid-template-columns: 90px 1fr auto;
+  grid-template-columns: 140px minmax(0, 1fr) auto;
   gap: 18px;
   align-items: center;
-  min-height: 74px;
-  border-bottom: 1px solid #e6ded5;
+  min-height: 58px;
+  padding: 14px 0;
+  border-bottom: 1px solid #f0e2d5;
+}
+
+.info-row:last-child {
+  border-bottom: none;
 }
 
 .info-label {
-  color: #566a7f;
-  font-size: 14px;
+  color: #8a99a8;
+  font-weight: 900;
 }
 
 .info-value {
-  color: #2f3a45;
-  font-size: 16px;
-  font-weight: 600;
-  word-break: break-word;
+  color: #566a7f;
+  font-weight: 800;
+}
+
+.readonly-row .info-value {
+  color: #8a99a8;
 }
 
 .password-dots {
-  letter-spacing: 8px;
+  letter-spacing: 3px;
+}
+
+.edit-field input,
+.password-form input {
+  width: 100%;
+  border: 1px solid #ead8c8;
+  border-radius: 10px;
+  padding: 11px 12px;
   color: #566a7f;
 }
 
-.text-action {
-  border: none;
-  background: transparent;
-  color: #8a6f5a;
-  font-size: 15px;
-  cursor: pointer;
-}
-
-.text-action:hover {
-  color: #e3ac7f;
-}
-
-.edit-profile-btn {
-  padding: 10px 18px;
-  border: none;
-  border-radius: 8px;
-  background: #e3ac7f;
-  color: #fff;
-  font-weight: 700;
-  cursor: pointer;
-  transition: 0.2s;
-}
-
-.edit-profile-btn:hover {
-  background: #d49a68;
-}
-
-.edit-field {
-  width: 100%;
-}
-
-.edit-field input {
-  width: 100%;
-  height: 44px;
-  padding: 0 14px;
-  border: 1px solid #d7ccc0;
-  border-radius: 8px;
+.edit-field input:focus,
+.password-form input:focus {
   outline: none;
-  background: #fff;
-  color: #3d4651;
-  font-size: 15px;
-  transition: 0.2s;
-}
-
-.edit-field input:focus {
   border-color: #e3ac7f;
-  box-shadow: 0 0 0 3px rgba(227, 172, 127, 0.16);
+  box-shadow: 0 0 0 3px rgba(227, 172, 127, 0.18);
 }
 
 .field-error {
-  margin: 6px 0 0;
-  color: #e11d48;
-  font-size: 13px;
+  margin: 8px 0 0;
+  color: #c0392b;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .profile-actions {
   display: flex;
   justify-content: center;
-  gap: 14px;
-  margin-top: 32px;
+  gap: 12px;
+  margin-top: 24px;
 }
 
 .cancel-profile-btn,
 .save-profile-btn {
-  width: 160px;
-  height: 46px;
-  border: none;
-  border-radius: 8px;
-  color: #fff;
-  font-weight: 700;
-  cursor: pointer;
-  transition: 0.2s;
+  padding: 12px 22px;
 }
 
-.cancel-profile-btn {
-  background: #8b98a6;
-}
-
-.cancel-profile-btn:hover:not(:disabled) {
-  background: #7b8794;
-}
-
-.save-profile-btn {
-  background: #e3ac7f;
-}
-
-.save-profile-btn:hover:not(:disabled) {
-  background: #d49a68;
-}
-
-.cancel-profile-btn:disabled,
-.save-profile-btn:disabled {
-  background: #c8c8c8;
-  color: #ffffff;
-  opacity: 0.8;
-  cursor: not-allowed;
-}
-
-.password-header {
-  justify-content: flex-start;
-}
-
-.back-btn {
-  background: #e3ac7f;
-  color: #fff;
-  border: none;
-  border-radius: 12px;
-  padding: 12px 24px;
-  font-size: 20px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.25s ease;
-}
-
-.back-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(227, 172, 127, 0.3);
-}
-
-.password-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.password-title {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin: 20px 0 34px;
-  color: #3d4651;
-  font-size: 30px;
-  font-weight: 800;
-}
-
-.password-title i {
-  color: #e3ac7f;
-}
-
-.password-form {
-  width: min(440px, 100%);
-}
-
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  color: #566a7f;
-  font-weight: 700;
-}
-
-.password-input-wrap {
-  position: relative;
-}
-
-.password-input-wrap input {
+.save-profile-btn.full {
   width: 100%;
-  height: 48px;
-  padding: 0 46px 0 14px;
-  border: 1px solid #d7ccc0;
-  border-radius: 8px;
-  outline: none;
-  background: #fff;
-  color: #3d4651;
-  font-size: 15px;
-  transition: 0.2s;
+  margin-top: 14px;
 }
 
-.password-input-wrap input:focus {
-  border-color: #e3ac7f;
-  box-shadow: 0 0 0 3px rgba(227, 172, 127, 0.16);
-}
-
-.eye-icon {
-  position: absolute;
-  top: 50%;
-  right: 14px;
-  transform: translateY(-50%);
-  color: #7b8794;
-  cursor: pointer;
-}
-
-.eye-icon:hover {
-  color: #e3ac7f;
-}
-
-.password-error {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 8px 0 16px;
-  color: #e11d48;
-  font-size: 14px;
-}
-
-.password-rules {
-  list-style: none;
-  padding: 0;
-  margin: 8px 0 28px;
-}
-
-.password-rules li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  color: #9aa3ad;
-  font-size: 14px;
-}
-
-.password-rules li.passed {
-  color: #2f9e44;
-}
-
-.password-actions {
-  display: flex;
-  justify-content: center;
-  margin-top: 30px;
-}
-
-.submit-btn {
-  width: 280px;
-  height: 48px;
-  border: none;
-  border-radius: 8px;
-  background: #e3ac7f;
-  color: #fff;
-  font-weight: 700;
-  cursor: pointer;
-  transition: 0.2s;
-}
-
-.submit-btn:hover:not(:disabled) {
-  background: #d49a68;
-}
-
-.submit-btn:disabled {
-  background: #c8c8c8;
-  color: #ffffff;
-  opacity: 0.8;
+button:disabled {
+  opacity: 0.65;
   cursor: not-allowed;
 }
 
-.points-section {
-  margin-top: 24px;
+.state-box {
+  grid-column: 1 / -1;
+  padding: 36px;
+  color: #8a99a8;
+  text-align: center;
+  font-weight: 900;
 }
 
-.points-summary-card {
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-  align-items: center;
+.state-box.inner {
+  grid-column: auto;
 }
 
-.points-card-label {
-  margin: 0 0 6px;
-  color: #7b8794;
-  font-size: 14px;
+.error-msg {
+  color: #c0392b;
 }
 
-.points-summary-card h3 {
-  margin: 0;
-  color: #e3ac7f;
-  font-size: 32px;
-  font-weight: 800;
-}
-
-.points-summary-detail {
-  color: #566a7f;
-  font-size: 15px;
-  line-height: 1.7;
-  text-align: right;
-}
-
-.points-summary-detail p {
-  margin: 0;
-}
-
-.points-history-card {
-  margin-top: 18px;
-}
-
-.points-history-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 18px;
-}
-
-.points-history-header h3 {
-  margin: 0;
-  color: #3d4651;
-  font-size: 22px;
-  font-weight: 800;
-}
-
-.points-history-header span {
-  color: #8a6f5a;
-  font-size: 14px;
-}
-
-.empty-history {
-  padding: 22px;
-  border-radius: 10px;
-  background: #fff7f0;
-  color: #8a6f5a;
+.empty-card {
+  padding: 44px 34px;
   text-align: center;
 }
 
-.history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.empty-card i {
+  color: #e3ac7f;
+  font-size: 48px;
 }
 
-.point-rule-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 240px;
-  min-height: 46px;
-  box-sizing: border-box;
-  margin-top: 12px;
-  padding: 0 12px;
-  border: 1px solid #ead5c3;
-  border-radius: 999px;
-  background: rgba(255, 250, 247, 0.95);
-  color: #d99a63;
+.empty-card h3 {
+  margin: 14px 0 8px;
+  color: #566a7f;
+  font-weight: 900;
+}
+
+.empty-card p,
+.empty-card li {
+  color: #7d8b9a;
+  line-height: 1.8;
+}
+
+.pending-card {
+  text-align: left;
+}
+
+.pending-card i,
+.pending-card h3 {
+  text-align: center;
+  display: block;
+}
+
+.pending-card code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #fff1e5;
+  color: #c47d4e;
+}
+
+.record-card {
+  overflow-x: auto;
+}
+
+.record-card table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.record-card th,
+.record-card td {
+  padding: 16px 18px;
+  border-bottom: 1px solid #f0e2d5;
+  color: #566a7f;
+  text-align: left;
+}
+
+.record-card th {
+  color: #8a99a8;
   font-size: 13px;
-  font-weight: 800;
-  cursor: pointer;
-  transition: 0.2s;
 }
 
-.point-rule-btn:hover {
-  background: #e3ac7f;
-  color: #fff;
-  border-color: #e3ac7f;
+.record-card .right {
+  text-align: right;
+  font-weight: 900;
+}
+
+.plus {
+  color: #2e9f5e !important;
+}
+
+.minus {
+  color: #c0392b !important;
 }
 
 .rule-modal-mask {
@@ -1255,125 +996,98 @@ const logout = async () => {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(47, 58, 69, 0.42);
+  background: rgba(0, 0, 0, 0.42);
 }
 
-.rule-modal {
+.rule-modal,
+.password-modal {
   position: relative;
-  width: min(420px, 100%);
-  padding: 30px 32px 28px;
+  width: min(520px, 100%);
+  padding: 30px;
   border-radius: 18px;
-  background: #fffaf6;
-  box-shadow: 0 18px 48px rgba(47, 58, 69, 0.2);
+  background: #fff;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);
 }
 
 .rule-close-btn {
   position: absolute;
   top: 14px;
-  right: 18px;
+  right: 16px;
+  width: 34px;
+  height: 34px;
   border: none;
-  background: transparent;
-  color: #8a6f5a;
-  font-size: 28px;
+  border-radius: 50%;
+  background: #fff7ef;
+  color: #d18f5e;
+  font-size: 24px;
   line-height: 1;
   cursor: pointer;
 }
 
-.rule-close-btn:hover {
-  color: #d49a68;
-}
-
-.rule-modal h3 {
-  margin: 0 0 20px;
-  color: #3d4651;
-  font-size: 26px;
+.rule-modal h3,
+.password-modal h3 {
+  margin: 0 0 18px;
+  color: #566a7f;
   font-weight: 900;
-}
-
-.rule-section {
-  padding: 16px 0;
-  border-top: 1px solid #eadfd4;
 }
 
 .rule-section h4 {
-  margin: 0 0 10px;
-  color: #d97706;
-  font-size: 16px;
+  margin: 18px 0 8px;
+  color: #e3ac7f;
   font-weight: 900;
 }
 
-.rule-section p {
-  margin: 0;
-  color: #6b7c8f;
-  font-size: 15px;
+.rule-section p,
+.rule-section li {
+  color: #7d8b9a;
   line-height: 1.8;
 }
 
-.rule-section ul {
+.password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.password-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #566a7f;
+  font-weight: 900;
+}
+
+.password-rules {
   margin: 0;
   padding-left: 20px;
-  color: #6b7c8f;
-  font-size: 15px;
-  line-height: 2;
+  color: #9aa6b2;
+  line-height: 1.9;
+}
+
+.password-rules li.passed {
+  color: #2e9f5e;
 }
 
 @media (max-width: 900px) {
+  .member-shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
   .member-page {
-    padding: 130px 18px 60px;
+    padding: 120px 14px 50px;
   }
 
-  .member-sidebar {
-    float: none;
-    width: 100%;
-    padding-right: 0;
-    margin-bottom: 24px;
-  }
-
-  .member-content {
-    margin-left: 0;
-  }
-
-  .birthday-card {
-    width: 100%;
-  }
-
-  .info-card,
-  .password-panel {
-    min-height: auto;
-    padding: 28px 22px;
-  }
-
-  .info-row {
-    grid-template-columns: 82px 1fr;
-  }
-
-  .profile-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .cancel-profile-btn,
-  .save-profile-btn {
-    width: 100%;
-  }
-
-  .points-summary-card {
-    flex-direction: column;
+  .section-header,
+  .info-row,
+  .password-row {
+    grid-template-columns: 1fr;
     align-items: flex-start;
   }
 
-  .points-summary-detail {
-    text-align: left;
-  }
-
-  .history-item {
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .text-action {
-    grid-column: 2 / 3;
-    justify-self: flex-start;
+  .section-header {
+    flex-direction: column;
   }
 }
 </style>

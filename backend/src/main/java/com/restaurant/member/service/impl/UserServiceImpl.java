@@ -13,6 +13,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -23,6 +26,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final MemberProfileRepository memberProfileRepository;
     private final StaffRepository staffRepository;
+    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
 
     /**
@@ -91,6 +95,33 @@ public class UserServiceImpl implements UserService {
         userRepository.deleteById(userId);
     }
 
+
+    /**
+     * 後台首頁會員 / 員工摘要。
+     * 只使用 member 模組內資料，避免依賴 order / reservation。
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public MemberAdminSummaryResponse getAdminSummary() {
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        LocalDateTime tomorrowStart = todayStart.plusDays(1);
+
+        return MemberAdminSummaryResponse.builder()
+                .totalMembers(userRepository.countByRole_RoleName("CUSTOMER"))
+                .todayNewMembers(userRepository.countByRole_RoleNameAndCreatedAtBetween(
+                        "CUSTOMER", todayStart, tomorrowStart))
+                .bronzeCount(memberProfileRepository.countByMemberLevelAndUser_Role_RoleName(
+                        MemberProfile.MemberLevel.BRONZE, "CUSTOMER"))
+                .silverCount(memberProfileRepository.countByMemberLevelAndUser_Role_RoleName(
+                        MemberProfile.MemberLevel.SILVER, "CUSTOMER"))
+                .goldCount(memberProfileRepository.countByMemberLevelAndUser_Role_RoleName(
+                        MemberProfile.MemberLevel.GOLD, "CUSTOMER"))
+                .diamondCount(memberProfileRepository.countByMemberLevelAndUser_Role_RoleName(
+                        MemberProfile.MemberLevel.DIAMOND, "CUSTOMER"))
+                .activeStaffCount(staffRepository.countByStatus(StaffStatus.ACTIVE))
+                .build();
+    }
+
     /**
      * 取得特定員工詳細資料
      */
@@ -103,18 +134,23 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * 取得指定門市的在職員工清單，依 storeId 過濾
+     * 取得所有員工清單，包含在職與離職。
+     * 前端會依狀態篩選顯示，讓「離職人員」統計與篩選能正確運作。
      */
     @Override
     @Transactional(readOnly = true)
     public List<StaffResponse> getActiveStaffs() {
-        return staffRepository.findByStatus(StaffStatus.ACTIVE).stream()
+        return staffRepository.findAll().stream()
+                .sorted(Comparator
+                        .comparing((Staff staff) -> staff.getStatus() == StaffStatus.RESIGNED ? 1 : 0)
+                        .thenComparing(Staff::getStaffId))
                 .map(staff -> toStaffResponse(staff.getUser(), staff))
                 .collect(Collectors.toList());
     }
 
     /**
-     * 變更員工狀態為離職
+     * 變更員工狀態為離職。
+     * 離職後保留會員身分與點數，但移除後台權限。
      */
     @Override
     @Transactional
@@ -122,7 +158,14 @@ public class UserServiceImpl implements UserService {
         Staff staff = staffRepository.findById(staffId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到員工資料"));
 
+        Role customerRole = roleRepository.findByRoleName("CUSTOMER")
+                .orElseThrow(() -> new BusinessException("系統角色 CUSTOMER 不存在"));
+
+        User user = staff.getUser();
+        user.setRole(customerRole);
         staff.setStatus(StaffStatus.RESIGNED);
+
+        userRepository.save(user);
         staffRepository.save(staff);
     }
 
@@ -166,6 +209,7 @@ public class UserServiceImpl implements UserService {
         res.setName(user.getName());
         res.setEmail(user.getEmail());
         res.setPhone(user.getPhone());
+        res.setBirthday(user.getBirthday());
         res.setRoleName(user.getRole().getRoleName());
         res.setStoreId(staff.getStore().getStoreId());
         res.setStaffNo(staff.getStaffNo());

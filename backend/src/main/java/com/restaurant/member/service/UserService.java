@@ -41,6 +41,13 @@ public interface UserService {
     void deleteAccount(Long userId);
 
     /**
+     * 後台首頁會員 / 員工摘要。
+     *
+     * @return member 模組可獨立統計的摘要資料
+     */
+    MemberAdminSummaryResponse getAdminSummary();
+
+    /**
      * 取得特定員工詳細資料。
      * 
      * @param staffId 員工 ID
@@ -49,9 +56,9 @@ public interface UserService {
     StaffResponse getStaff(Long staffId);
 
     /**
-     * 取得所有在職員工清單。
+     * 取得所有員工清單（含離職）。
      * 
-     * @return 在職員工列表
+     * @return 員工列表
      */
     List<StaffResponse> getActiveStaffs();
 
