@@ -33,14 +33,9 @@ export const reservationApi = {
     return http.get(`/reservations/${reservationId}`)
   },
 
-  // 登入會員依 JWT 查詢自己的訂位
-  getMyReservations() {
-    return http.get('/reservations/me')
-  },
-
-  // 依 userId 查訂位
-  getUserReservations(userId) {
-    return http.get(`/reservations/user/${userId}`)
+  // Gmail 訂位成功信連結用 id + token 查詢(可不用會員登入 JWT)
+  getPublicReservation(reservationId, token) {
+    return http.get(`/reservations/${reservationId}/public`, { params: { token } })
   },
 
   // 取消訂位，恢復容量、移除已配桌資料
@@ -51,6 +46,16 @@ export const reservationApi = {
 
 // ========== 後台訂位管理 API (訂位總覽、訂位名單、分配桌位) ==========
 export const reservationAdminApi = {
+
+  // 訂位後台可管理分店：ADMIN 全部，STAFF/MANAGER 自己分店
+  getManageableStores() {
+    return http.get('/admin/reservations/stores')
+  },
+
+  // 訂位後台桌位查詢：給總覽與配桌頁使用
+  getStoreTables(storeId) {
+    return http.get(`/admin/reservations/stores/${storeId}/tables`)
+  },
 
   // 查全部訂位 (訂位名單、總數統計)
   getReservations(storeId) {

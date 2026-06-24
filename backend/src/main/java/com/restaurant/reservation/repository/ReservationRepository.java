@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
 
@@ -41,6 +42,11 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 
     // 顧客端查詢自己的訂位，最新建立的排前面
     List<Reservation> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+    // 信件連結不依賴會員登入 JWT，改用訂位本身的 access_token 驗證
+    Optional<Reservation> findByReservationIdAndAccessToken(Long reservationId, String accessToken);
+
+    boolean existsByAccessToken(String accessToken);
 
     // 分配桌位時檢查同一時段其他訂位，避免同一桌被重複分配
     List<Reservation> findBySlotIdAndReservationIdNot(Long slotId, Long reservationId);

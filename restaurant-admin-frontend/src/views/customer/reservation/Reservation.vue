@@ -4,6 +4,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { getProfile } from '@/api/member'
 import { reservationApi } from '@/api/reservation'
 import { storeApi } from '@/api/store'
+import {
+  extractStoreDetail,
+  extractStoreList,
+  formatDateInput,
+  formatPhoneNumber,
+  formatTime,
+  getCurrentUserInfo,
+} from '@/assets/js/reservationUi'
 import reservationHeroImage from '@/assets/images/reservation.jpg'
 
 const route = useRoute()
@@ -31,14 +39,6 @@ const calendarMonth = ref(new Date(new Date().getFullYear(), new Date().getMonth
 const today = new Date()
 const tomorrow = new Date(today)
 tomorrow.setDate(today.getDate() + 1)
-
-// 日期格式：用本地時間 yyyy-MM-dd，避免 toISOString() 造成 UTC 時區問題(非現在時間)
-const formatDateInput = (date) => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
 
 // 訂位表單送出時直接組成 API payload（json)
 const form = reactive({
@@ -138,17 +138,6 @@ const calendarDays = computed(() => {
   })
 })
 
-// 轉換格式前台只顯示 HH:mm (後端 time 格式可能含 ss 秒)
-const formatTime = (time) => time?.slice(0, 5) || ''
-
-// 手機輸入自動格式化 0900-000-000
-const formatPhoneNumber = (value) => {
-  const digits = String(value || '').replace(/\D/g, '').slice(0, 10)
-  if (digits.length <= 4) return digits
-  if (digits.length <= 7) return `${digits.slice(0, 4)}-${digits.slice(4)}`
-  return `${digits.slice(0, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`
-}
-
 // 輸入手機就套用手機格式（降低使用者輸入錯誤）
 const handlePhoneInput = (event) => {
   form.customerPhone = formatPhoneNumber(event.target.value)
@@ -209,7 +198,7 @@ const reservationNotice = computed(() => {
 const loadStores = async () => {
   try {
     const res = await storeApi.getStores()
-    stores.value = res.data || []
+    stores.value = extractStoreList(res.data)
     if (!form.storeId && filteredStores.value.length) {
       form.storeId = String(filteredStores.value[0].storeId)
     }
@@ -223,7 +212,7 @@ const loadStoreDetail = async () => {
   selectedStoreDetail.value = null
   if (!form.storeId) return
   const res = await storeApi.getStoreDetail(form.storeId)
-  selectedStoreDetail.value = res.data?.store || res.data || null
+  selectedStoreDetail.value = extractStoreDetail(res.data)
 }
 
 // 一次讀取頁面上所有可訂時段的容量，讓日期與時段一進頁面就能顯示滿額狀態
@@ -296,14 +285,6 @@ const loadCapacity = async () => {
   }
 }
 
-const getStoredUserInfo = () => {
-  try {
-    return JSON.parse(localStorage.getItem('userInfo') || '{}')
-  } catch {
-    return {}
-  }
-}
-
 const fillMemberInfo = (member) => {
   if (!member || route.query.editId) return
   form.customerName = member.name || form.customerName
@@ -314,7 +295,7 @@ const fillMemberInfo = (member) => {
 // 若會員已登入，進入訂位頁時自動帶入姓名、手機、Email
 const loadCurrentMember = async () => {
   if (!localStorage.getItem('accessToken')) return
-  const storedUser = getStoredUserInfo()
+  const storedUser = getCurrentUserInfo()
   try {
     const res = await getProfile()
     const profile = res.data?.data || {}
@@ -325,45 +306,21 @@ const loadCurrentMember = async () => {
   fillMemberInfo(currentMember.value)
 }
 
-// 登入會員查詢自己的最新有效訂位，切到訂位成功頁但顯示「查詢成功」
-const queryMyReservation = async () => {
-  errorMessage.value = ''
-  const userId = currentMember.value?.userId || getStoredUserInfo().userId
-  if (!localStorage.getItem('accessToken') || !userId) {
-    errorMessage.value = '需註冊並登入會員才能查詢訂位'
-    return
-  }
-
-  try {
-    const res = await reservationApi.getMyReservations()
-    const reservations = (res.data || []).filter((item) => item.status !== 'CANCELLED')
-    if (!reservations.length) {
-      errorMessage.value = '目前沒有可查詢的訂位'
-      return
-    }
-    router.push({
-      name: 'CustomerReservationSuccess',
-      query: {
-        id: reservations[0].reservationId,
-        mode: 'query',
-      },
-    })
-  } catch (error) {
-    errorMessage.value = error.response?.data?.message || '查詢訂位失敗，請稍後再試'
-  }
-}
-
 // 送出訂位、修改訂位：成功後切到訂位成功頁
 const submitReservation = async () => {
   if (!form.slotId || selectedSlotIsFull.value) {
     errorMessage.value = '此日期時段已額滿，請重新選擇'
     return
   }
+  if (!form.customerEmail) {
+    errorMessage.value = '請填寫 Email'
+    return
+  }
   submitting.value = true
   errorMessage.value = ''
   successMessage.value = ''
   const payload = {
-    userId: currentMember.value?.userId || getStoredUserInfo().userId || null,
+    userId: currentMember.value?.userId || getCurrentUserInfo().userId || null,
     storeId: Number(form.storeId),
     slotId: Number(form.slotId),
     customerName: form.customerName,
@@ -381,7 +338,9 @@ const submitReservation = async () => {
     successReservation.value = res.data
     editingReservationId.value = null
     successMessage.value = isEditing ? '訂位已更新' : ''
-    router.push({ name: 'CustomerReservationSuccess', query: { id: res.data.reservationId } })
+    const successQuery = { id: res.data.reservationId }
+    if (res.data.accessToken) successQuery.token = res.data.accessToken
+    router.push({ name: 'CustomerReservationSuccess', query: successQuery })
   } catch (error) {
     errorMessage.value = error.response?.data?.message || '訂位失敗，請稍後再試'
   } finally {
@@ -529,7 +488,7 @@ onBeforeUnmount(() => {
           </div>
           <div class="col-md-6">
             <label class="form-label" for="reservation-email">Email</label>
-            <input id="reservation-email" v-model.trim="form.customerEmail" type="email" class="form-control" placeholder="name@gmail.com" />
+            <input id="reservation-email" v-model.trim="form.customerEmail" type="email" class="form-control" placeholder="name@gmail.com" required />
           </div>
           <div class="col-md-6">
             <label class="form-label" for="reservation-party-size">人數</label>
@@ -611,9 +570,6 @@ onBeforeUnmount(() => {
             </button>
             <button type="reset" class="btn btn-label-secondary" @click="errorMessage = ''">取消</button>
           </div>
-          <button type="button" class="btn btn-reservation-dark gap-1" @click="queryMyReservation">
-            <i class="bx bx-search"></i>查詢訂位
-          </button>
         </div>
       </form>
     </div>

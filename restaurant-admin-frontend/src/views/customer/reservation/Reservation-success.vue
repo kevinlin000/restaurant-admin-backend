@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import Swal from 'sweetalert2'
 import { reservationApi } from '@/api/reservation'
 import { storeApi } from '@/api/store'
+import { extractStoreDetail, formatTime } from '@/assets/js/reservationUi'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,13 +16,10 @@ const successMessage = ref('')
 const cachedReservation = ref({})
 const storeName = ref('')
 
-// 轉換格式前台只顯示 HH:mm (後端 time 格式可能含 ss 秒)
-const formatTime = (time) => time?.slice(0, 5) || ''
-
 // 訂位成功顯示名字、分店
 const displayName = computed(() => reservation.value?.customerName || cachedReservation.value.customerName || '訂位顧客')
 const displayStoreName = computed(() => storeName.value || cachedReservation.value.storeName || '未指定分店')
-const pageTitle = computed(() => route.query.mode === 'query' ? '查詢成功' : '訂位成功')
+const pageTitle = computed(() => '訂位成功')
 
 // 讀取訂位頁送出暫存顧客資訊（避免重新整理或後端欄位差）
 const loadCachedReservation = (reservationId) => {
@@ -39,14 +37,14 @@ const loadStoreName = async (storeId) => {
   if (!storeId) return
   try {
     const res = await storeApi.getStoreDetail(storeId)
-    const store = res.data?.store || res.data
+    const store = extractStoreDetail(res.data)
     storeName.value = store?.storeName || ''
   } catch {
     storeName.value = ''
   }
 }
 
-// query id 讀取單筆訂位
+// query id 讀取單筆訂位；信件連結會多帶 token，沒登入可以連結
 const loadReservation = async () => {
   if (!route.query.id) {
     errorMessage.value = '找不到訂位編號'
@@ -54,7 +52,9 @@ const loadReservation = async () => {
   }
   loading.value = true
   try {
-    const res = await reservationApi.getReservation(route.query.id)
+    const res = route.query.token
+      ? await reservationApi.getPublicReservation(route.query.id, route.query.token)
+      : await reservationApi.getReservation(route.query.id)
     reservation.value = res.data
     loadCachedReservation(res.data?.reservationId)
     await loadStoreName(res.data?.storeId)
@@ -135,7 +135,9 @@ const reserveReservation = async () => {
 // 編輯訂位：只有 PENDING 狀態可編輯
 const editReservation = () => {
   if (!reservation.value || reservation.value.status !== 'PENDING') return
-  router.push({ name: 'CustomerReservation', query: { editId: reservation.value.reservationId } })
+  const query = { editId: reservation.value.reservationId }
+  if (route.query.token) query.token = route.query.token
+  router.push({ name: 'CustomerReservation', query })
 }
 
 // 回訂位頁

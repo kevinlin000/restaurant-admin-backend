@@ -148,12 +148,13 @@
 
 /* 日期列與時段標題列 */
 .reservation-date-header td {
-  background: #4f483e;
+  background: #394859;
   color: #fff;
 }
 
 .reservation-group-header th {
-  background: #5e554883 !important;
+  background: #566a7fec !important;
   color: #fff !important;
   font-weight: 700;
+  white-space: nowrap;
 }

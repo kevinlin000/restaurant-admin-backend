@@ -60,8 +60,8 @@ public class SecurityConfig {
 
                         // ===== 前台訂位（允許未登入訂位）=====
                         .requestMatchers(HttpMethod.GET, "/api/reservations/slots/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/reservations/me").hasAuthority("ROLE_CUSTOMER")
                         .requestMatchers(HttpMethod.POST, "/api/reservations").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/reservations/*/public").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/reservations/*").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/api/reservations/*").permitAll()
                         .requestMatchers(HttpMethod.PATCH, "/api/reservations/*/reserve").permitAll()
@@ -96,8 +96,10 @@ public class SecurityConfig {
                         // 後台訂位管理：給 STAFF、MANAGER、ADMIN
                         .requestMatchers("/api/admin/reservations/**")
                         .hasAnyAuthority("ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
-                        .requestMatchers("/api/admin/reservation-settings/**")
+                        .requestMatchers(HttpMethod.GET, "/api/admin/reservation-settings/**")
                         .hasAnyAuthority("ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
+                        .requestMatchers("/api/admin/reservation-settings/**")
+                        .hasAnyAuthority("ROLE_MANAGER", "ROLE_ADMIN")
 
                         // 其他所有後台 API：給 STAFF、MANAGER、ADMIN
                         // 這條很重要，避免 CUSTOMER 直接用 Postman 打其他 /api/admin/** API

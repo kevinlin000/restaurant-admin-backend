@@ -2,7 +2,25 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { reservationAdminApi } from '@/api/reservation'
-import { storeApi } from '@/api/store'
+import {
+  buildStoreNameLookup,
+  canUseAllManagedStores,
+  dateRangeText,
+  formatDateInput,
+  formatTime,
+  groupReservationsByDateAndTime,
+  isInRangeFor,
+  isRangeEndFor,
+  isRangeStartFor,
+  isSameReservationDateTime,
+  matchesDateRange,
+  nextDateRangeSelection,
+  resolveManagedStoreSelection,
+  sortByReservationDateTime,
+  storeDisplayName,
+  useMonthCalendar,
+  usePagination,
+} from '@/assets/js/reservationUi'
 
 const route = useRoute()
 
@@ -23,6 +41,11 @@ const errorMessage = ref('')
 const pageSizeOptions = [5, 10, 15, 20, 25, 30]
 const pageSize = ref(10)
 const currentPage = ref(1)
+const canSelectAllStores = computed(() => canUseAllManagedStores())
+const fixedStoreName = computed(() => stores.value[0]?.storeName || '尚無可管理分店')
+const showStoreColumn = computed(() => canSelectAllStores.value)
+const storeNameById = computed(() => buildStoreNameLookup(stores.value))
+const storeName = (storeId) => storeDisplayName(storeNameById.value, storeId)
 
 const statusOptions = [
   { value: 'PENDING', label: '未配桌' },
@@ -30,108 +53,39 @@ const statusOptions = [
   { value: 'ASSIGNED', label: '已配桌' },
 ]
 
-// 日期格式：本地日期，篩選預設今天起
-function formatDateInput(date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 // 日期選取區器：可選起日、區間
 const selectedDateRangeText = computed(() => {
-  if (!selectedStartDate.value && !selectedEndDate.value) return '全部日期區間'
-  if (selectedStartDate.value && selectedEndDate.value) return `${selectedStartDate.value} ~ ${selectedEndDate.value}`
-  if (selectedStartDate.value) return `${selectedStartDate.value} 起`
-  return `${selectedEndDate.value} 前`
+  return dateRangeText(selectedStartDate.value, selectedEndDate.value)
 })
 
 // 查詢日期區間日曆
-const calendarTitle = computed(() => {
-  const year = calendarMonth.value.getFullYear()
-  const month = String(calendarMonth.value.getMonth() + 1).padStart(2, '0')
-  return `${year} / ${month}`
-})
-
-const calendarDays = computed(() => {
-  const year = calendarMonth.value.getFullYear()
-  const month = calendarMonth.value.getMonth()
-  const firstDay = new Date(year, month, 1)
-  const start = new Date(firstDay)
-  start.setDate(firstDay.getDate() - firstDay.getDay())
-  return Array.from({ length: 42 }, (_, index) => {
-    const date = new Date(start)
-    date.setDate(start.getDate() + index)
-    return {
-      value: formatDateInput(date),
-      day: date.getDate(),
-      currentMonth: date.getMonth() === month,
-    }
-  })
-})
+const { calendarTitle, calendarDays, shiftCalendarMonth } = useMonthCalendar(calendarMonth)
 
 // 依日期區間、多選狀態篩選
 const filteredReservations = computed(() => reservations.value.filter((item) => {
-  const matchDate = !selectedStartDate.value
-    ? true
-    : selectedEndDate.value
-      ? item.reservationDate >= selectedStartDate.value && item.reservationDate <= selectedEndDate.value
-      : item.reservationDate >= selectedStartDate.value
+  const matchDate = matchesDateRange(item.reservationDate, selectedStartDate.value, selectedEndDate.value)
   const matchStatus = selectedStatuses.value.length === 0 || selectedStatuses.value.includes(item.status)
   return matchDate && matchStatus
 }))
 
 // 桌位分配名單：依「訂位日期 + 開始時間」排序，由近到遠排列
 const sortedFilteredReservations = computed(() => {
-  return [...filteredReservations.value].sort((a, b) => {
-    return `${a.reservationDate} ${a.startTime}`.localeCompare(`${b.reservationDate} ${b.startTime}`)
-  })
+  return sortByReservationDateTime(filteredReservations.value)
 })
 
-const totalPages = computed(() => Math.max(1, Math.ceil(sortedFilteredReservations.value.length / pageSize.value)))
-const pageStart = computed(() => (currentPage.value - 1) * pageSize.value)
-const pagedReservations = computed(() => sortedFilteredReservations.value.slice(pageStart.value, pageStart.value + pageSize.value))
-const dateLabel = (date) => {
-  if (!date) return ''
-  const [, month, day] = date.split('-')
-  return `${Number(month)}/${Number(day)}`
-}
+const {
+  totalPages,
+  pagedItems: pagedReservations,
+  paginationText,
+  prevPage,
+  nextPage,
+  clampPage,
+} = usePagination(sortedFilteredReservations, pageSize, currentPage)
 
 // 桌位分配名單：先依日期分組，日期底下再依時段分組；同一天只顯示一次日期列
 const groupedReservations = computed(() => {
-  const dateGroups = new Map()
-  pagedReservations.value.forEach((item) => {
-    if (!dateGroups.has(item.reservationDate)) dateGroups.set(item.reservationDate, new Map())
-    const timeGroups = dateGroups.get(item.reservationDate)
-    const time = `${formatTime(item.startTime)} - ${formatTime(item.endTime)}`
-    if (!timeGroups.has(time)) timeGroups.set(time, [])
-    timeGroups.get(time).push(item)
-  })
-  return [...dateGroups.entries()].map(([date, timeGroups]) => ({
-    date,
-    dateLabel: dateLabel(date),
-    slots: [...timeGroups.entries()].map(([time, items]) => ({
-      label: `${date}-${time}`,
-      timeLabel: time,
-      items,
-    })),
-  }))
+  return groupReservationsByDateAndTime(pagedReservations.value)
 })
-
-const paginationText = computed(() => {
-  if (!sortedFilteredReservations.value.length) return '顯示 0 筆，共 0 筆'
-  const start = pageStart.value + 1
-  const end = Math.min(pageStart.value + pageSize.value, sortedFilteredReservations.value.length)
-  return `顯示 ${start}-${end} 筆，共 ${sortedFilteredReservations.value.length} 筆`
-})
-
-const prevPage = () => {
-  currentPage.value = Math.max(1, currentPage.value - 1)
-}
-
-const nextPage = () => {
-  currentPage.value = Math.min(totalPages.value, currentPage.value + 1)
-}
 
 const statusText = {
   PENDING: '未配桌',
@@ -145,27 +99,20 @@ const statusClass = {
   ASSIGNED: 'bg-label-info',
 }
 
-const formatTime = (time) => time?.slice(0, 5) || ''
 const tableText = (item) => item.tableNumbers?.length ? item.tableNumbers.join('、') : '未分配'
 
 // 同一日期時段已經被其他訂位選走的桌位，不再出現在下拉選單
-const isSameDateTimeSlot = (source, target) => {
-  return source.reservationDate === target.reservationDate
-    && formatTime(source.startTime) === formatTime(target.startTime)
-    && formatTime(source.endTime) === formatTime(target.endTime)
-}
-
 const usedTableIdsForReservation = (item) => {
   return new Set(reservations.value
     .filter((reservation) => reservation.reservationId !== item.reservationId)
     .filter((reservation) => String(reservation.storeId) === String(item.storeId))
     .filter((reservation) => reservation.status !== 'CANCELLED')
-    .filter((reservation) => isSameDateTimeSlot(reservation, item))
+    .filter((reservation) => isSameReservationDateTime(reservation, item))
     .flatMap((reservation) => reservation.tableIds || [])
     .map(String))
 }
 
-// ＊只列出該訂位分店的桌位，並扣掉同時段其他訂位已使用桌位。＊
+// 只列出該訂位分店的桌位，並扣掉同時段其他已使用桌位
 const tablesForReservation = (item) => {
   const usedTableIds = usedTableIdsForReservation(item)
   return tables.value.filter((table) => {
@@ -196,11 +143,12 @@ const toggleStatus = (status) => {
   }
 }
 
-// ＊載入分店後再讀取桌位與訂位。＊
+// 載入分店後，讀取桌位與訂位
 const loadStores = async () => {
   try {
-    const res = await storeApi.getStores({ admin: true })
+    const res = await reservationAdminApi.getManageableStores()
     stores.value = res.data || []
+    selectedStoreId.value = resolveManagedStoreSelection(stores.value, selectedStoreId.value, canSelectAllStores.value)
     await loadPageData()
   } catch (error) {
     errorMessage.value = error.response?.data?.message || '讀取分店資料失敗，請確認後端已啟動'
@@ -215,7 +163,7 @@ const loadPageData = async () => {
   try {
     if (selectedStoreId.value) {
       const [tableRes, reservationRes] = await Promise.all([
-        storeApi.getStoreTables(selectedStoreId.value),
+        reservationAdminApi.getStoreTables(selectedStoreId.value),
         reservationAdminApi.getUnassignedReservations(selectedStoreId.value),
       ])
       tables.value = (tableRes.data || []).map((table) => ({ ...table, storeId: Number(selectedStoreId.value) }))
@@ -225,7 +173,7 @@ const loadPageData = async () => {
 
     const results = await Promise.all(stores.value.map(async (store) => {
       const [tableRes, reservationRes] = await Promise.all([
-        storeApi.getStoreTables(store.storeId),
+        reservationAdminApi.getStoreTables(store.storeId),
         reservationAdminApi.getUnassignedReservations(store.storeId),
       ])
       return {
@@ -244,25 +192,12 @@ const loadPageData = async () => {
   }
 }
 
-// 切換日曆月份
-const shiftCalendarMonth = (offset) => {
-  calendarMonth.value = new Date(calendarMonth.value.getFullYear(), calendarMonth.value.getMonth() + offset, 1)
-}
-
 // 日期區間選取
 const selectDateRangeDay = (date) => {
-  if (!selectedStartDate.value || (selectedStartDate.value && selectedEndDate.value)) {
-    selectedStartDate.value = date
-    selectedEndDate.value = ''
-    return
-  }
-  if (date < selectedStartDate.value) {
-    selectedEndDate.value = selectedStartDate.value
-    selectedStartDate.value = date
-  } else {
-    selectedEndDate.value = date
-  }
-  showDateRangeDropdown.value = false
+  const nextRange = nextDateRangeSelection(date, selectedStartDate.value, selectedEndDate.value)
+  selectedStartDate.value = nextRange.startDate
+  selectedEndDate.value = nextRange.endDate
+  if (nextRange.completed) showDateRangeDropdown.value = false
 }
 
 // 清空日期區間，顯示全部日期。
@@ -271,9 +206,9 @@ const clearDateRange = () => {
   selectedEndDate.value = ''
 }
 
-const isRangeStart = (date) => date === selectedStartDate.value
-const isRangeEnd = (date) => date === selectedEndDate.value
-const isInRange = (date) => selectedStartDate.value && selectedEndDate.value && date > selectedStartDate.value && date < selectedEndDate.value
+const isRangeStart = (date) => isRangeStartFor(date, selectedStartDate.value)
+const isRangeEnd = (date) => isRangeEndFor(date, selectedEndDate.value)
+const isInRange = (date) => isInRangeFor(date, selectedStartDate.value, selectedEndDate.value)
 
 // 點空白處關閉下拉選單
 const handleOutsideClick = (event) => {
@@ -316,7 +251,7 @@ watch([filteredReservations, pageSize], () => {
   currentPage.value = 1
 })
 watch(totalPages, () => {
-  if (currentPage.value > totalPages.value) currentPage.value = totalPages.value
+  clampPage()
 })
 
 onMounted(() => {
@@ -346,12 +281,13 @@ onBeforeUnmount(() => {
         <!-- 查詢篩選 -->
         <div class="card-header d-flex flex-wrap align-items-center gap-2">
           <h5 class="mb-0">桌位分配名單</h5>
-          <select v-model="selectedStoreId" class="form-select ms-auto store-select">
-            <option value="">全部可管理分店</option>
+          <select v-if="canSelectAllStores || stores.length > 1" v-model="selectedStoreId" class="form-select ms-auto store-select">
+            <option v-if="canSelectAllStores" value="">全部可管理分店</option>
             <option v-for="store in stores" :key="store.storeId" :value="String(store.storeId)">
               {{ store.storeName }}
             </option>
           </select>
+          <div v-else class="ms-auto text-muted px-3">{{ fixedStoreName }}</div>
           <div class="multi-select dropdown-closable date-select" @click.stop>
             <button type="button" class="form-select text-start" @click="showDateRangeDropdown = !showDateRangeDropdown">
               {{ selectedDateRangeText }}
@@ -386,8 +322,7 @@ onBeforeUnmount(() => {
                     'is-selected': isRangeStart(day.value) || isRangeEnd(day.value),
                     'is-in-range': isInRange(day.value),
                   }"
-                  @click="selectDateRangeDay(day.value)"
-                >
+                  @click="selectDateRangeDay(day.value)">
                   {{ day.day }}
                 </button>
               </div>
@@ -450,7 +385,7 @@ onBeforeUnmount(() => {
               <template v-for="dateGroup in groupedReservations" :key="dateGroup.date">
                 <tbody class="reservation-date-header">
                   <tr>
-                    <td colspan="7">
+                    <td :colspan="showStoreColumn ? 8 : 7">
                       <i class="bx bx-calendar"></i>&nbsp;
                       {{ dateGroup.dateLabel }}</td>
                   </tr>
@@ -458,7 +393,8 @@ onBeforeUnmount(() => {
                 <template v-for="slot in dateGroup.slots" :key="slot.label">
                   <tbody class="reservation-group-header">
                     <tr>
-                      <th>{{ slot.timeLabel }}</th>
+                      <th>{{ slot.timeLabel }}&nbsp; |</th>
+                      <th v-if="showStoreColumn">Store</th>
                       <th>Phone</th>
                       <th>Email</th>
                       <th>Persons</th>
@@ -470,6 +406,7 @@ onBeforeUnmount(() => {
                   <tbody class="table-border-bottom-0">
                     <tr v-for="item in slot.items" :key="item.reservationId">
                       <td><span class="fw-medium">{{ item.customerName }}</span></td>
+                      <td v-if="showStoreColumn">{{ storeName(item.storeId) }}</td>
                       <td>{{ item.customerPhone }}</td>
                       <td>{{ item.customerEmail || '-' }}</td>
                       <td>{{ item.partySize }} 位</td>
@@ -509,7 +446,7 @@ onBeforeUnmount(() => {
             </template>
             <tbody v-else-if="!loading">
               <tr>
-                <td class="text-center text-muted py-4">目前沒有符合條件的桌位分配資料</td>
+                <td :colspan="showStoreColumn ? 8 : 7" class="text-center text-muted py-4">目前沒有符合條件的桌位分配資料</td>
               </tr>
             </tbody>
           </table>

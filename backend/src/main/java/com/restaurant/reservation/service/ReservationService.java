@@ -12,20 +12,23 @@ import com.restaurant.reservation.repository.ReservationCapacityRepository;
 import com.restaurant.reservation.repository.ReservationRepository;
 import com.restaurant.reservation.repository.ReservationTableRepository;
 import com.restaurant.reservation.repository.TimeSlotRepository;
-import com.restaurant.store.entity.Store;
+// import com.restaurant.store.entity.Store;
 import com.restaurant.store.entity.StoreHour;
 import com.restaurant.store.entity.TableInfo;
 import com.restaurant.store.repository.StoreHolidayRepository;
 import com.restaurant.store.repository.StoreHourRepository;
-import com.restaurant.store.repository.StoreRepository;
+// import com.restaurant.store.repository.StoreRepository;
 import com.restaurant.store.repository.TableInfoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -38,14 +41,15 @@ public class ReservationService {
     private final ReservationCapacityRepository capacityRepository;
     private final ReservationTableRepository reservationTableRepository;
     private final TableInfoRepository tableInfoRepository;
-    private final StoreRepository storeRepository;
+    // private final StoreRepository storeRepository;
     private final StoreHolidayRepository storeHolidayRepository;
     private final StoreHourRepository storeHourRepository;
+    private final ReservationEmailService reservationEmailService;
 
     // 顧客端查可訂時段
     public List<TimeSlot> getAvailableSlots(Long storeId, LocalDate startDate, LocalDate endDate) {
-        Store store = storeRepository.findByStoreIdAndIsDeletedFalse(storeId)
-                .orElseThrow(() -> new ResourceNotFoundException("分店", storeId));
+        // Store store = storeRepository.findByStoreIdAndIsDeletedFalse(storeId)
+        //         .orElseThrow(() -> new ResourceNotFoundException("分店", storeId));
         LocalDate today = LocalDate.now();
         LocalDate maxDate = today.plusDays(30);
         LocalDate effectiveStart = startDate.isBefore(today) ? today : startDate;
@@ -104,9 +108,13 @@ public class ReservationService {
                 .customerName(request.getCustomerName())
                 .customerPhone(request.getCustomerPhone())
                 .customerEmail(request.getCustomerEmail())
+                .accessToken(generateReservationAccessToken())
                 .specialRequest(request.getSpecialRequest())
                 .build());
-        return toResponse(reservation);
+        // 寄訂位成功 gmail
+        ReservationResponse response = toResponse(reservation);
+        sendReservationCreatedEmailAfterCommit(response);
+        return response;
     }
 
     // 讀取單筆訂位：給訂位成功頁、編輯頁使用
@@ -116,11 +124,16 @@ public class ReservationService {
                 .orElseThrow(() -> new ResourceNotFoundException("訂位", reservationId)));
     }
 
-    // 顧客登入後查詢自己的訂位
-    public List<ReservationResponse> getReservationsByUserId(Long userId) {
-        return reservationRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
-                .map(this::toResponse)
-                .toList();
+    // 信件中的成功頁連結使用 reservation_id + access_token 查詢，不需要會員登入 JWT
+    public ReservationResponse getReservationByAccessToken(Long reservationId, String accessToken) {
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new BusinessException("訂位連結驗證失敗");
+        }
+
+        Reservation reservation = reservationRepository
+                .findByReservationIdAndAccessToken(reservationId, accessToken)
+                .orElseThrow(() -> new BusinessException("訂位連結驗證失敗"));
+        return toResponse(reservation);
     }
 
     // 顧客編輯訂位：只有 PENDING 能改
@@ -245,6 +258,30 @@ public class ReservationService {
         }
     }
 
+    // 寄訂位成功 gmail
+    private void sendReservationCreatedEmailAfterCommit(ReservationResponse response) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            reservationEmailService.sendReservationCreatedEmail(response);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                reservationEmailService.sendReservationCreatedEmail(response);
+            }
+        });
+    }
+
+    // AccessToken
+    private String generateReservationAccessToken() {
+        String token;
+        do {
+            token = UUID.randomUUID().toString().replace("-", "");
+        } while (reservationRepository.existsByAccessToken(token));
+        return token;
+    }
+
     // Entity 轉 DTO 補上時段日期、開始結束時間、已配桌桌號 -> 前端不用再分別查多張表
     public ReservationResponse toResponse(Reservation reservation) {
         TimeSlot slot = timeSlotRepository.findById(reservation.getSlotId()).orElse(null);
@@ -273,6 +310,7 @@ public class ReservationService {
                 .customerName(reservation.getCustomerName())
                 .customerPhone(reservation.getCustomerPhone())
                 .customerEmail(reservation.getCustomerEmail())
+                .accessToken(reservation.getAccessToken())
                 .tableIds(tableIds)
                 .tableNumbers(tableNumbers)
                 .createdAt(reservation.getCreatedAt())

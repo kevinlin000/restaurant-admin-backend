@@ -1,7 +1,16 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { reservationAdminApi } from '@/api/reservation'
-import { storeApi } from '@/api/store'
+import {
+  canUseAllManagedStores,
+  formatDateInput,
+  formatTime,
+  isSameReservationDateTime,
+  normalizePhone,
+  reservationStatusClass,
+  reservationStatusText,
+  resolveManagedStoreSelection,
+} from '@/assets/js/reservationUi'
 
 const stores = ref([])
 const tables = ref([])
@@ -32,14 +41,9 @@ const rangeOptions = [
 ]
 const selectedRangeDays = ref(1)
 
-// 日期格式：用本地時間 yyyy-MM-dd，避免 toISOString() 造成 UTC 時區問題(非現在時間)
-function formatDateInput(date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
 const selectedDate = ref(formatDateInput(new Date()))
+const canSelectAllStores = computed(() => canUseAllManagedStores())
+const fixedStoreName = computed(() => stores.value[0]?.storeName || '尚無可管理分店')
 
 // 依選到的天數值，轉換標題顯示文字
 const selectedRangeLabel = computed(() => {
@@ -80,31 +84,8 @@ const todayStats = computed(() => {
   }
 })
 
-const statusText = {
-  PENDING: '未配桌',
-  RESERVED: '已保留',
-  ASSIGNED: '已配桌',
-  CHECKED_IN: '已入座',
-  COMPLETED: '已完成',
-  CANCELLED: '已取消',
-  NO_SHOW: '未到',
-}
-
-// 訂位狀態樣式
-const statusClass = {
-  PENDING: 'bg-label-danger',
-  RESERVED: 'bg-label-warning',
-  ASSIGNED: 'bg-label-info',
-  CHECKED_IN: 'bg-label-success',
-  COMPLETED: 'bg-label-primary',
-  CANCELLED: 'bg-label-secondary',
-  NO_SHOW: 'bg-label-dark',
-}
-
-const formatTime = (time) => time?.slice(0, 5) || ''
-
-// 搜尋手機忽略格式 "-" 也可以搜尋
-const normalizePhone = (phone) => String(phone || '').replace(/\D/g, '')
+const statusText = reservationStatusText
+const statusClass = reservationStatusClass
 
 // 判斷訂位是否已超過時段；排除在「接下來訂位總數」
 const isPastReservationTime = (item) => {
@@ -165,11 +146,12 @@ const groupedReservations = computed(() => {
   })
 })
 
-// ＊載入後台可管理分店；目前未做權限時先允許全部，未來可由登入身分限制 stores。＊
+// 載入後台可管理分店；登入身分限制 stores
 const loadStores = async () => {
   try {
-    const res = await storeApi.getStores({ admin: true })
+    const res = await reservationAdminApi.getManageableStores()
     stores.value = res.data || []
+    selectedStoreId.value = resolveManagedStoreSelection(stores.value, selectedStoreId.value, canSelectAllStores.value)
     await loadDashboard()
   } catch (error) {
     errorMessage.value = error.response?.data?.message || '讀取分店資料失敗，請確認後端已啟動'
@@ -185,7 +167,7 @@ const loadOverview = async () => {
     if (selectedStoreId.value) {
       const [overviewResults, tableRes] = await Promise.all([
         Promise.all(overviewDates.value.map((date) => reservationAdminApi.getDailyOverview(selectedStoreId.value, date))),
-        storeApi.getStoreTables(selectedStoreId.value),
+        reservationAdminApi.getStoreTables(selectedStoreId.value),
       ])
       const reservations = overviewResults
         .flatMap((result) => result.data?.reservations || [])
@@ -203,7 +185,7 @@ const loadOverview = async () => {
       const results = await Promise.all(stores.value.map(async (store) => {
         const [overviewResults, tableRes] = await Promise.all([
           Promise.all(overviewDates.value.map((date) => reservationAdminApi.getDailyOverview(store.storeId, date))),
-          storeApi.getStoreTables(store.storeId),
+          reservationAdminApi.getStoreTables(store.storeId),
         ])
         return {
           overviews: overviewResults.map((result) => result.data || {}),
@@ -292,18 +274,12 @@ const checkIn = async (item) => {
 const tableText = (item) => item.tableNumbers?.length ? item.tableNumbers.join('、') : '未分配'
 
 // 同一日期時段已經被其他訂位選走的桌位，不再出現在下拉選單
-const isSameDateTimeSlot = (source, target) => {
-  return source.reservationDate === target.reservationDate
-    && formatTime(source.startTime) === formatTime(target.startTime)
-    && formatTime(source.endTime) === formatTime(target.endTime)
-}
-
 const usedTableIdsForReservation = (item) => {
   return new Set((overview.value.reservations || [])
     .filter((reservation) => reservation.reservationId !== item.reservationId)
     .filter((reservation) => String(reservation.storeId) === String(item.storeId))
     .filter(isVisibleOverviewReservation)
-    .filter((reservation) => isSameDateTimeSlot(reservation, item))
+    .filter((reservation) => isSameReservationDateTime(reservation, item))
     .flatMap((reservation) => reservation.tableIds || [])
     .map(String))
 }
@@ -351,12 +327,13 @@ onMounted(loadStores)
     <div class="container-xxl flex-grow-1 container-p-y">
       <div class="d-flex flex-wrap align-items-center gap-3 py-3 mb-4">
         <h2 class="mb-0">訂位管理總覽<span class="text-muted fw-light"> / Reservation</span></h2>
-        <select v-model="selectedStoreId" class="form-select ms-auto control-select">
-          <option value="">全部可管理分店</option>
+        <select v-if="canSelectAllStores || stores.length > 1" v-model="selectedStoreId" class="form-select ms-auto control-select">
+          <option v-if="canSelectAllStores" value="">全部可管理分店</option>
           <option v-for="store in stores" :key="store.storeId" :value="String(store.storeId)">
             {{ store.storeName }}
           </option>
         </select>
+        <div v-else class="ms-auto text-muted px-3">{{ fixedStoreName }}</div>
       </div>
 
       <div v-if="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>

@@ -9,7 +9,6 @@ import com.restaurant.reservation.service.ReservationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -53,17 +52,13 @@ public class ReservationController {
         return ApiResponse.success("訂位成功", reservationService.createReservation(request));
     }
 
-    // 顧客登入後 -> 依 JWT 內的 userId 查詢自己的訂位
-    @GetMapping("/me")
-    public ApiResponse<List<ReservationResponse>> getMyReservations() {
-        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return ApiResponse.success(reservationService.getReservationsByUserId(userId));
-    }
-
-    // 顧客登入後 -> 依 userId 查詢自己的訂位
-    @GetMapping("/user/{userId}")
-    public ApiResponse<List<ReservationResponse>> getReservationsByUserId(@PathVariable Long userId) {
-        return ApiResponse.success(reservationService.getReservationsByUserId(userId));
+    // 信件連結 -> 沒有登入也可透過訂位 access token 讀取成功頁資料
+    @GetMapping("/{reservationId}/public")
+    public ApiResponse<ReservationResponse> getPublicReservation(
+            @PathVariable Long reservationId,
+            @RequestParam String token
+    ) {
+        return ApiResponse.success(reservationService.getReservationByAccessToken(reservationId, token));
     }
 
     // 訂位成功、編輯頁 -> 讀取單筆訂位
