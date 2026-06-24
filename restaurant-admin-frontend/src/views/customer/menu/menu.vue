@@ -22,12 +22,15 @@ import japaneseSakeImg from "@/assets/images/japanese-sake.jpg";
 const currentStoreId = ref(null)
 const storeList = ref([])
 
-// 🗂️ 2. 動態分類控制中心 (🎯 已移除所有死資料，完全由資料庫驅動)
+// 🗂️ 2. 動態分類控制中心 
 const categoryList = ref([])
 const currentCategory = ref(null) 
 
 // 🍱 3. 菜單控制中心
 const menuItems = ref([])
+
+// 🌟 紀錄客人在畫面上點擊了哪一個行銷特色標籤（預設為 null 代表顯示全部）
+const selectedFeatureTag = ref(null)
 
 // 🌟 4. 幻燈片滾動漸隱控制
 const heroOpacity = ref(1)
@@ -65,7 +68,7 @@ const getMenuItemImage = (item) => {
   return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80';
 }
 
-// 🌟 智慧分類小圖標字典（動態匹配資料庫字眼）
+// 🌟 智慧分類小圖標字典
 const getCategoryIcon = (categoryName) => {
   if (!categoryName) return '🏮';
   if (categoryName.includes('前菜') || categoryName.includes('沙拉')) return '🥗';
@@ -150,14 +153,59 @@ const handleStoreChange = () => { fetchMenuData(currentStoreId.value) }
 
 watch(currentStoreId, (newStoreId) => { if (newStoreId) { fetchMenuData(newStoreId) } })
 
-// 🎯 升級版演算核心
+
+// 🌟 全域雷達模式 —— 自動分析出這家分店「全部餐點」擁有的所有特色標籤，一併全部秀出！
+const activeAvailableTags = vueComputed(() => {
+  if (!Array.isArray(menuItems.value)) return []
+  return [...new Set(
+    menuItems.value.flatMap(item => item.featureTags || [])
+  )]
+})
+
+// 🎯 智慧篩選導航：點擊標籤時，不僅進行單選切換，若當前大分類沒有此標籤餐點，自動幫客人轉場！
+const toggleFeatureTag = (tag) => {
+  if (selectedFeatureTag.value === tag) {
+    selectedFeatureTag.value = null // 反選取消
+  } else {
+    selectedFeatureTag.value = tag // 啟用篩選
+    
+    // 🌟 檢查目前看的大分類（例如前菜）裡有沒有這類標籤商品
+    const hasTagInCurrentCategory = menuItems.value.some(item => {
+      const itemCatId = item.categoryId !== undefined ? item.categoryId : item.category_id;
+      return Number(itemCatId) === Number(currentCategory.value) && 
+             item.featureTags && item.featureTags.includes(tag)
+    })
+
+    // 🚀 如果當前大分類找不到，自動幫客人切換到「第一個有這張標籤」的分類！
+    if (!hasTagInCurrentCategory) {
+      const targetItem = menuItems.value.find(item => item.featureTags && item.featureTags.includes(tag))
+      if (targetItem) {
+        const targetCatId = targetItem.categoryId !== undefined ? targetItem.categoryId : targetItem.category_id;
+        currentCategory.value = Number(targetCatId)
+      }
+    }
+  }
+}
+
+// 🎯 雙重過濾核心
 const filteredMenu = vueComputed(() => {
   if (!Array.isArray(menuItems.value)) return []
-  return menuItems.value.filter(item => {
+  
+  // 第一層：先過濾出當前左側選中分類的餐點
+  const categoryFiltered = menuItems.value.filter(item => {
     const itemCatId = item.categoryId !== undefined ? item.categoryId : item.category_id;
     return Number(itemCatId) === Number(currentCategory.value)
   })
+
+  // 第二層：如果上方的全域標籤有點選，進一步留下含有該標籤的品項
+  if (!selectedFeatureTag.value) {
+    return categoryFiltered
+  }
+  return categoryFiltered.filter(item => 
+    item.featureTags && item.featureTags.includes(selectedFeatureTag.value)
+  )
 })
+
 const addToCart = (item) => { alert(`🎉 成功將【${item.itemName}】加入購物車！`) }
 
 onMounted(async () => {
@@ -238,9 +286,29 @@ onUnmounted(() => {
           </div>
 
           <div class="col-md-9">
+            <div v-if="activeAvailableTags.length > 0" class="menu-feature-tags-container mb-4">
+              <div class="d-flex align-items-center flex-wrap gap-2 py-2">
+                <button 
+                  @click="selectedFeatureTag = null"
+                  :class="['btn btn-feature-tag', !selectedFeatureTag ? 'active' : '']"
+                >
+                  全部特色
+                </button>
+
+                <button 
+                  v-for="tag in activeAvailableTags" 
+                  :key="tag"
+                  @click="toggleFeatureTag(tag)"
+                  :class="['btn btn-feature-tag', selectedFeatureTag === tag ? 'active' : '']"
+                >
+                  {{ tag }}
+                </button>
+              </div>
+            </div>
+
             <div class="row row-cols-1 row-cols-md-2 g-4">
               <div class="col" v-for="item in filteredMenu" :key="item.id">
-                <div class="card h-100 border-0 shadow-sm overflow-hidden hover-shadow bg-white transition-all" style="border-radius: 12px;">
+                <div class="card h-100 border-0 shadow-sm overflow-hidden hover-shadow bg-white transition-all item-card" style="border-radius: 12px;">
                   <div class="position-relative overflow-hidden" style="height: 240px;">
                     <img :src="getMenuItemImage(item)" class="card-img-top h-100 w-100 transition-scale" style="object-fit: cover;" :alt="item.itemName">
                   </div>
@@ -251,6 +319,17 @@ onUnmounted(() => {
                         ${{ item.finalPrice || item.price || 0 }}
                       </span>
                     </div>
+
+                    <div v-if="item.featureTags && item.featureTags.length > 0" class="flex flex-wrap gap-1.5 mb-2.5">
+                      <span 
+                        v-for="(tag, tagIdx) in item.featureTags" 
+                        :key="tagIdx"
+                        class="inline-flex align-items-center px-2.5 py-0.5 rounded-full small fw-bold tag-badge"
+                      >
+                        {{ tag }}
+                      </span>
+                    </div>
+
                     <p class="card-text small flex-grow-1 mb-3" style="line-height: 1.6; color: #6b7280;">{{ item.description }}</p>
                     <div v-if="item.allergenInfo" class="alert alert-warning py-1 px-2 mb-3 border-0 rounded-2 d-flex align-items-center bg-opacity-10" style="font-size: 0.75rem; color: #9a3412; background-color: #ffedd5;">
                       ⚠️ 過敏原提示：{{ item.allergenInfo }}
@@ -286,22 +365,19 @@ onUnmounted(() => {
 .hover-shadow:hover .transition-scale { transform: scale(1.04); }
 
 /* ==========================================================================
-   左側分類選單字體與質感優化（極速硬體加速版）
+   左側分類選單字體與質感優化
    ========================================================================== */
 .category-btn { 
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft JhengHei", sans-serif;
   font-size: 15px;
-  font-weight: 650 !important; /* 🌟 保持厚實有質感的分量 */
+  font-weight: 650 !important; 
   color: #374151 !important; 
   letter-spacing: 0.06em; 
   line-height: 1.5;
-  
-  /* 預告瀏覽器開啟硬體加速，大幅減少點擊時的渲染重繪延遲 */
   will-change: padding, background-color, color;
   transition: all 0.12s ease-out; 
 }
 
-/* 滑鼠游標移入（未選取狀態） */
 .category-btn:hover:not(.yayoi-active) { 
   background-color: #fff7ed !important; 
   color: #b45309 !important; 
@@ -309,16 +385,68 @@ onUnmounted(() => {
   padding-left: 1.25rem !important; 
 }
 
-/* 當前選中的分類（Active 狀態）：點擊瞬間雷厲風行！ */
 .yayoi-active { 
-  transition: none !important; /* 🌟 強制扼殺全域繼承而來的任何黏滯動畫 */
-  
+  transition: none !important; 
   background-color: #b45309 !important; 
   background-image: linear-gradient(135deg, #cc7d24 0%, #b45309 100%) !important; 
   color: #ffffff !important; 
   font-weight: 700 !important; 
   padding-left: 1.25rem !important;
   box-shadow: 0 4px 12px rgba(180, 83, 9, 0.35) !important;
+}
+
+/* ==========================================================================
+   🌟 特色標籤列：優雅暖橘棕配色（與右側價格及高亮按鈕呼應）
+   ========================================================================== */
+.menu-feature-tags-container {
+  border-bottom: 1px solid #e5e7eb; 
+  padding-bottom: 12px;
+}
+
+/* 基礎膠囊按鈕（未選取狀態） */
+.btn-feature-tag {
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 6px 18px;
+  border-radius: 50px; 
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+  color: #6b7280;
+  transition: all 0.2s ease-in-out;
+}
+
+/* 滑鼠游標懸停 */
+.btn-feature-tag:hover {
+  border-color: #fed7aa;
+  color: #c2410c;
+  background-color: #fff7ed;
+}
+
+/* 🌟 選取標籤後：呈現溫潤的和風暖焦糖色（告別突兀，極具整體美感） */
+.btn-feature-tag.active {
+  background-color: #fff7ed !important; 
+  color: #c2410c !important; 
+  border-color: #fed7aa !important; 
+  box-shadow: 0 2px 6px rgba(194, 65, 12, 0.08);
+}
+
+/* ==========================================================================
+   特色標籤微光澤細緻樣式
+   ========================================================================== */
+.tag-badge {
+  background-color: #fdf2e9; 
+  color: #c2410c;            
+  border: 1px solid #fed7aa; 
+  letter-spacing: 0.04em;
+  box-shadow: 0 1px 2px rgba(194, 65, 12, 0.03);
+  transition: all 0.15s ease-in-out;
+}
+
+.item-card:hover .tag-badge {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(194, 65, 12, 0.08);
+  background-color: #fff7ed;
+  color: #b45309;
 }
 
 /* ==========================================================================

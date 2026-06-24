@@ -17,7 +17,8 @@ const newItem = ref({
   imageUrl: '',
   categoryId: 1,
   status: 'AVAILABLE',
-  allergenInfo: ''
+  allergenInfo: '',
+  featureTags: null
 })
 
 // 🚀 4. 初始化為空籃子，準備裝真實數據
@@ -77,18 +78,32 @@ const handleAddItemMenu = async () => {
       description: newItem.value.description || "日式職人手作美味。",
       imageUrl: newItem.value.imageUrl || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c",
       allergenInfo: newItem.value.allergenInfo || "無特殊過敏原提示。",
-      isActive: true
+      isActive: true,
+      
+      // ⚡ 關鍵加入這一行！將前端選好的標籤打包送往後端
+      featureTags: newItem.value.featureTags 
     })
     
     if (response.data.success) {
-      alert(` 🎉 成功新增一筆定食餐點，並精準綁定至第 ${currentStoreId.value} 號分店資料庫！`)
-      fetchMenuItems() // 重新刷新該店專屬資料列表
-      newItem.value = { itemName: '', price: '', description: '', imageUrl: '', categoryId: 1, status: 'AVAILABLE', allergenInfo: '' }
+      alert(` 🎉 成功新增一筆定食餐點，並寫入第 ${currentStoreId.value} 號分店資料庫！`)
+      fetchMenuItems() // 重新刷新列表
+      
+      // 腦收集籃擦乾淨：記得把 featureTags 也重設為 null
+      newItem.value = { 
+        itemName: '', 
+        price: '', 
+        description: '', 
+        imageUrl: '', 
+        categoryId: 1, 
+        status: 'AVAILABLE', 
+        allergenInfo: '',
+        featureTags: null // 👈 清空重置
+      } 
     } else {
       alert('上架失敗：' + response.data.message)
     }
   } catch (error) {
-    console.error('後端發電廠拒收包裹：', error)
+    console.error('後端資料庫拒收包裹：', error)
     alert(' ⚠️ 請檢查後端控制台是否已完全啟動！')
   }
 }
@@ -156,6 +171,23 @@ const handleAddItemMenu = async () => {
                 style="color: #374151; border-color: #fed7aa; background-color: #ffffff; font-weight: 500;"
               >
             </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold text-secondary">✨ 特色行銷標籤：</label>
+            <select v-model="newItem.featureTags" class="form-select border-2">
+              <option :value="null">-- 不設定標籤（留白） --</option>
+              <option value="👑 店長推薦">👑 店長推薦 </option>
+              <option value="🔥 人氣熱銷">🔥 人氣熱銷 </option>
+              <option value="🍣 主廚推薦">🍣 主廚推薦 </option>
+              <option value="🔥 入口即化">🔥 入口即化 </option>
+              <option value="🥩 頂級和牛">🥩 頂級和牛 </option>
+              <option value="🍵 濃郁系">🍵 濃郁系 </option>
+              <option value="🥢 手工研磨">🥢 手工研磨 </option>
+              <option value="🧊 夏季限定">🧊 夏季限定 </option>
+              <option value="🍶 頂級清酒">🍶 頂級清酒 </option>
+            </select>
+            <div class="form-text small text-muted">選擇一個最能吸引顧客下單的特色標籤，前台將會優雅顯示。</div>
           </div>
 
           <div class="col-md-3">

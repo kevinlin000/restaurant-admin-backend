@@ -98,6 +98,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/reservation-settings/**")
                         .hasAnyAuthority("ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
 
+                        // 後台菜單管理：STAFF、MANAGER、ADMIN 
+                        .requestMatchers("/api/menu-items/**")
+                        .hasAnyAuthority("ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
+
                         // 其他所有後台 API：給 STAFF、MANAGER、ADMIN
                         // 這條很重要，避免 CUSTOMER 直接用 Postman 打其他 /api/admin/** API
                         .requestMatchers("/api/admin/**").hasAnyAuthority("ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")

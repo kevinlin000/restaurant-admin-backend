@@ -41,4 +41,7 @@ public class MenuItem {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "feature_tags", length = 255)
+    private String featureTags; // 儲存格式如: "👑 店長推薦"
 }
