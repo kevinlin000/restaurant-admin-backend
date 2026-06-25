@@ -66,6 +66,13 @@ const availableFeatures = computed(() => {
       path: "/admin/member",
       roles: ["ADMIN"],
     },
+    {
+      title: "常見問答",
+      icon: "bx bx-help-circle",
+      description: "管理 FAQ 與客服窗知識庫。",
+      path: "/admin/faqs",
+      roles: ["ADMIN"],
+    },
   ];
 
   return baseFeatures.filter((feature) => feature.roles.includes(role));
@@ -212,7 +219,7 @@ const roleSummary = computed(() => {
 }
 
 .feature-grid.is-admin-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
 
 .feature-card {

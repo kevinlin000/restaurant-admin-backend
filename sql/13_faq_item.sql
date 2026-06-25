@@ -1,0 +1,55 @@
+CREATE TABLE IF NOT EXISTS faq_item (
+  faq_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  category VARCHAR(30) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
+  question VARCHAR(180) NOT NULL,
+  answer TEXT NOT NULL,
+  keywords VARCHAR(320) NULL,
+  is_featured TINYINT(1) NOT NULL DEFAULT 0,
+  sort_order INT NOT NULL DEFAULT 0,
+  is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_faq_question (question),
+  INDEX idx_faq_public (is_deleted, status, category, is_featured, sort_order),
+  INDEX idx_faq_admin (is_deleted, is_featured, sort_order)
+);
+
+INSERT INTO faq_item
+  (category, status, question, answer, keywords, is_featured, sort_order, is_deleted)
+VALUES
+  ('RESERVATION', 'PUBLISHED', '訂位最早可以預約多久之後的日期？',
+   '線上訂位開放未來 30 天內的餐期。熱門餐期建議提前安排，若指定時段額滿，可改選相近門市或其他時段。',
+   '訂位,預約,30天,一個月,熱門餐期,時段', 1, 10, 0),
+  ('RESERVATION', 'PUBLISHED', '訂位需要在幾點前抵達？',
+   '請依訂位時間準時抵達。若會晚到，建議先聯繫門市；逾時保留規則會依當日候位狀況調整，現場以門市說明為準。',
+   '遲到,保留,抵達,候位,門市', 1, 20, 0),
+  ('DEPOSIT', 'PUBLISHED', '哪些訂位需要支付訂金？',
+   '特殊餐期、包廂、大人數或高需求時段可能需要支付訂金。系統會在訂位流程中顯示是否需付訂金與付款期限。',
+   '訂金,付款期限,包廂,大人數,特殊餐期', 1, 30, 0),
+  ('DEPOSIT', 'PUBLISHED', '取消訂位後訂金可以退嗎？',
+   '符合取消期限的訂位可依原付款方式辦理退款；若已超過取消期限、未到或臨時取消，訂金規則會依該餐期公告處理。',
+   '取消,退款,訂金退還,未到,no show', 1, 40, 0),
+  ('ORDER', 'PUBLISHED', '可以先線上點餐再到店用餐嗎？',
+   '目前點餐功能支援依門市菜單建立訂單。內用訂單需選擇門市與桌位；外帶訂單可不指定桌位，實際供應品項依各門市設定為準。',
+   '點餐,內用,外帶,桌位,門市菜單', 1, 50, 0),
+  ('PAYMENT', 'PUBLISHED', '付款方式有哪些？',
+   '系統支援信用卡與 Line Pay 等付款流程。部分門市現場付款、發票與退款處理方式，請依結帳頁面與門市說明為準。',
+   '付款,信用卡,Line Pay,發票,退款', 0, 60, 0),
+  ('STORE', 'PUBLISHED', '如何查詢各門市營業狀態？',
+   '可到分店資訊頁查看門市位置、交通方式、營業狀態與特色標籤。若門市暫停營業，系統會避免建立不適用的訂位或點餐流程。',
+   '門市,營業狀態,交通,分店資訊,暫停營業', 0, 70, 0),
+  ('MEMBER', 'PUBLISHED', '一定要登入會員才能訂位或點餐嗎？',
+   '一般訂位與 demo 點餐流程可未登入使用；登入會員後可查看個人資料、訂位紀錄與消費紀錄，後續也能累積會員服務。',
+   '會員,登入,訂位紀錄,消費紀錄,個人資料', 0, 80, 0),
+  ('SERVICE', 'PUBLISHED', '有特殊需求或過敏資訊要怎麼告知？',
+   '建議在訂位備註中先寫明需求，例如兒童椅、包廂、慶生或過敏資訊。門市會依現場條件協助安排，實際結果以門市回覆為準。',
+   '過敏,兒童椅,包廂,慶生,備註,特殊需求', 0, 90, 0)
+ON DUPLICATE KEY UPDATE
+  category = VALUES(category),
+  status = VALUES(status),
+  answer = VALUES(answer),
+  keywords = VALUES(keywords),
+  is_featured = VALUES(is_featured),
+  sort_order = VALUES(sort_order),
+  is_deleted = VALUES(is_deleted);

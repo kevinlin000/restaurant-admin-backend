@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import Swal from "sweetalert2";
+import SupportChatWidget from "@/components/support/SupportChatWidget.vue";
 
 const router = useRouter();
 const userInfo = ref(null);
@@ -124,6 +125,9 @@ const logout = async () => {
               <li class="nav-item">
                 <RouterLink class="nav-link" to="/news">最新消息</RouterLink>
               </li>
+              <li class="nav-item">
+                <RouterLink class="nav-link" to="/faq">常見問答</RouterLink>
+              </li>
               <li v-if="!userInfo" class="nav-item ms-lg-5">
                 <RouterLink to="/login" class="login-btn">
                   <i class="bi bi-person"></i>
@@ -196,6 +200,7 @@ const logout = async () => {
 
     <div class="layout-overlay layout-menu-toggle"></div>
     <div class="drag-target"></div>
+    <SupportChatWidget />
   </div>
 </template>
 
