@@ -5,27 +5,221 @@ import Swal from "sweetalert2";
 
 const router = useRouter();
 const userInfo = ref(null);
+const accessToken = ref("");
+const isHydratingUserInfo = ref(false);
+
+const ROLE = {
+  STAFF: "STAFF",
+  MANAGER: "MANAGER",
+  ADMIN: "ADMIN",
+  CUSTOMER: "CUSTOMER",
+};
+
+const adminRoles = [ROLE.STAFF, ROLE.MANAGER, ROLE.ADMIN];
+const roleDisplayName = {
+  [ROLE.STAFF]: "工作人員",
+  [ROLE.MANAGER]: "店長",
+  [ROLE.ADMIN]: "系統管理員",
+  [ROLE.CUSTOMER]: "會員",
+};
+
+const parseStoredUserInfo = () => {
+  const data = localStorage.getItem("userInfo");
+
+  if (!data) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(data);
+  } catch (error) {
+    localStorage.removeItem("userInfo");
+    return null;
+  }
+};
+
+const decodeTokenPayload = (token) => {
+  try {
+    const payload = token.split(".")[1];
+
+    if (!payload) {
+      return null;
+    }
+
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const paddedBase64 = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const jsonPayload = decodeURIComponent(
+      atob(paddedBase64)
+        .split("")
+        .map((char) => `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`)
+        .join(""),
+    );
+
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    return null;
+  }
+};
+
+const getRoleFromToken = (token) => {
+  const payload = decodeTokenPayload(token);
+  const role = payload?.role || payload?.roleName || "";
+  return String(role).replace(/^ROLE_/, "");
+};
+
+const isExpiredToken = (token) => {
+  const payload = decodeTokenPayload(token);
+
+  if (!payload?.exp) {
+    return false;
+  }
+
+  return payload.exp * 1000 <= Date.now();
+};
+
+const buildFallbackUserInfo = (token) => {
+  const roleName = getRoleFromToken(token);
+
+  if (!roleName) {
+    return null;
+  }
+
+  return {
+    userId: null,
+    name: roleDisplayName[roleName] || "使用者",
+    roleName,
+  };
+};
+
+const getDisplayName = (info) => {
+  if (info?.name) {
+    return info.name;
+  }
+
+  return roleDisplayName[info?.roleName] || "使用者";
+};
 
 const loadUserInfo = () => {
-  const data = localStorage.getItem("userInfo");
-  userInfo.value = data ? JSON.parse(data) : null;
+  const token = localStorage.getItem("accessToken") || "";
+
+  if (token && isExpiredToken(token)) {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("userInfo");
+    accessToken.value = "";
+    userInfo.value = null;
+    return;
+  }
+
+  accessToken.value = token;
+
+  if (!token) {
+    userInfo.value = null;
+    return;
+  }
+
+  const storedUserInfo = parseStoredUserInfo();
+
+  if (storedUserInfo) {
+    const roleName = storedUserInfo.roleName || getRoleFromToken(token);
+    userInfo.value = {
+      ...storedUserInfo,
+      roleName,
+      name: getDisplayName({ ...storedUserInfo, roleName }),
+    };
+    return;
+  }
+
+  // 避免只有 accessToken、沒有 userInfo 時，前台 Navbar 誤判成未登入。
+  // 這種情況會出現在後台登入後跳回首頁 / 個人資料頁，或舊資料缺少 userInfo 時。
+  userInfo.value = token ? buildFallbackUserInfo(token) : null;
+};
+
+
+const hydrateUserInfoFromProfile = async () => {
+  const token = localStorage.getItem("accessToken") || "";
+
+  if (!token || isExpiredToken(token) || isHydratingUserInfo.value) {
+    return;
+  }
+
+  isHydratingUserInfo.value = true;
+
+  try {
+    const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(
+      /\/$/,
+      "",
+    );
+    const response = await fetch(`${apiBaseUrl}/api/members/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.status === 401) {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("userInfo");
+      accessToken.value = "";
+      userInfo.value = null;
+      window.dispatchEvent(new Event("login-state-changed"));
+      return;
+    }
+
+    if (!response.ok) {
+      return;
+    }
+
+    const body = await response.json();
+    const profile = body?.data;
+
+    if (!profile) {
+      return;
+    }
+
+    const roleName = userInfo.value?.roleName || getRoleFromToken(token);
+    const mergedUserInfo = {
+      ...userInfo.value,
+      userId: profile.userId ?? userInfo.value?.userId ?? null,
+      name: profile.name || getDisplayName({ roleName }),
+      roleName,
+    };
+
+    userInfo.value = mergedUserInfo;
+    localStorage.setItem("userInfo", JSON.stringify(mergedUserInfo));
+  } catch (error) {
+    // Navbar 已經會用 token 裡的角色作 fallback，這裡失敗不阻斷頁面。
+  } finally {
+    isHydratingUserInfo.value = false;
+  }
 };
 
 const roleName = computed(() => userInfo.value?.roleName || "");
+const isAdminRole = computed(() => adminRoles.includes(roleName.value));
 
 const dropdownItems = computed(() => {
   if (!userInfo.value) {
     return [];
   }
 
-  // 前台首頁的下拉選單只呈現「消費者會員」相關功能。
-  // STAFF / MANAGER 雖然有後台權限，但在前台仍視為一般會員顯示。
-  // ADMIN 是共用管理帳號，不提供個人會員頁，因此只保留登出。
-  if (roleName.value === "ADMIN") {
-    return [];
+  const items = [];
+
+  // STAFF / MANAGER / ADMIN 從餐廳前台也要能回到後台管理系統。
+  if (isAdminRole.value) {
+    items.push({
+      label: "後台管理系統",
+      subtitle: "返回工作總覽",
+      path: "/admin/home",
+      icon: "bi-speedometer2",
+      menuClass: "admin-home-entry",
+    });
+  }
+
+  // ADMIN 是共用管理帳號，不提供個人會員頁。
+  if (roleName.value === ROLE.ADMIN) {
+    return items;
   }
 
   return [
+    ...items,
     {
       label: "個人資料",
       path: "/profile",
@@ -43,19 +237,28 @@ const dropdownItems = computed(() => {
     },
   ];
 });
-onMounted(() => {
+
+const refreshUserInfo = () => {
   loadUserInfo();
-  window.addEventListener("login-state-changed", loadUserInfo);
+  hydrateUserInfoFromProfile();
+};
+
+onMounted(() => {
+  refreshUserInfo();
+  window.addEventListener("login-state-changed", refreshUserInfo);
+  window.addEventListener("storage", refreshUserInfo);
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener("login-state-changed", loadUserInfo);
+  window.removeEventListener("login-state-changed", refreshUserInfo);
+  window.removeEventListener("storage", refreshUserInfo);
 });
 
 const logout = async () => {
   localStorage.removeItem("accessToken");
   localStorage.removeItem("userInfo");
 
+  accessToken.value = "";
   userInfo.value = null;
   window.dispatchEvent(new Event("login-state-changed"));
 
@@ -119,6 +322,10 @@ const logout = async () => {
 
               <li class="nav-item">
                 <RouterLink class="nav-link" to="/store">分店資訊</RouterLink>
+              </li>
+
+              <li class="nav-item">
+                <RouterLink class="nav-link" to="/news">最新消息</RouterLink>
               </li>
               <li v-if="!userInfo" class="nav-item ms-lg-5">
                 <RouterLink to="/login" class="login-btn">
@@ -358,6 +565,26 @@ const logout = async () => {
 
 .dropdown-menu .dropdown-item:hover i {
   color: #d5905f;
+}
+
+.dropdown-menu .admin-home-entry {
+  background: #f8f3ed;
+  color: #c47c4c;
+}
+
+.dropdown-menu .admin-home-entry i,
+.dropdown-menu .admin-home-entry small {
+  color: #c47c4c;
+}
+
+.dropdown-menu .admin-home-entry:hover {
+  background: #e3ac7f;
+  color: #fff;
+}
+
+.dropdown-menu .admin-home-entry:hover i,
+.dropdown-menu .admin-home-entry:hover small {
+  color: #fff;
 }
 
 /* main */

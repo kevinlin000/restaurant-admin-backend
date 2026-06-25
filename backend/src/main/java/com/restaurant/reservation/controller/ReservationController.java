@@ -30,7 +30,7 @@ public class ReservationController {
 
     private final ReservationService reservationService;
 
-    // 顧客端 -> 訂位頁查可訂日期/時段，依店家設定的 time_slot
+    // 顧客端訂位頁 -> 可訂日期/時段，依店家設定的 time_slot
     @GetMapping("/slots")
     public ApiResponse<List<TimeSlot>> getAvailableSlots(
             @RequestParam Long storeId,
@@ -50,6 +50,15 @@ public class ReservationController {
     @PostMapping
     public ApiResponse<ReservationResponse> createReservation(@Valid @RequestBody CreateReservationRequest request) {
         return ApiResponse.success("訂位成功", reservationService.createReservation(request));
+    }
+
+    // 信件連結 -> 沒有登入也可透過訂位 access token 讀取成功頁資料
+    @GetMapping("/{reservationId}/public")
+    public ApiResponse<ReservationResponse> getPublicReservation(
+            @PathVariable Long reservationId,
+            @RequestParam String token
+    ) {
+        return ApiResponse.success(reservationService.getReservationByAccessToken(reservationId, token));
     }
 
     // 訂位成功、編輯頁 -> 讀取單筆訂位

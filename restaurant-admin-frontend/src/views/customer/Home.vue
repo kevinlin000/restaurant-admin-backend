@@ -19,11 +19,19 @@ const featuredStores = computed(() => {
     .slice(0, 3);
 });
 
+const primaryStore = computed(() => featuredStores.value[0] || null);
+
+const supportingStores = computed(() => featuredStores.value.slice(1));
+
 const openStoreCount = computed(() => stores.value.filter((store) => store.openNow).length);
+
+const cityCount = computed(() => new Set(stores.value.map((store) => store.city).filter(Boolean)).size);
 
 const storeLocation = (store) => [store.city, store.district].filter(Boolean).join(" ");
 
 const openStatusText = (store) => (store.openNow ? "營業中" : "非營業時間");
+
+const storeImage = (store) => store?.mainImageUrl || "/store-images/xuri-dining-room.jpg";
 
 const loadFeaturedStores = async () => {
   storeLoading.value = true;
@@ -115,21 +123,15 @@ onMounted(loadFeaturedStores);
   <!-- Store 分店資訊 -->
   <section id="store" class="store-section">
     <div class="section-container">
-      <div class="store-heading">
-        <span class="section-kicker">Store Locator</span>
-        <div class="section-title">分店資訊</div>
-        <p>
-          從城市旗艦、商圈聚餐到旅途慢食，快速找到最適合今天用餐情境的敘日門市。
-        </p>
-      </div>
-
-      <div class="store-toolbar">
-        <div>
-          <span>全台 {{ stores.length || 0 }} 間門市</span>
-          <strong>{{ openStoreCount }} 間營業中</strong>
+      <div class="store-heading-row">
+        <div class="store-heading">
+          <span class="section-kicker">Locations</span>
+          <div class="section-title">今日想在哪裡用餐</div>
+          <p>從信義夜景、車站共構到旅途餐桌，挑一間離今天最近的敘日。</p>
         </div>
+
         <RouterLink class="store-link" to="/store">
-          查看全部分店
+          全部門市
           <i class="bi bi-arrow-right"></i>
         </RouterLink>
       </div>
@@ -143,37 +145,56 @@ onMounted(loadFeaturedStores);
         {{ storeError }}
       </div>
 
-      <div v-else class="store-grid">
+      <div v-else class="location-panel">
         <RouterLink
-          v-for="store in featuredStores"
-          :key="store.storeId"
-          class="store-card"
+          v-if="primaryStore"
+          class="location-feature"
           :to="{ name: 'CustomerStore' }"
         >
-          <div class="store-image">
-            <img :src="store.mainImageUrl" :alt="store.storeName" />
-            <span :class="['store-status', store.openNow ? 'open' : 'closed']">
-              {{ openStatusText(store) }}
+          <img :src="storeImage(primaryStore)" :alt="primaryStore.storeName" />
+          <div class="location-feature-copy">
+            <span :class="['store-status', primaryStore.openNow ? 'open' : 'closed']">
+              {{ openStatusText(primaryStore) }}
             </span>
-          </div>
-          <div class="store-card-body">
-            <span class="store-location">{{ storeLocation(store) }}</span>
-            <h3>{{ store.storeName }}</h3>
-            <p>{{ store.address }}</p>
-            <div v-if="store.featureTags?.length" class="store-tags">
-              <span
-                v-for="feature in store.featureTags.slice(0, 3)"
-                :key="feature.featureKey"
-              >
-                {{ feature.featureLabel }}
-              </span>
-            </div>
-            <div class="store-meta">
-              <span><i class="bi bi-telephone"></i>{{ store.phone || "電話更新中" }}</span>
-              <span><i class="bi bi-train-front"></i>{{ store.mrtInfo || "交通資訊更新中" }}</span>
-            </div>
+            <p>{{ storeLocation(primaryStore) }}</p>
+            <h3>{{ primaryStore.storeName }}</h3>
+            <span>{{ primaryStore.address }}</span>
           </div>
         </RouterLink>
+
+        <div class="location-side">
+          <div class="location-counts" aria-label="門市統計">
+            <div>
+              <strong>{{ stores.length || 0 }}</strong>
+              <span>門市</span>
+            </div>
+            <div>
+              <strong>{{ cityCount || 0 }}</strong>
+              <span>城市</span>
+            </div>
+            <div>
+              <strong>{{ openStoreCount }}</strong>
+              <span>營業中</span>
+            </div>
+          </div>
+
+          <RouterLink
+            v-for="store in supportingStores"
+            :key="store.storeId"
+            class="location-row"
+            :to="{ name: 'CustomerStore' }"
+          >
+            <img :src="storeImage(store)" :alt="store.storeName" />
+            <span>{{ storeLocation(store) }}</span>
+            <strong>{{ store.storeName }}</strong>
+            <p>{{ store.mrtInfo || store.address }}</p>
+          </RouterLink>
+
+          <div class="location-note">
+            <span>依地區、情境標籤與交通方式瀏覽完整門市。</span>
+            <RouterLink to="/store">查看門市頁</RouterLink>
+          </div>
+        </div>
       </div>
 
       <div class="store-actions">
@@ -348,20 +369,24 @@ onMounted(loadFeaturedStores);
 
 .store-section {
   padding: 140px 0;
-  background:
-    linear-gradient(rgba(247, 243, 238, 0.9), rgba(247, 243, 238, 0.94)),
-    url('../assets/images/bg-store.jpg');
-  background-size: cover;
-  background-position: center;
+  background: #f5f0ea;
+}
+
+.store-heading-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 32px;
+  align-items: end;
+  margin-bottom: 34px;
 }
 
 .store-heading {
-  max-width: 760px;
-  margin: 0 auto 42px;
-  text-align: center;
+  max-width: 680px;
+  text-align: left;
 }
 
 .store-heading .section-title {
+  text-align: left;
   margin-bottom: 18px;
 }
 
@@ -376,79 +401,89 @@ onMounted(loadFeaturedStores);
 
 .store-heading p {
   margin: 0;
-  color: #697386;
+  color: #5f5750;
   font-size: 18px;
   line-height: 1.8;
-}
-
-.store-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 22px;
-  color: #697386;
-  font-weight: 800;
-}
-
-.store-toolbar div {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.store-toolbar strong {
-  color: #167a3d;
 }
 
 .store-link {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #8c552e;
+  border-bottom: 1px solid currentColor;
+  color: #7b3f2a;
   font-weight: 900;
   text-decoration: none;
+  padding-bottom: 4px;
 }
 
-.store-grid {
+.location-panel {
   display: grid;
-  grid-template-columns: repeat(3,1fr);
-  gap: 24px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+  min-height: 540px;
+  border: 1px solid #2f2924;
+  background: #fff;
 }
 
-.store-card {
-  overflow: hidden;
-  border: 1px solid #e4d9ce;
-  border-radius: 8px;
-  background: #ffffff;
+.location-feature,
+.location-row {
   color: inherit;
   text-decoration: none;
-  box-shadow: 0 12px 28px rgba(52, 64, 81, 0.09);
-  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
 }
 
-.store-card:hover {
-  border-color: #b1642f;
-  box-shadow: 0 18px 36px rgba(52, 64, 81, 0.14);
-  transform: translateY(-4px);
-}
-
-.store-image {
+.location-feature {
   position: relative;
-  height: 210px;
-  background: #f2eee9;
+  display: grid;
+  align-items: end;
+  min-height: 540px;
+  overflow: hidden;
+  background: #2f2924;
 }
 
-.store-image img {
+.location-feature::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.72));
+}
+
+.location-feature > img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
+.location-feature-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 620px;
+  color: #fff;
+  padding: 38px;
+}
+
+.location-feature-copy p {
+  margin: 18px 0 8px;
+  color: #f0d8bd;
+  font-weight: 900;
+}
+
+.location-feature-copy h3 {
+  margin: 0 0 10px;
+  font-size: 36px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.location-feature-copy > span:last-child {
+  color: rgba(255, 255, 255, 0.84);
+  line-height: 1.7;
+}
+
 .store-status {
-  position: absolute;
-  right: 14px;
-  bottom: 14px;
+  display: inline-flex;
+  width: fit-content;
   border-radius: 999px;
   padding: 7px 12px;
   font-size: 13px;
@@ -465,58 +500,95 @@ onMounted(loadFeaturedStores);
   color: #74685f;
 }
 
-.store-card-body {
-  padding: 24px;
+.location-side {
+  display: grid;
+  align-content: start;
+  border-left: 1px solid #2f2924;
 }
 
-.store-location {
-  color: #8c552e;
-  font-size: 14px;
+.location-counts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid #d9cec3;
+}
+
+.location-counts div {
+  display: grid;
+  gap: 2px;
+  padding: 18px;
+  border-right: 1px solid #d9cec3;
+}
+
+.location-counts div:last-child {
+  border-right: 0;
+}
+
+.location-counts strong {
+  color: #7b3f2a;
+  font-size: 28px;
   font-weight: 900;
 }
 
-.store-card h3 {
-  margin: 8px 0 10px;
-  color: #263445;
-  font-size: 24px;
-  font-weight: 900;
-}
-
-.store-card p {
-  min-height: 52px;
-  margin: 0;
-  color: #697386;
-  line-height: 1.7;
-}
-
-.store-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 12px;
-}
-
-.store-tags span {
-  border-radius: 999px;
-  background: #faf3ea;
-  color: #8c552e;
-  padding: 5px 9px;
+.location-counts span {
+  color: #6c625a;
   font-size: 13px;
   font-weight: 900;
 }
 
-.store-meta {
+.location-row {
   display: grid;
-  gap: 8px;
-  margin-top: 18px;
-  color: #566a7f;
-  font-size: 14px;
+  grid-template-columns: 108px minmax(0, 1fr);
+  column-gap: 16px;
+  row-gap: 4px;
+  align-items: start;
+  border-bottom: 1px solid #d9cec3;
+  padding: 18px;
 }
 
-.store-meta span {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.location-row:hover {
+  background: #fbf6f0;
+}
+
+.location-row img {
+  grid-row: span 3;
+  width: 108px;
+  height: 88px;
+  object-fit: cover;
+  background: #eee8df;
+}
+
+.location-row span {
+  color: #7b3f2a;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.location-row strong {
+  color: #2f2924;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.location-row p {
+  margin: 0;
+  color: #625951;
+  line-height: 1.6;
+}
+
+.location-note {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  color: #625951;
+  line-height: 1.7;
+}
+
+.location-note a {
+  width: fit-content;
+  color: #7b3f2a;
+  font-weight: 900;
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
 }
 
 .store-state {
@@ -563,15 +635,49 @@ onMounted(loadFeaturedStores);
 
   .about-grid,
   .menu-grid,
-  .store-grid {
+  .location-panel,
+  .store-heading-row {
     grid-template-columns: 1fr;
   }
 
-  .store-toolbar,
-  .store-toolbar div,
+  .location-side {
+    border-left: 0;
+    border-top: 1px solid #2f2924;
+  }
+
   .store-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .location-feature,
+  .location-panel {
+    min-height: auto;
+  }
+
+  .location-feature {
+    min-height: 420px;
+  }
+}
+
+@media (max-width: 640px) {
+  .location-feature-copy {
+    padding: 26px;
+  }
+
+  .location-feature-copy h3 {
+    font-size: 28px;
+  }
+
+  .location-counts,
+  .location-row {
+    grid-template-columns: 1fr;
+  }
+
+  .location-row img {
+    grid-row: auto;
+    width: 100%;
+    height: 170px;
   }
 }
 </style>

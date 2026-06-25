@@ -1,5 +1,6 @@
 package com.restaurant.order.controller;
 
+import java.io.IOException;
 import java.util.Map;
 
 import org.springframework.http.MediaType;
@@ -11,6 +12,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.restaurant.order.service.PaymentService;
+
+import jakarta.servlet.http.HttpServletResponse;
 
 @RestController
 @RequestMapping("/api/payments")
@@ -32,21 +35,28 @@ public class PaymentController {
         return paymentService.createEcpayCheckoutForm(orderId);
     }
 
-    @GetMapping(value = "/ecpay/result", produces = MediaType.TEXT_HTML_VALUE)
-    public String ecpayResultGet(@RequestParam Long orderId) {
-        return ecpayResult(orderId);
-    }
-
-    @PostMapping(value = "/ecpay/result", produces = MediaType.TEXT_HTML_VALUE)
-    public String ecpayResult(@RequestParam Long orderId) {
+    @PostMapping("/ecpay/result")
+    public void ecpayResult(
+            @RequestParam Long orderId,
+            HttpServletResponse response) throws IOException {
 
         paymentService.simulatePaymentSuccess(orderId);
 
-        return "<html><body>"
-                + "<h1>付款成功</h1>"
-                + "<p>訂單編號：" + orderId + "</p>"
-                + "<a href='http://localhost:5173/payment-success?orderId=" + orderId + "'>查看訂單結果</a>"
-                + "</body></html>";
+        response.setContentType("text/html;charset=UTF-8");
+        response.getWriter().write(
+                paymentService.buildPaymentSuccessHtml(orderId));
+    }
+
+    @GetMapping("/ecpay/result")
+    public void ecpayResultGet(
+            @RequestParam Long orderId,
+            HttpServletResponse response) throws IOException {
+
+        paymentService.simulatePaymentSuccess(orderId);
+
+        response.setContentType("text/html;charset=UTF-8");
+        response.getWriter().write(
+                paymentService.buildPaymentSuccessHtml(orderId));
     }
 
     @PostMapping("/ecpay/callback")

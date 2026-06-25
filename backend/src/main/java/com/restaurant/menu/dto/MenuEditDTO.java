@@ -14,4 +14,5 @@ public class MenuEditDTO {
     private String imageUrl;
     private String allergenInfo;
     private Boolean isActive;
+    private String featureTags;
 }

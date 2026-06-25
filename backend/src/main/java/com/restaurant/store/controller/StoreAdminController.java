@@ -11,6 +11,7 @@ import com.restaurant.store.dto.response.StoreListResponse;
 import com.restaurant.store.dto.response.TableInfoResponse;
 import com.restaurant.store.service.StoreAdminAccessService;
 import com.restaurant.store.service.StoreService;
+import com.restaurant.store.service.StoreStatusService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,6 +29,7 @@ public class StoreAdminController {
 
     private final StoreService storeService;
     private final StoreAdminAccessService storeAdminAccessService;
+    private final StoreStatusService storeStatusService;
 
     // =================== 門市 ===================
 
@@ -65,6 +67,27 @@ public class StoreAdminController {
             Authentication authentication) {
         storeAdminAccessService.requireStoreAccess(authentication, storeId);
         return ApiResponse.success("門市已更新", storeService.updateStore(storeId, request));
+    }
+
+    @PutMapping("/api/admin/stores/{storeId}/status")
+    @Operation(summary = "修改單一門市營業狀態")
+    public ApiResponse<StoreDetailResponse> updateStoreStatus(
+            @PathVariable Long storeId,
+            @Valid @RequestBody StoreStatusUpdateRequest request,
+            Authentication authentication) {
+        storeAdminAccessService.requireStoreAccess(authentication, storeId);
+        storeStatusService.updateStoreStatus(storeId, request.getStatus());
+        return ApiResponse.success("門市營業狀態已更新", storeService.getStoreDetailForAdmin(storeId));
+    }
+
+    @PutMapping("/api/admin/stores/global-status")
+    @Operation(summary = "修改所有門市營業狀態")
+    public ApiResponse<Integer> updateGlobalStoreStatus(
+            @Valid @RequestBody StoreStatusUpdateRequest request,
+            Authentication authentication) {
+        storeAdminAccessService.requireAdmin(authentication);
+        int updatedCount = storeStatusService.updateGlobalStatus(request.getStatus());
+        return ApiResponse.success("全域門市營業狀態已更新", updatedCount);
     }
 
     @DeleteMapping("/api/admin/stores/{storeId}")

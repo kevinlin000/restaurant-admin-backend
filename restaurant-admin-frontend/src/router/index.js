@@ -15,11 +15,13 @@ import AdminMenuCreate from "@/views/admin/menu/menu-create.vue";
 import AdminMenuEdit from "@/views/admin/menu/menu-edit.vue";
 import AdminMenuSetting from "@/views/admin/menu/menu-setting.vue";
 import AdminStore from "@/views/admin/store/store.vue";
+import AdminNews from "@/views/admin/news/news.vue";
 import AdminMember from "@/views/admin/member/member.vue";
-import AdminOrder from "@/views/admin/order/order.vue";
+import AdminOrderManage from "@/views/admin/order/AdminOrderManage.vue";
 import CustomerMenu from "@/views/customer/menu/menu.vue";
 import CustomerOrder from "@/views/customer/order/order.vue";
 import CustomerStore from "@/views/customer/store/store.vue";
+import CustomerNews from "@/views/customer/news/news.vue";
 
 const ROLE = {
   STAFF: "STAFF",
@@ -68,6 +70,11 @@ const routers = [
         path: "store",
         name: "CustomerStore",
         component: CustomerStore,
+      },
+      {
+        path: "news",
+        name: "CustomerNews",
+        component: CustomerNews,
       },
       {
         path: "login",
@@ -128,24 +135,24 @@ const routers = [
         path: "menu-create",
         name: "AdminMenuCreate",
         component: AdminMenuCreate,
-        meta: { roles: ADMIN_ONLY },
+        meta: { roles: MANAGER_ROLES },
       },
       {
         path: "menu-edit/:id",
         name: "AdminMenuEdit",
         component: AdminMenuEdit,
-        meta: { roles: ADMIN_ONLY },
+        meta: { roles: MANAGER_ROLES },
       },
       {
         path: "menu-setting",
         name: "AdminMenuSetting",
         component: AdminMenuSetting,
-        meta: { roles: ADMIN_ONLY },
+        meta: { roles: MANAGER_ROLES },
       },
       {
         path: "order-manage",
         name: "AdminOrderManage",
-        component: AdminOrder,
+        component: AdminOrderManage,
         meta: { roles: ADMIN_ROLES },
       },
       {
@@ -160,6 +167,12 @@ const routers = [
         component: AdminStore,
         meta: { roles: MANAGER_ROLES },
       },
+      {
+        path: "news",
+        name: "AdminNews",
+        component: AdminNews,
+        meta: { roles: MANAGER_ROLES },
+      },
     ],
   },
 ];
@@ -167,6 +180,9 @@ const routers = [
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: routers,
+  scrollBehavior(to, from, savedPosition) {
+    return savedPosition || { top: 0 };
+  },
 });
 
 const getDefaultPathByRole = (roleName) => {
@@ -181,13 +197,66 @@ const getDefaultPathByRole = (roleName) => {
   return "/login";
 };
 
-const getUserInfo = () => {
+const decodeTokenPayload = (token) => {
   try {
-    return JSON.parse(localStorage.getItem("userInfo") || "{}");
+    const payload = token.split(".")[1];
+
+    if (!payload) {
+      return null;
+    }
+
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const paddedBase64 = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const jsonPayload = decodeURIComponent(
+      atob(paddedBase64)
+        .split("")
+        .map((char) => `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`)
+        .join(""),
+    );
+
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    return null;
+  }
+};
+
+const getRoleFromToken = (token) => {
+  const payload = decodeTokenPayload(token);
+  const role = payload?.role || payload?.roleName || "";
+  return String(role).replace(/^ROLE_/, "");
+};
+
+const isExpiredToken = (token) => {
+  const payload = decodeTokenPayload(token);
+
+  if (!payload?.exp) {
+    return false;
+  }
+
+  return payload.exp * 1000 <= Date.now();
+};
+
+const clearAuth = () => {
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("userInfo");
+  window.dispatchEvent(new Event("login-state-changed"));
+};
+
+const getUserInfo = (token = "") => {
+  let storedUserInfo = {};
+
+  try {
+    storedUserInfo = JSON.parse(localStorage.getItem("userInfo") || "{}");
   } catch (error) {
     localStorage.removeItem("userInfo");
-    return {};
   }
+
+  const roleName = storedUserInfo.roleName || getRoleFromToken(token);
+
+  return {
+    ...storedUserInfo,
+    roleName,
+  };
 };
 
 const getRouteRoles = (to) => {
@@ -199,8 +268,14 @@ const getRouteRoles = (to) => {
 };
 
 router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem("accessToken");
-  const userInfo = getUserInfo();
+  let token = localStorage.getItem("accessToken");
+
+  if (token && isExpiredToken(token)) {
+    clearAuth();
+    token = "";
+  }
+
+  const userInfo = getUserInfo(token);
   const roleName = userInfo.roleName;
 
   const isAdminPage = to.path.startsWith("/admin");
@@ -209,6 +284,20 @@ router.beforeEach((to, from, next) => {
   const allowedRoles = getRouteRoles(to);
 
   if (!token && (requiresAuth || isAdminPage || isProfilePage)) {
+    next("/login");
+    return;
+  }
+
+  if (
+    token &&
+    !roleName &&
+    (requiresAuth ||
+      isAdminPage ||
+      isProfilePage ||
+      to.path === "/login" ||
+      to.path === "/register")
+  ) {
+    clearAuth();
     next("/login");
     return;
   }

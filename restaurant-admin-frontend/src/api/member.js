@@ -54,6 +54,10 @@ export const getPointBalance = () => api.get("/api/members/me/points");
 // 查詢會員點數紀錄
 export const getPointHistory = () => api.get("/api/members/me/points/history");
 
+// 查詢會員自己的訂位紀錄
+export const getMyReservations = () => api.get("/api/members/me/reservations");
+
+
 // 後台：會員/員工統計摘要
 export const getMemberAdminSummary = () => api.get("/api/admin/members/summary");
 

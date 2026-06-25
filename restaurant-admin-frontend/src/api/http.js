@@ -17,7 +17,6 @@ const http = axios.create({
 // 請求攔截器：自動帶 JWT
 http.interceptors.request.use((config) => {
   const token = localStorage.getItem("accessToken");
-
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

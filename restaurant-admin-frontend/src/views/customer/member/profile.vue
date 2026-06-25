@@ -165,10 +165,58 @@
             <div class="section-header">
               <div>
                 <h2>訂位紀錄</h2>
-                <p>查看會員的訂位紀錄。</p>
+                <p>查看會員登入後建立的訂位紀錄。</p>
               </div>
             </div>
-            <div class="empty-card">
+
+            <div v-if="isReservationLoading" class="state-box inner">
+              訂位紀錄載入中...
+            </div>
+
+            <div v-else-if="reservationErrorMsg" class="state-box inner error-msg">
+              {{ reservationErrorMsg }}
+            </div>
+
+            <div v-else-if="reservations.length" class="record-card">
+              <table>
+                <thead>
+                  <tr>
+                    <th>訂位編號</th>
+                    <th>訂位日期</th>
+                    <th>訂位時間</th>
+                    <th>店名</th>
+                    <th>人數</th>
+                    <th>狀態</th>
+                    <th>備註</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="reservation in reservations"
+                    :key="reservation.reservationId"
+                  >
+                    <td>#{{ reservation.reservationId }}</td>
+                    <td>{{ formatDate(reservation.reservationDate) }}</td>
+                    <td>{{ formatReservationTime(reservation) }}</td>
+                    <td>{{ formatStore(reservation) }}</td>
+                    <td>{{ reservation.partySize || 0 }} 人</td>
+                    <td>
+                      <span
+                        class="status-badge"
+                        :class="getReservationStatusClass(reservation.status)"
+                      >
+                        {{ getReservationStatusText(reservation.status) }}
+                      </span>
+                    </td>
+                    <td class="note-cell">
+                      {{ reservation.specialRequest || "無" }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div v-else class="empty-card">
               <i class="bx bx-calendar-check"></i>
               <h3>尚無訂位紀錄</h3>
               <p>目前沒有可顯示的訂位資料。</p>
@@ -298,6 +346,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import Swal from "sweetalert2";
 import {
+  getMyReservations,
   getPointBalance,
   getProfile,
   updatePassword,
@@ -311,6 +360,9 @@ const errorMsg = ref("");
 const activeTab = ref("profile");
 const showPointRuleModal = ref(false);
 const showPasswordModal = ref(false);
+const reservations = ref([]);
+const isReservationLoading = ref(false);
+const reservationErrorMsg = ref("");
 
 const getStoredUserInfo = () => {
   try {
@@ -403,6 +455,22 @@ const loadMemberPageData = async () => {
   };
 };
 
+const loadReservationRecords = async () => {
+  isReservationLoading.value = true;
+  reservationErrorMsg.value = "";
+
+  try {
+    const res = await getMyReservations();
+    reservations.value = Array.isArray(res.data?.data) ? res.data.data : [];
+  } catch (err) {
+    reservations.value = [];
+    reservationErrorMsg.value =
+      err.response?.data?.message || "無法取得訂位紀錄，請稍後再試";
+  } finally {
+    isReservationLoading.value = false;
+  }
+};
+
 onMounted(async () => {
   syncActiveTabFromRoute();
 
@@ -414,6 +482,7 @@ onMounted(async () => {
 
   try {
     await loadMemberPageData();
+    await loadReservationRecords();
   } catch (err) {
     errorMsg.value = "無法取得會員資料，請重新登入";
   } finally {
@@ -635,9 +704,49 @@ const handleUpdatePassword = async () => {
   }
 };
 
+const formatDate = (date) => {
+  if (!date) return "未提供";
+  return String(date).replaceAll("-", "/");
+};
+
+const formatTime = (time) => {
+  if (!time) return "--:--";
+  return String(time).slice(0, 5);
+};
+
+const formatReservationTime = (reservation) => {
+  return formatTime(reservation.startTime);
+};
+
+const formatStore = (reservation) => {
+  if (reservation.storeName) return reservation.storeName;
+  if (reservation.storeId) return `店名未設定 (#${reservation.storeId})`;
+  return "未提供";
+};
+
+const getReservationStatusText = (status) => {
+  const statusMap = {
+    PENDING: "待確認",
+    RESERVED: "已保留",
+    ASSIGNED: "已配桌",
+    CHECKED_IN: "已入座",
+    COMPLETED: "已完成",
+    CANCELLED: "已取消",
+    NO_SHOW: "未到店",
+  };
+  return statusMap[status] || status || "未提供";
+};
+
+const getReservationStatusClass = (status) => {
+  if (["COMPLETED", "CHECKED_IN"].includes(status)) return "success";
+  if (["RESERVED", "ASSIGNED"].includes(status)) return "active";
+  if (["CANCELLED", "NO_SHOW"].includes(status)) return "danger";
+  return "pending";
+};
+
 const formatBirthday = (birthday) => {
   if (!birthday) return "未提供";
-  return String(birthday).replaceAll("-", "/");
+  return formatDate(birthday);
 };
 </script>
 
@@ -978,6 +1087,42 @@ button:disabled {
 .record-card .right {
   text-align: right;
   font-weight: 900;
+}
+
+.note-cell {
+  min-width: 160px;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 68px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.status-badge.pending {
+  background: #fff7ef;
+  color: #c47d4e;
+}
+
+.status-badge.active {
+  background: #edf4ff;
+  color: #3f6fb5;
+}
+
+.status-badge.success {
+  background: #eef9f2;
+  color: #2e9f5e;
+}
+
+.status-badge.danger {
+  background: #fff0ee;
+  color: #c0392b;
 }
 
 .plus {

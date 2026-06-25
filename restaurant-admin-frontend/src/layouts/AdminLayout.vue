@@ -69,6 +69,7 @@ const currentPageTitle = computed(() => {
   if (path.startsWith("/admin/store")) return "分店管理";
   if (path.startsWith("/admin/menu")) return "菜單管理";
   if (path.startsWith("/admin/member")) return "員工管理";
+  if (path.startsWith("/admin/news")) return "品牌內容";
   if (path.startsWith("/admin/home")) return "後台管理首頁";
 
   return "後台管理首頁";
@@ -141,22 +142,22 @@ const sidebarGroups = computed(() => [
     key: "menu",
     label: "菜單管理",
     icon: "bx bx-food-menu",
-    roles: ["ADMIN"],
+    roles: ["MANAGER", "ADMIN"],
     children: [
       {
         label: "新增菜單",
         path: "/admin/menu-create",
-        roles: ["ADMIN"],
+        roles: ["MANAGER", "ADMIN"],
       },
       {
         label: "修改菜單",
         path: "/admin/menu-edit/1",
-        roles: ["ADMIN"],
+        roles: ["MANAGER", "ADMIN"],
       },
       {
         label: "菜單設定",
         path: "/admin/menu-setting",
-        roles: ["ADMIN"],
+        roles: ["MANAGER", "ADMIN"],
       },
     ],
   },
@@ -167,6 +168,19 @@ const sidebarGroups = computed(() => [
     icon: "bx bx-group",
     path: "/admin/member",
     roles: ["ADMIN"],
+  },
+  {
+    key: "content",
+    label: "品牌內容",
+    icon: "bx bx-news",
+    roles: ["MANAGER", "ADMIN"],
+    children: [
+      {
+        label: "最新消息",
+        path: "/admin/news",
+        roles: ["MANAGER", "ADMIN"],
+      },
+    ],
   },
 ]);
 
@@ -183,6 +197,7 @@ const openMenu = ref({
   menu: route.path.startsWith("/admin/menu"),
   order: route.path.startsWith("/admin/order"),
   store: route.path.startsWith("/admin/store"),
+  content: route.path.startsWith("/admin/news"),
 });
 
 const toggleMenu = (menu) => {

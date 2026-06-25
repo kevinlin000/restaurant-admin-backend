@@ -37,6 +37,8 @@ public class OrderResponse {
 
     private String paymentMethod;
 
+    private String paymentStatus;
+
     private String invoiceType;
     
     private String carrierNumber;

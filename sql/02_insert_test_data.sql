@@ -308,7 +308,7 @@ INSERT INTO user (role_id, email, password_hash, name, phone, birthday) VALUES
 (2, 'staff@xuri.com',     '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '李店員',     '0955-555-555', '1997-09-10'),
 (1, 'user1@example.com',  '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '陳小明',     '0922-222-222', '1995-03-20'),
 (1, 'user2@example.com',  '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '林小美',     '0933-333-333', '1998-11-08'),
-(3, 'storemanager@store.local', '$2a$10$rJDF6fkfGR8sCuqi/N6mOuyTqvK0UYIm3Q61GWsbNl/t9.e6HK87.', 'storemanager', '0966-666-666', '1992-06-15');
+(3, 'storemanager@store.local', '$2a$10$rJDF6fkfGR8sCuqi/N6mOuyTqvK0UYIm3Q61GWsbNl/t9.e6HK87.', '店長', '0966-666-666', '1992-06-15');
 
 -- ============================================================
 -- 會員資料 members（顧客；對應 user 4、5 → 陳小明 / 林小美）

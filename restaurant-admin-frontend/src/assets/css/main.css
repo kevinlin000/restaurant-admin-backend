@@ -12,3 +12,149 @@
   height: 50px;
   margin-right: 15px;
 }
+
+/* 按鈕 */
+.btn-reservation-dark {
+  background: #4c4332b8;
+  border-color: #4c4332b8;
+  color: #ffffff;
+}
+
+.btn-reservation-dark:hover,
+.btn-reservation-dark:focus {
+  background: #3f3729;
+  border-color: #3f3729;
+  color: #ffffff;
+}
+
+.btn-reservation-light {
+  background: #e3ac7f;
+  border-color: #e3ac7f;
+  color: #ffffff;
+}
+
+.btn-reservation-light:hover,
+.btn-reservation-light:focus {
+  background: #d49a68;
+  border-color: #d49a68;
+  color: #ffffff;
+}
+
+/* 分頁 */
+.pagination-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.page-size-select {
+  width: 110px;
+}
+
+/* 多選下拉選單 */
+.multi-select {
+  position: relative;
+}
+
+.multi-select-menu {
+  position: absolute;
+  z-index: 1090;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 100%;
+  min-width: 300px;
+  padding: 0.5rem;
+  background: #fff;
+  border: 1px solid #d9dee3;
+  border-radius: 0.375rem;
+  box-shadow: 0 0.25rem 1rem rgba(67, 89, 113, 0.12);
+}
+
+.multi-select-option,
+.status-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.5rem;
+  margin: 0;
+  border-radius: 0.375rem;
+  color: #566a7f;
+  cursor: pointer;
+}
+
+.multi-select-option:hover,
+.status-option:hover {
+  background: #f5f5f9;
+}
+
+/* 日期區間日曆 */
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+
+.calendar-weekdays {
+  color: #697a8d;
+  font-size: 0.75rem;
+  text-align: center;
+  margin-bottom: 0.25rem;
+}
+
+.calendar-day {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: #566a7f;
+}
+
+.calendar-day:hover {
+  background: #f5f5f9;
+}
+
+.calendar-day.is-muted {
+  color: #b4bdc6;
+}
+
+.calendar-day.is-in-range {
+  background: #e7e7ff;
+  color: #696cff;
+}
+
+.calendar-day.is-selected {
+  background: #696cff;
+  color: #fff;
+}
+
+.date-range-hint {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  background: #f5f5f9;
+  color: #566a7f;
+  text-align: center;
+}
+
+/* 日期列與時段標題列 */
+.reservation-date-header td {
+  background: #394859;
+  color: #fff;
+}
+
+.reservation-group-header th {
+  background: #566a7fec !important;
+  color: #fff !important;
+  font-weight: 700;
+  white-space: nowrap;
+}

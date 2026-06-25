@@ -1,12 +1,14 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-// 1. 導入 Vue Router 的捕手手套
-import { useRoute } from 'vue-router'
-import axios from 'axios'
+import { useRoute } from 'vue-router' // 1. 導入 Vue Router 的捕手手套
+import axios from '@/api/axios';
 
 // 2. 啟動手套
 const route = useRoute()
 const menuItemId = ref(null)
+
+// 🏪 多租戶防禦點火線：獲取當前店長專屬的 storeId 
+const currentStoreId = ref(localStorage.getItem('storeId') || 1)
 
 // 3. 🎯 完美對齊 Java MenuItem.java 的屬性規格！
 const formData = ref({
@@ -17,7 +19,8 @@ const formData = ref({
   description: '',
   imageUrl: '',
   isActive: true, // 🚀 史詩級同步：只用 isActive 布林值！
-  allergenInfo: ''
+  allergenInfo: '',
+  featureTags: null // 👈 完美追加行銷標籤欄位
 })
 
 // 下方列表數據與搜尋字串
@@ -34,27 +37,38 @@ const filteredMenuItems = computed(() => {
   })
 })
 
-// 撈取所有菜單供下方列表點選
+// 撈取所有菜單 —— ⚡ 史詩級升級：改為只顯示自己店裡的餐點列表，避開隔壁店家！
 const fetchAllMenuItems = async () => {
   try {
-    const response = await axios.get('http://localhost:8080/api/menu-items')
-    menuItems.value = response.data.data || response.data
+    // 🎯 移除硬編碼，使用分店隔離查詢 API
+    const response = await axios.get(`/api/menu-items/store/${currentStoreId.value}`)
+    
+    // 將後端多表動態計算出來的 finalPrice 對齊前端表單的 price 變數名
+    const formattedData = (response.data.data || response.data).map(item => ({
+      ...item,
+      price: item.finalPrice // 讓分店修改時，預設帶出的是該分店的專屬定價
+    }))
+    menuItems.value = formattedData
   } catch (error) {
-    console.error('撈取菜單列表失敗：', error)
+    console.error('撈取分店菜單列表失敗：', error)
   }
 }
 
 // 點擊下方列表快速切換編輯對象（並絲滑滾動至頂部與自動聚焦）
 const selectItem = (item) => {
-  formData.value = { ...item }
+  formData.value = { 
+    ...item,
+    // ⚡ 核心回填：從下方列表選取時，若有標籤陣列，將第一個值抽出來做為單選值回填
+    featureTags: (item.featureTags && item.featureTags.length > 0) ? item.featureTags[0] : null
+  }
   menuItemId.value = item.id
-
+  
   // 🎯 絲滑滾動大絕招
   window.scrollTo({
     top: 0,
     behavior: 'smooth'
   })
-
+  
   // 🎯 自動聚焦餐點名稱輸入框
   setTimeout(() => {
     const nameInput = document.getElementById('itemNameInput')
@@ -65,55 +79,86 @@ const selectItem = (item) => {
 // 4. 網頁開機自動點火
 onMounted(async () => {
   menuItemId.value = route.params.id
-  fetchAllMenuItems()
-
-  if (menuItemId.value) {
+  fetchAllMenuItems()    //任務a:搬分店大清單
+  if (menuItemId.value) {  //任務b:去搬這「單一品項」的舊資料
     try {
-      const res = await axios.get(`http://localhost:8080/api/menu-items/${menuItemId.value}`)
-      formData.value = res.data.data || res.data
+      // 🎯 移除硬編碼，回歸相對路徑
+      const res = await axios.get(`/api/menu-items/${menuItemId.value}`)
+      const rawData = res.data.data || res.data
+      
+      // ⚡ 核心動態回填：將後端回傳的 List 標籤解構為單選下拉選單所需值
+      let currentTag = null;
+      if (rawData.featureTags && rawData.featureTags.length > 0) {
+        currentTag = rawData.featureTags[0];
+      }
+
+      formData.value = {
+        ...rawData,
+        // 如果是點進來的，由於是從總表撈單一品項，若分店有客製價則優先沿用，沒有就用總部的
+        price: rawData.price || rawData.basePrice,
+        featureTags: currentTag // 將解析後的標籤回填入 formData
+      }
     } catch (error) {
       console.error('撈取單一菜單資料失敗：', error)
     }
   }
 })
 
-// 5. 儲存修改
+// 5. 儲存修改 —— ⚡ 史詩級升級：走分店隔離更新 API，絕對不污染總表
 const handleUpdateMenu = async () => {
   try {
-    await axios.put(`http://localhost:8080/api/menu-items/${menuItemId.value}`, formData.value)
-    alert('🎉定食餐點布林真數據修改成功，已寫入資料庫！')
-    fetchAllMenuItems()
+    // 🎯 完美對齊後端 PUT /api/menu-items/{id}/store/{storeId} 隔離管線！
+    await axios.put(`/api/menu-items/${menuItemId.value}/store/${currentStoreId.value}`, {
+      categoryId: Number(formData.value.categoryId),
+      itemName: formData.value.itemName,
+      price: Number(formData.value.price), // 這是修改後的店家客製售價
+      description: formData.value.description,
+      imageUrl: formData.value.imageUrl,
+      allergenInfo: formData.value.allergenInfo,
+      isActive: formData.value.isActive, // 作為分店上架狀態傳入 store_menu
+      featureTags: formData.value.featureTags // ⚡ 同步送出修改後的特色行銷標籤
+    })
+    
+    alert(` 🎉 第 ${currentStoreId.value} 號分店餐點數據客製修改成功，已安全寫入關聯表並同步刷新快取！`)
+    fetchAllMenuItems() // 即時重刷該店專屬列表
   } catch (error) {
-    console.error('更新餐點失敗：', error)
-    alert('❌ 更新失敗，請檢查後端控制台！')
+    console.error('分店更新餐點失敗：', error)
+    alert(' ❌ 更新失敗，請檢查後端控制台！')
   }
 }
 
-// 🚀 6. 雙向開關邏輯：純布林值取反切換（true 變 false，false 變 true）
+// 🚀 6. 雙向開關邏輯：分店專屬狀態取反切換（上架/下架）
 const handleToggleStatus = async () => {
   if (!formData.value.id) {
     alert('請先在下方列表選擇一個餐點才能進行操作唷！')
     return
   }
-
   const isCurrentlyAvailable = formData.value.isActive === true || formData.value.isActive === 'true'
-  const actionText = isCurrentlyAvailable ? '下架移出菜單' : '重新上架還原'
-
+  const actionText = isCurrentlyAvailable ? '下架移出分店菜單' : '分店重新上架還原'
   const confirmAction = confirm(`確定要將【${formData.value.itemName}】進行${actionText}嗎？`)
   if (!confirmAction) return
-
+  
   try {
     // 布林值大翻轉
     formData.value.isActive = !isCurrentlyAvailable
-
-    // 送回 Java 後端 MySQL 資料庫
-    await axios.put(`http://localhost:8080/api/menu-items/${menuItemId.value}`, formData.value)
-
-    alert(`🎉【${formData.value.itemName}】${actionText}成功！`)
+    
+    // 🎯 完美咬合後端 PUT /api/menu-items/{id}/store/{storeId} 隔離管線
+    await axios.put(`/api/menu-items/${menuItemId.value}/store/${currentStoreId.value}`, {
+      categoryId: Number(formData.value.categoryId),
+      itemName: formData.value.itemName,
+      price: Number(formData.value.price),
+      description: formData.value.description,
+      imageUrl: formData.value.imageUrl,
+      allergenInfo: formData.value.allergenInfo,
+      isActive: formData.value.isActive, // 翻轉後的布林狀態
+      featureTags: formData.value.featureTags // 狀態翻轉時亦保持當前標籤完整度
+    })
+    
+    alert(` 🎉 【${formData.value.itemName}】${actionText}成功！`)
     fetchAllMenuItems() // 即時重刷列表
   } catch (error) {
     console.error('狀態切換失敗：', error)
-    alert('❌ 操作失敗，請檢查後端控制台！')
+    alert(' ❌ 操作失敗，請檢查後端控制台！')
   }
 }
 </script>
@@ -132,7 +177,7 @@ const handleToggleStatus = async () => {
         </h5>
 
         <div class="row g-3">
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label class="form-label fw-bold small" style="color: #4b5563;">餐點名稱</label>
             <input id="itemNameInput" v-model="formData.itemName" type="text" class="form-control form-control-solid bg-white" placeholder="點擊下方列表進行編輯..." style="color: #374151; border-color: #fed7aa;">
           </div>
@@ -149,13 +194,30 @@ const handleToggleStatus = async () => {
               <option :value="2" style="color: #374151;">旬味生魚片系列</option>
               <option :value="3" style="color: #374151;">職人握壽司盛合</option>
               <option :value="4" style="color: #374151;">主廚熱騰騰熟食</option>
+              <option :value="5" style="color: #374151;">日式極緻炸揚物</option>
               <option :value="6" style="color: #374151;">職人手作甜點</option>
               <option :value="7" style="color: #374151;">特調清爽飲料</option>
               <option :value="8" style="color: #374151;">微醺日式酒水</option>
             </select>
           </div>
 
-          <div class="col-md-3">
+          <div class="col-md-2">
+            <label class="form-label fw-bold small" style="color: #4b5563;">✨ 特色行銷標籤</label>
+            <select v-model="formData.featureTags" class="form-select form-control-solid bg-white" style="color: #374151; border-color: #fed7aa; font-weight: 500;">
+              <option :value="null" style="color: #6b7280;">-- 留白 (無標籤) --</option>
+              <option value="👑 店長推薦" style="color: #374151;">👑 店長推薦</option>
+              <option value="🔥 人氣熱銷" style="color: #374151;">🔥 人氣熱銷</option>
+              <option value="🍣 主廚推薦" style="color: #374151;">🍣 主廚推薦</option>
+              <option value="🔥 入口即化" style="color: #374151;">🔥 入口即化</option>
+              <option value="🥩 頂級和牛" style="color: #374151;">🥩 頂級和牛</option>
+              <option value="🍵 濃郁系" style="color: #374151;">🍵 濃郁系</option>
+              <option value="🥢 手工研磨" style="color: #374151;">🥢 手工研磨</option>
+              <option value="🧊 夏季限定" style="color: #374151;">🧊 夏季限定</option>
+              <option value="🍶 頂級清酒" style="color: #374151;">🍶 頂級清酒</option>
+            </select>
+          </div>
+
+          <div class="col-md-2">
             <label class="form-label fw-bold small" style="color: #4b5563;">上架狀態</label>
             <select v-model="formData.isActive" class="form-select form-control-solid bg-white" style="color: #374151; border-color: #fed7aa; font-weight: 500;">
               <option :value="true" style="color: #374151;">🟢 供應中</option>
@@ -214,6 +276,7 @@ const handleToggleStatus = async () => {
                 <th style="width: 120px; color: #374151;">分類</th>
                 <th style="color: #374151;">餐點名稱</th>
                 <th style="width: 100px; color: #374151;">價格</th>
+                <th style="color: #374151;">行銷標籤</th>
                 <th style="color: #374151;">餐點描述</th>
                 <th style="color: #374151;">過敏原</th>
                 <th style="width: 120px; color: #374151;">狀態</th>
@@ -235,6 +298,14 @@ const handleToggleStatus = async () => {
                 </td>
                 <td class="fw-bold" style="color: #4b5563;">{{ item.itemName }}</td>
                 <td class="fw-bold" style="color: #16a34a;">${{ item.price || item.basePrice }}</td>
+                
+                <td>
+                  <span v-if="item.featureTags && item.featureTags.length > 0" class="badge border" style="background-color: #fff7ed; color: #c2410c; border-color: #fed7aa; font-weight: bold;">
+                    {{ item.featureTags[0] }}
+                  </span>
+                  <span v-else class="text-muted small fw-normal">無</span>
+                </td>
+
                 <td class="text-muted small" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ item.description || '暫無描述' }}</td>
                 <td>
                   <span v-if="item.allergenInfo" class="badge text-amber-800 bg-warning bg-opacity-10 border border-warning-subtle rounded-2" style="font-size: 0.75rem; color: #9a3412; background-color: #ffedd5 !important;">{{ item.allergenInfo }}</span>

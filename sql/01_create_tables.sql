@@ -223,9 +223,11 @@ CREATE TABLE time_slot (
     slot_id         BIGINT AUTO_INCREMENT PRIMARY KEY,
     store_id        BIGINT NOT NULL,
     reservation_date DATE NOT NULL COMMENT '可訂日期',
+    day_of_week     INT COMMENT '1=週一...7=週日',
     start_time      TIME NOT NULL COMMENT '時段開始',
     end_time        TIME NOT NULL COMMENT '時段結束',
     is_open         BOOLEAN NOT NULL DEFAULT TRUE COMMENT '是否開放訂位',
+    is_rule_generated BOOLEAN NOT NULL DEFAULT FALSE COMMENT '是否由星期規則批次產生',
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (store_id) REFERENCES store(store_id),
     UNIQUE KEY uk_time_slot (store_id, reservation_date, start_time)
@@ -298,7 +300,7 @@ CREATE TABLE orders (
     points_used     INT NOT NULL DEFAULT 0 COMMENT '本次折抵點數',
     points_earned   INT NOT NULL DEFAULT 0 COMMENT '本次累積點數',
     status          VARCHAR(20) NOT NULL DEFAULT 'PENDING'
-                    COMMENT 'PENDING / PREPARING / SERVED / PAID / CANCELLED',
+                   COMMENT 'PENDING / CONFIRMED / PREPARING / READY / COMPLETED / CANCELLED',
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user(user_id),
@@ -331,8 +333,8 @@ CREATE TABLE payment (
     reservation_id  BIGINT COMMENT '關聯訂位（付訂金時填）',
     amount          DECIMAL(10, 2) NOT NULL COMMENT '付款金額',
     payment_method  VARCHAR(20) COMMENT 'CREDIT_CARD / LINE_PAY / CASH',
-    payment_status  VARCHAR(20) NOT NULL DEFAULT 'PENDING'
-                    COMMENT 'PENDING / SUCCESS / FAILED / REFUNDED',
+    payment_status  VARCHAR(20) NOT NULL DEFAULT 'UNPAID'
+                    COMMENT 'UNPAID / PAID / REFUNDED',
     transaction_no  VARCHAR(100) COMMENT '金流服務商交易序號',
     paid_at         DATETIME COMMENT '實際付款成功時間',
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,

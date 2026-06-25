@@ -24,6 +24,8 @@ public class OrderSummaryResponse {
 
     private String paymentMethod;
 
+    private String paymentStatus;
+
     private String invoiceType;
 
     private String carrierNumber;

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import Swal from 'sweetalert2'
 import { reservationApi } from '@/api/reservation'
 import { storeApi } from '@/api/store'
+import { extractStoreDetail, formatTime } from '@/assets/js/reservationUi'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,12 +16,10 @@ const successMessage = ref('')
 const cachedReservation = ref({})
 const storeName = ref('')
 
-// 轉換格式前台只顯示 HH:mm (後端 time 格式可能含 ss 秒)
-const formatTime = (time) => time?.slice(0, 5) || ''
-
 // 訂位成功顯示名字、分店
 const displayName = computed(() => reservation.value?.customerName || cachedReservation.value.customerName || '訂位顧客')
 const displayStoreName = computed(() => storeName.value || cachedReservation.value.storeName || '未指定分店')
+const pageTitle = computed(() => '訂位成功')
 
 // 讀取訂位頁送出暫存顧客資訊（避免重新整理或後端欄位差）
 const loadCachedReservation = (reservationId) => {
@@ -38,14 +37,14 @@ const loadStoreName = async (storeId) => {
   if (!storeId) return
   try {
     const res = await storeApi.getStoreDetail(storeId)
-    const store = res.data?.store || res.data
+    const store = extractStoreDetail(res.data)
     storeName.value = store?.storeName || ''
   } catch {
     storeName.value = ''
   }
 }
 
-// query id 讀取單筆訂位
+// query id 讀取單筆訂位；信件連結會多帶 token，沒登入可以連結
 const loadReservation = async () => {
   if (!route.query.id) {
     errorMessage.value = '找不到訂位編號'
@@ -53,7 +52,9 @@ const loadReservation = async () => {
   }
   loading.value = true
   try {
-    const res = await reservationApi.getReservation(route.query.id)
+    const res = route.query.token
+      ? await reservationApi.getPublicReservation(route.query.id, route.query.token)
+      : await reservationApi.getReservation(route.query.id)
     reservation.value = res.data
     loadCachedReservation(res.data?.reservationId)
     await loadStoreName(res.data?.storeId)
@@ -134,7 +135,9 @@ const reserveReservation = async () => {
 // 編輯訂位：只有 PENDING 狀態可編輯
 const editReservation = () => {
   if (!reservation.value || reservation.value.status !== 'PENDING') return
-  router.push({ name: 'CustomerReservation', query: { editId: reservation.value.reservationId } })
+  const query = { editId: reservation.value.reservationId }
+  if (route.query.token) query.token = route.query.token
+  router.push({ name: 'CustomerReservation', query })
 }
 
 // 回訂位頁
@@ -155,7 +158,7 @@ onMounted(loadReservation)
           <i class="bx bx-check-double bx-sm" style="color: green;"></i>
         </span>
       </div>
-      <h3 class="card-header">訂位成功</h3>
+      <h3 class="card-header">{{ pageTitle }}</h3>
 
       <div class="card-body text-center w-100">
         <div v-if="loading" class="alert alert-info">讀取訂位資料中...</div>
@@ -198,14 +201,14 @@ onMounted(loadReservation)
     </div>
     <!-- 導覽到其他頁面 -->
     <div v-if="reservation && !loading && !errorMessage" class="success-footer-actions">
-      <button type="button" class="btn btn-success-back" @click="goReservationPage">
+      <button type="button" class="btn btn-reservation-dark" @click="goReservationPage">
         <i class="bx bx-chevron-left"></i>
         回訂位頁面
       </button>
-      <RouterLink class="btn btn-success-main" to="/menu">
+      <RouterLink class="btn btn-reservation-light" to="/menu">
         瀏覽菜單 <i class="bx bx-food-menu"></i>
       </RouterLink>
-      <RouterLink class="btn btn-success-main" to="/store">
+      <RouterLink class="btn btn-reservation-light" to="/store">
         店舖位置 <i class="bx bx-map"></i>
       </RouterLink>
     </div>
@@ -245,32 +248,6 @@ onMounted(loadReservation)
   justify-content: center;
   gap: 0.25rem;
   min-width: 126px;
-}
-
-.btn-success-back {
-  background: #4c4332b8;
-  border-color: #4c4332b8;
-  color: #ffffff;
-}
-
-.btn-success-back:hover,
-.btn-success-back:focus {
-  background: #3f3729;
-  border-color: #3f3729;
-  color: #ffffff;
-}
-
-.btn-success-main {
-  background: #e3ac7f;
-  border-color: #e3ac7f;
-  color: #ffffff;
-}
-
-.btn-success-main:hover,
-.btn-success-main:focus {
-  background: #d49a68;
-  border-color: #d49a68;
-  color: #ffffff;
 }
 
 @media (max-width: 576px) {

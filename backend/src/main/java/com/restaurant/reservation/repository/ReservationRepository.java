@@ -2,10 +2,13 @@ package com.restaurant.reservation.repository;
 
 import com.restaurant.reservation.entity.Reservation;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
 
@@ -15,8 +18,38 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     // 訂位名單頁 -> 依分店查全部訂位，最新建立的排前面
     List<Reservation> findByStoreIdOrderByCreatedAtDesc(Long storeId);
 
+    // 後台查詢前先把已逾時且未入座的訂位改成 NO_SHOW。
+    @Modifying
+    @Query("""
+            update Reservation r
+            set r.status = 'NO_SHOW'
+            where r.storeId = :storeId
+              and r.status in ('PENDING', 'RESERVED', 'ASSIGNED')
+              and exists (
+                select 1
+                from TimeSlot ts
+                where ts.slotId = r.slotId
+                  and (
+                    ts.reservationDate < :today
+                    or (ts.reservationDate = :today and ts.endTime < :now)
+                  )
+              )
+            """)
+    int markNoShowReservations(Long storeId, LocalDate today, LocalTime now);
+
     // 依狀態查訂位
     List<Reservation> findByStoreIdAndStatusOrderByCreatedAtAsc(Long storeId, String status);
+
+    // 顧客端查詢自己的訂位，最新建立的排前面
+    List<Reservation> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+    // 信件連結不依賴會員登入 JWT，改用訂位本身的 access_token 驗證
+    Optional<Reservation> findByReservationIdAndAccessToken(Long reservationId, String accessToken);
+
+    boolean existsByAccessToken(String accessToken);
+
+    // 分配桌位時檢查同一時段其他訂位，避免同一桌被重複分配
+    List<Reservation> findBySlotIdAndReservationIdNot(Long slotId, Long reservationId);
 
     // ＊訂位總覽查分店某一天訂位＊
     @Query("""
