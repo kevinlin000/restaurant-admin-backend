@@ -67,6 +67,13 @@ const availableFeatures = computed(() => {
       roles: ["ADMIN"],
     },
     {
+      title: "首頁管理",
+      icon: "bx bx-layout",
+      description: "管理首頁 Hero、品牌文案與精選內容。",
+      path: "/admin/homepage",
+      roles: ["ADMIN"],
+    },
+    {
       title: "常見問答",
       icon: "bx bx-help-circle",
       description: "管理 FAQ 與客服窗知識庫。",

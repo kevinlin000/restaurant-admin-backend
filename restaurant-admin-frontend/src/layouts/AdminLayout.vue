@@ -69,6 +69,7 @@ const currentPageTitle = computed(() => {
   if (path.startsWith("/admin/store")) return "分店管理";
   if (path.startsWith("/admin/menu")) return "菜單管理";
   if (path.startsWith("/admin/member")) return "員工管理";
+  if (path.startsWith("/admin/homepage")) return "首頁管理";
   if (path.startsWith("/admin/news") || path.startsWith("/admin/faqs")) return "品牌內容";
   if (path.startsWith("/admin/home")) return "後台管理首頁";
 
@@ -176,6 +177,11 @@ const sidebarGroups = computed(() => [
     roles: ["MANAGER", "ADMIN"],
     children: [
       {
+        label: "首頁管理",
+        path: "/admin/homepage",
+        roles: ["ADMIN"],
+      },
+      {
         label: "最新消息",
         path: "/admin/news",
         roles: ["MANAGER", "ADMIN"],
@@ -202,7 +208,10 @@ const openMenu = ref({
   menu: route.path.startsWith("/admin/menu"),
   order: route.path.startsWith("/admin/order"),
   store: route.path.startsWith("/admin/store"),
-  content: route.path.startsWith("/admin/news") || route.path.startsWith("/admin/faqs"),
+  content:
+    route.path.startsWith("/admin/news") ||
+    route.path.startsWith("/admin/faqs") ||
+    route.path.startsWith("/admin/homepage"),
 });
 
 const toggleMenu = (menu) => {
