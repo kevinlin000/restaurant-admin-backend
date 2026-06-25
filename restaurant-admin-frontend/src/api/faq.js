@@ -16,6 +16,10 @@ export const faqApi = {
     return unwrap(await api.get("/api/admin/faqs"));
   },
 
+  async getSearchAnalytics() {
+    return unwrap(await api.get("/api/admin/faqs/search-logs"));
+  },
+
   async createFaq(payload) {
     return unwrap(await api.post("/api/admin/faqs", payload));
   },

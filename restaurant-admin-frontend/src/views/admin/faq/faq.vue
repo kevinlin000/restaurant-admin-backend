@@ -1,6 +1,9 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
+import { useRoute } from "vue-router";
 import { faqApi } from "@/api/faq";
+
+const route = useRoute();
 
 const faqs = ref([]);
 const selectedId = ref(null);
@@ -88,6 +91,17 @@ const startCreate = () => {
   resetMessages();
 };
 
+const applyDraftQuestionFromRoute = () => {
+  const draftQuestion =
+    typeof route.query.draftQuestion === "string" ? route.query.draftQuestion.trim() : "";
+  if (!draftQuestion) return;
+
+  startCreate();
+  form.question = draftQuestion;
+  form.keywords = draftQuestion;
+  message.value = "已帶入客服未命中問題，請補上回答後儲存。";
+};
+
 const selectFaq = (faq) => {
   selectedId.value = faq.faqId;
   assignForm(faq);
@@ -155,7 +169,10 @@ const deleteFaq = async () => {
   }
 };
 
-onMounted(loadFaqs);
+onMounted(async () => {
+  await loadFaqs();
+  applyDraftQuestionFromRoute();
+});
 </script>
 
 <template>

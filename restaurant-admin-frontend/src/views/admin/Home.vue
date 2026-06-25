@@ -80,6 +80,13 @@ const availableFeatures = computed(() => {
       path: "/admin/faqs",
       roles: ["ADMIN"],
     },
+    {
+      title: "客服查詢紀錄",
+      icon: "bx bx-message-square-detail",
+      description: "查看熱門查詢與未命中問題。",
+      path: "/admin/faq-analytics",
+      roles: ["ADMIN"],
+    },
   ];
 
   return baseFeatures.filter((feature) => feature.roles.includes(role));
