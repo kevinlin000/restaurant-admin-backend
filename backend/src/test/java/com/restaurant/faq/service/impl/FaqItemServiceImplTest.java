@@ -68,6 +68,23 @@ class FaqItemServiceImplTest {
     }
 
     @Test
+    void searchMatchesChineseKeywordTokensInsideNaturalQuestion() {
+        FaqItem takeawayFaq = faq(4L, "可以外帶點餐嗎？", "外帶訂單可選擇支援外帶的門市", FaqCategory.ORDER, FaqStatus.PUBLISHED, true);
+        takeawayFaq.setKeywords("外帶,點餐,取餐,付款,門市");
+        FaqItem orderFaq = faq(6L, "可以先線上點餐嗎？", "內用與外帶訂單依門市菜單供應", FaqCategory.ORDER, FaqStatus.PUBLISHED, true);
+        orderFaq.setKeywords("點餐,內用,外帶,桌位,門市菜單");
+        FaqItem paymentFaq = faq(5L, "付款方式有哪些？", "支援信用卡與 Line Pay", FaqCategory.PAYMENT, FaqStatus.PUBLISHED, false);
+        paymentFaq.setKeywords("付款,信用卡,Line Pay");
+
+        when(faqItemRepository.findByIsDeletedFalseAndStatusOrderByIsFeaturedDescSortOrderAscFaqIdDesc(FaqStatus.PUBLISHED))
+                .thenReturn(List.of(paymentFaq, orderFaq, takeawayFaq));
+
+        FaqSearchResponse result = faqItemService.searchPublishedFaqs("我可以先外帶點餐嗎");
+
+        assertThat(result.getResults()).extracting(FaqItemResponse::getFaqId).containsExactly(4L, 6L);
+    }
+
+    @Test
     void adminCanCreateFaq() {
         Authentication auth = adminAuth();
         when(faqItemRepository.save(any(FaqItem.class))).thenAnswer(invocation -> {

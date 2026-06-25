@@ -13,9 +13,10 @@ const suggestions = ref([]);
 const hasSearched = ref(false);
 
 const quickPrompts = [
-  "訂位需要訂金嗎？",
+  "訂位最早可以預約多久？",
   "取消訂位可以退款嗎？",
   "可以外帶點餐嗎？",
+  "門市可以停車嗎？",
 ];
 
 const visibleAnswers = computed(() => (results.value.length ? results.value : suggestions.value));
@@ -61,76 +62,84 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="support-widget" aria-live="polite">
-    <section v-if="isOpen" class="support-panel" aria-label="敘日客服助手">
-      <header class="support-header">
-        <div>
-          <span>Support Desk</span>
-          <h2>敘日客服</h2>
-        </div>
-        <button type="button" class="icon-btn" aria-label="關閉客服視窗" @click="closeChat">
-          <i class="bi bi-x-lg"></i>
-        </button>
-      </header>
+  <Teleport to="body">
+    <div class="support-widget" aria-live="polite">
+      <section v-if="isOpen" class="support-panel" aria-label="敘日服務台">
+        <header class="support-header">
+          <div>
+            <span>FAQ Desk</span>
+            <h2>敘日服務台</h2>
+          </div>
+          <button type="button" class="icon-btn" aria-label="關閉客服視窗" @click="closeChat">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </header>
 
-      <div class="support-intro">
-        <p>輸入訂位、訂金、點餐或門市問題，我會從官方 FAQ 裡找最接近的規則。</p>
-      </div>
-
-      <form class="support-search" @submit.prevent="submitSearch">
-        <label class="visually-hidden" for="support-query">搜尋問題</label>
-        <input
-          id="support-query"
-          v-model="query"
-          type="search"
-          placeholder="例如：訂金可以退嗎？"
-        />
-        <button type="submit" :disabled="loading">
-          <i class="bi bi-search"></i>
-        </button>
-      </form>
-
-      <div class="quick-prompts">
-        <button
-          v-for="prompt in quickPrompts"
-          :key="prompt"
-          type="button"
-          @click="search(prompt)"
-        >
-          {{ prompt }}
-        </button>
-      </div>
-
-      <div class="support-body">
-        <div v-if="loading" class="support-state">查詢中...</div>
-        <div v-else-if="errorMessage" class="support-state danger">{{ errorMessage }}</div>
-        <div v-else-if="hasSearched && !results.length" class="support-state">
-          沒有找到完全相符的規則。可以換個關鍵字，或查看完整 FAQ。
+        <div class="support-intro">
+          <p>查詢訂位、訂金、外帶與門市規則。回覆來源為已發布常見問答。</p>
         </div>
 
-        <article v-for="item in visibleAnswers" :key="item.faqId" class="answer-card">
-          <span>{{ item.categoryLabel }}</span>
-          <h3>{{ item.question }}</h3>
-          <p>{{ item.answer }}</p>
-        </article>
-      </div>
+        <form class="support-search" @submit.prevent="submitSearch">
+          <label class="visually-hidden" for="support-query">搜尋問題</label>
+          <input
+            id="support-query"
+            v-model="query"
+            type="search"
+            placeholder="輸入關鍵字或問題"
+          />
+          <button type="submit" :disabled="loading">
+            <i class="bi bi-search"></i>
+          </button>
+        </form>
 
-      <footer class="support-footer">
-        <button type="button" @click="goFaq">查看完整 FAQ</button>
-      </footer>
-    </section>
+        <div class="quick-prompts">
+          <span>常用查詢</span>
+          <button
+            v-for="prompt in quickPrompts"
+            :key="prompt"
+            type="button"
+            @click="search(prompt)"
+          >
+            {{ prompt }}
+          </button>
+        </div>
 
-    <button
-      type="button"
-      class="support-toggle"
-      :aria-expanded="isOpen"
-      aria-label="開啟客服助手"
-      @click="openChat"
-    >
-      <i class="bi bi-chat-dots"></i>
-      <span>客服</span>
-    </button>
-  </div>
+        <div class="support-body">
+          <div v-if="loading" class="support-state">查詢中...</div>
+          <div v-else-if="errorMessage" class="support-state danger">{{ errorMessage }}</div>
+          <div v-else-if="hasSearched && !results.length" class="support-state">
+            沒有完全相符的規則。可換個關鍵字，或前往完整 FAQ 查看所有條款。
+          </div>
+
+          <div class="support-section-label">
+            {{ results.length ? "查詢結果" : "推薦規則" }}
+          </div>
+
+          <article v-for="item in visibleAnswers" :key="item.faqId" class="answer-card">
+            <span>{{ item.categoryLabel }}</span>
+            <h3>{{ item.question }}</h3>
+            <p>{{ item.answer }}</p>
+            <small>已發布 FAQ</small>
+          </article>
+        </div>
+
+        <footer class="support-footer">
+          <button type="button" @click="goFaq">查看完整 FAQ</button>
+        </footer>
+      </section>
+
+      <button
+        type="button"
+        class="support-toggle"
+        :aria-expanded="isOpen"
+        aria-label="開啟敘日服務台"
+        @click="openChat"
+      >
+        <i class="bi bi-chat-dots"></i>
+        <span>客服</span>
+      </button>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -138,7 +147,7 @@ onMounted(() => {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  z-index: 1200;
+  z-index: 2147483000;
   font-family: "Noto Sans TC", system-ui, -apple-system, sans-serif;
 }
 
@@ -161,11 +170,12 @@ onMounted(() => {
   right: 0;
   bottom: 64px;
   display: grid;
+  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
   width: min(380px, calc(100vw - 32px));
   max-height: min(680px, calc(100vh - 120px));
   overflow: hidden;
   border: 1px solid #ded4ca;
-  background: #fffaf4;
+  background: #fffdf9;
   box-shadow: 0 30px 80px rgba(20, 14, 9, 0.28);
 }
 
@@ -173,9 +183,10 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #211814;
+  background:
+    linear-gradient(90deg, rgba(33, 24, 20, 0.98), rgba(54, 38, 31, 0.98));
   color: #fff;
-  padding: 20px;
+  padding: 18px 20px;
 }
 
 .support-header span {
@@ -198,12 +209,13 @@ onMounted(() => {
   width: 36px;
   height: 36px;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.08);
+  background: transparent;
   color: #fff;
 }
 
 .support-intro {
-  padding: 16px 20px 0;
+  border-bottom: 1px solid #eaded2;
+  padding: 15px 20px;
 }
 
 .support-intro p {
@@ -216,7 +228,7 @@ onMounted(() => {
 .support-search {
   display: grid;
   grid-template-columns: 1fr 46px;
-  margin: 16px 20px 12px;
+  margin: 16px 20px 10px;
   border: 1px solid #d8cbbf;
   background: #fff;
 }
@@ -244,12 +256,19 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 0 20px 14px;
+  padding: 0 20px 16px;
+}
+
+.quick-prompts span {
+  flex: 0 0 100%;
+  color: #9a5d35;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .quick-prompts button {
   border: 1px solid #dccdbf;
-  background: #fff;
+  background: #fbf6ef;
   color: #7c6250;
   padding: 7px 10px;
   font-size: 13px;
@@ -259,7 +278,14 @@ onMounted(() => {
   display: grid;
   gap: 10px;
   overflow: auto;
+  min-height: 0;
   padding: 0 20px 18px;
+}
+
+.support-section-label {
+  color: #9a5d35;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .support-state {
@@ -278,7 +304,7 @@ onMounted(() => {
 .answer-card {
   border: 1px solid #e2d8ce;
   background: #fff;
-  padding: 16px;
+  padding: 15px 16px;
 }
 
 .answer-card span {
@@ -302,17 +328,27 @@ onMounted(() => {
   line-height: 1.75;
 }
 
+.answer-card small {
+  display: block;
+  margin-top: 12px;
+  border-top: 1px solid #efe6dc;
+  color: #8b7a6d;
+  font-size: 12px;
+  padding-top: 10px;
+}
+
 .support-footer {
   border-top: 1px solid #ded4ca;
+  background: #fffaf4;
   padding: 14px 20px;
 }
 
 .support-footer button {
   width: 100%;
   min-height: 42px;
-  border: 0;
-  background: #dca874;
-  color: #211814;
+  border: 1px solid #c98e63;
+  background: #fff;
+  color: #8a512d;
   font-weight: 800;
 }
 
@@ -329,6 +365,10 @@ onMounted(() => {
   .support-widget {
     right: 16px;
     bottom: 16px;
+  }
+
+  .support-panel {
+    max-height: calc(100vh - 96px);
   }
 }
 </style>

@@ -20,7 +20,18 @@ const categories = [
   { value: "SERVICE", label: "服務", note: "過敏、包廂、特殊需求" },
 ];
 
-const featuredFaqs = computed(() => faqs.value.filter((faq) => faq.isFeatured).slice(0, 4));
+const policyNotes = [
+  { title: "訂位開放", text: "線上可預約未來 30 天內餐期，熱門時段建議提前安排。" },
+  { title: "座位保留", text: "請依訂位時間抵達；若可能晚到，請先聯繫門市確認座位保留。" },
+  { title: "訂金確認", text: "特殊餐期、包廂或大人數訂位可能需於期限內完成付款。" },
+  { title: "現場為準", text: "營業異動、候位與特殊需求，仍以當日門市回覆為準。" },
+];
+
+const featuredFaqs = computed(() => faqs.value.filter((faq) => faq.isFeatured).slice(0, 6));
+
+const activeCategory = computed(() =>
+  categoryCounts.value.find((category) => category.value === selectedCategory.value),
+);
 
 const filteredFaqs = computed(() => {
   const keyword = searchText.value.trim().toLowerCase();
@@ -69,10 +80,10 @@ onMounted(loadFaqs);
   <main class="faq-page">
     <section class="faq-hero">
       <div class="faq-hero-inner">
-        <span class="eyebrow">Guest Support</span>
-        <h1>用餐前，把規則查清楚。</h1>
+        <span class="eyebrow">Service Guide</span>
+        <h1>訂位與用餐規則。</h1>
         <p>
-          訂位、訂金、取消、點餐與門市資訊整理在同一頁。搜尋問題或選擇分類，快速找到正式規則。
+          把用餐前會遇到的時段、訂金、取消、付款與門市資訊整理成正式規則。查詢前先確認細節，抵達後把時間留給餐桌。
         </p>
 
         <label class="faq-search" for="faq-search-input">
@@ -89,7 +100,7 @@ onMounted(loadFaqs);
 
     <section class="faq-shell">
       <aside class="faq-side">
-        <span class="side-label">分類</span>
+        <span class="side-label">規則索引</span>
         <button
           v-for="category in categoryCounts"
           :key="category.value"
@@ -106,13 +117,19 @@ onMounted(loadFaqs);
       <section class="faq-content">
         <div class="faq-summary">
           <div>
-            <span>Knowledge Base</span>
-            <h2>常見問答</h2>
+            <span>Guest Policy</span>
+            <h2>{{ activeCategory?.label || "全部" }}</h2>
           </div>
-          <p>目前收錄 {{ faqs.length }} 則規則，客服窗也會使用同一份 FAQ 知識庫回答。</p>
+          <p>
+            目前收錄 {{ faqs.length }} 則已發布規則。依分類瀏覽，或直接搜尋訂金、外帶、停車、過敏等關鍵字。
+          </p>
         </div>
 
-        <div v-if="featuredFaqs.length" class="featured-strip">
+        <div v-if="featuredFaqs.length" class="featured-list" aria-label="常用規則">
+          <div class="featured-list-head">
+            <span>常用規則</span>
+            <small>顧客最常確認的餐期與服務條款</small>
+          </div>
           <article v-for="faq in featuredFaqs" :key="faq.faqId">
             <span>{{ faq.categoryLabel }}</span>
             <strong>{{ faq.question }}</strong>
@@ -143,12 +160,13 @@ onMounted(loadFaqs);
       </section>
 
       <aside class="policy-panel">
-        <span>Service Policy</span>
-        <h2>展示時可以講的亮點</h2>
+        <span>Before Dining</span>
+        <h2>訂位與用餐須知</h2>
         <ul>
-          <li>前台 FAQ 與客服窗共用同一份後台知識庫。</li>
-          <li>只回答已發布內容，避免草稿規則被客人看到。</li>
-          <li>搜尋以問題、答案、關鍵字加權排序，比純文字列表更像真實客服。</li>
+          <li v-for="note in policyNotes" :key="note.title">
+            <strong>{{ note.title }}</strong>
+            <small>{{ note.text }}</small>
+          </li>
         </ul>
       </aside>
     </section>
@@ -158,16 +176,16 @@ onMounted(loadFaqs);
 <style scoped>
 .faq-page {
   min-height: 100vh;
-  background: #fffaf4;
+  background: #f8f2ea;
   color: #2f2924;
 }
 
 .faq-hero {
   background:
-    linear-gradient(90deg, rgba(22, 15, 11, 0.88), rgba(22, 15, 11, 0.58)),
+    linear-gradient(90deg, rgba(20, 13, 9, 0.9), rgba(20, 13, 9, 0.66)),
     url("@/assets/images/japanese-tea.jpg") center/cover;
   color: #fff;
-  padding: 190px 0 92px;
+  padding: 184px 0 86px;
 }
 
 .faq-hero-inner {
@@ -178,9 +196,9 @@ onMounted(loadFaqs);
 .eyebrow,
 .side-label,
 .faq-summary span,
-.featured-strip span,
+.featured-list span,
 .policy-panel span {
-  color: #dca874;
+  color: #b7774d;
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0;
@@ -210,8 +228,8 @@ onMounted(loadFaqs);
   grid-template-columns: 54px 1fr;
   width: min(720px, 100%);
   min-height: 58px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 250, 244, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 253, 248, 0.98);
   color: #2f2924;
 }
 
@@ -231,8 +249,8 @@ onMounted(loadFaqs);
 
 .faq-shell {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 300px;
-  gap: 28px;
+  grid-template-columns: 252px minmax(0, 1fr) 292px;
+  gap: 24px;
   width: min(1180px, calc(100% - 48px));
   margin: -36px auto 96px;
   align-items: start;
@@ -241,8 +259,8 @@ onMounted(loadFaqs);
 .faq-side,
 .faq-content,
 .policy-panel {
-  border: 1px solid #ded4ca;
-  background: #fff;
+  border: 1px solid #dfd3c7;
+  background: #fffdf9;
 }
 
 .faq-side {
@@ -258,15 +276,15 @@ onMounted(loadFaqs);
   display: grid;
   gap: 2px;
   border: 1px solid transparent;
-  background: #fffaf4;
+  background: #fbf6ef;
   padding: 14px 42px 14px 14px;
   text-align: left;
 }
 
 .faq-side button.active,
 .faq-side button:hover {
-  border-color: #dca874;
-  background: #fff4e7;
+  border-color: #c98e63;
+  background: #fff3e5;
 }
 
 .faq-side strong {
@@ -287,15 +305,15 @@ onMounted(loadFaqs);
 }
 
 .faq-content {
-  padding: 28px;
+  padding: 30px 30px 34px;
 }
 
 .faq-summary {
   display: flex;
   justify-content: space-between;
   gap: 24px;
-  border-bottom: 1px solid #e4d9ce;
-  padding-bottom: 24px;
+  border-bottom: 1px solid #e1d6cb;
+  padding-bottom: 26px;
 }
 
 .faq-summary h2,
@@ -314,22 +332,39 @@ onMounted(loadFaqs);
   line-height: 1.7;
 }
 
-.featured-strip {
+.featured-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin: 24px 0;
-}
-
-.featured-strip article {
-  border: 1px solid #eaded2;
+  grid-template-columns: 1fr;
+  margin: 26px 0;
+  border: 1px solid #e3d8cd;
   background: #fffaf4;
-  padding: 16px;
 }
 
-.featured-strip strong {
-  display: block;
-  margin-top: 6px;
+.featured-list-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid #e3d8cd;
+  padding: 14px 18px;
+}
+
+.featured-list-head small {
+  color: #75685d;
+  line-height: 1.6;
+}
+
+.featured-list article {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: 18px;
+  padding: 16px 18px;
+}
+
+.featured-list article + article {
+  border-top: 1px solid #eaded2;
+}
+
+.featured-list strong {
   color: #2f2924;
   line-height: 1.55;
 }
@@ -340,7 +375,8 @@ onMounted(loadFaqs);
 }
 
 .faq-item {
-  border: 1px solid #e1d6cb;
+  border: 1px solid #dfd4c9;
+  background: #fff;
 }
 
 .faq-item button {
@@ -379,7 +415,7 @@ onMounted(loadFaqs);
 .faq-item p {
   margin: 0;
   border-top: 1px solid #eaded2;
-  background: #fffaf4;
+  background: #fbf6ef;
   color: #615850;
   padding: 20px;
   line-height: 1.9;
@@ -399,7 +435,7 @@ onMounted(loadFaqs);
 .policy-panel {
   position: sticky;
   top: 126px;
-  padding: 24px;
+  padding: 24px 24px 26px;
 }
 
 .policy-panel ul {
@@ -412,8 +448,22 @@ onMounted(loadFaqs);
 
 .policy-panel li {
   border-top: 1px solid #eaded2;
-  color: #615850;
   padding-top: 14px;
+}
+
+.policy-panel li strong,
+.policy-panel li small {
+  display: block;
+}
+
+.policy-panel li strong {
+  color: #2f2924;
+  font-size: 15px;
+}
+
+.policy-panel li small {
+  margin-top: 5px;
+  color: #615850;
   line-height: 1.7;
 }
 
@@ -443,7 +493,7 @@ onMounted(loadFaqs);
   }
 
   .faq-side,
-  .featured-strip {
+  .featured-list {
     grid-template-columns: 1fr;
   }
 
@@ -457,6 +507,11 @@ onMounted(loadFaqs);
 
   .faq-item button span {
     grid-column: 1 / -1;
+  }
+
+  .featured-list article,
+  .featured-list-head {
+    grid-template-columns: 1fr;
   }
 }
 </style>

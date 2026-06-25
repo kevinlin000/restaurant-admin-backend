@@ -158,6 +158,14 @@ public class FaqItemServiceImpl implements FaqItemService {
             if (answer.contains(token)) score += 1;
         }
 
+        for (String keywordToken : keywords.split("[,，、\\s]+")) {
+            if (keywordToken.isBlank()) continue;
+            if (loweredQuery.contains(keywordToken)) {
+                score += 4;
+                if (question.contains(keywordToken)) score += 3;
+            }
+        }
+
         if (score > 0 && Boolean.TRUE.equals(faq.getIsFeatured())) score += 1;
         return score;
     }
