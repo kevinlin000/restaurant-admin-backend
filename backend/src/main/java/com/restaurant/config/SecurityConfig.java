@@ -114,9 +114,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/menu-items/**")
                         .hasAnyAuthority("ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
 
-                        // 後台 Dashboard：先放行測試
-                        .requestMatchers(HttpMethod.GET, "/api/admin/dashboard/**").permitAll()
-                        
+                        // 後台 Dashboard：營收與訂單統計，只給後台角色
+                        .requestMatchers(HttpMethod.GET, "/api/admin/dashboard/**")
+                        .hasAnyAuthority("ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
+
                         // 其他所有後台 API：給 STAFF、MANAGER、ADMIN
                         // 這條很重要，避免 CUSTOMER 直接用 Postman 打其他 /api/admin/** API
                         .requestMatchers("/api/admin/**").hasAnyAuthority("ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
