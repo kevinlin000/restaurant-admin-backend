@@ -50,6 +50,10 @@ const filters = reactive({
 })
 const canSelectAllStores = computed(() => canUseAllManagedStores())
 const fixedStoreName = computed(() => stores.value[0]?.storeName || '尚無可管理分店')
+const currentStoreLabel = computed(() => {
+  if (!selectedStoreId.value) return canSelectAllStores.value ? '全部分店' : fixedStoreName.value
+  return stores.value.find((store) => String(store.storeId) === String(selectedStoreId.value))?.storeName || fixedStoreName.value
+})
 const showStoreColumn = computed(() => canSelectAllStores.value)
 const storeNameById = computed(() => buildStoreNameLookup(stores.value))
 const storeName = (storeId) => storeDisplayName(storeNameById.value, storeId)
@@ -276,19 +280,28 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="container-xxl flex-grow-1 container-p-y">
-    <h2 class="py-3 mb-4">訂位查詢<span class="text-muted fw-light"> / Reservation Search</span></h2>
+    <header class="admin-ops-header">
+      <div>
+        <span>RESERVATION OPS</span>
+        <h1>訂位查詢</h1>
+        <p>查詢所有訂位資料，依日期、時段、狀態與顧客資訊篩選。</p>
+      </div>
+      <div class="admin-current-store">
+        <small>store</small>
+        <select v-if="canSelectAllStores || stores.length > 1" v-model="selectedStoreId" class="form-select">
+          <option v-if="canSelectAllStores" value="">全部可管理分店</option>
+          <option v-for="store in stores" :key="store.storeId" :value="String(store.storeId)">
+            {{ store.storeName }}
+          </option>
+        </select>
+        <strong v-else>{{ currentStoreLabel }}</strong>
+      </div>
+    </header>
 
     <div class="content-wrapper">
       <div class="card">
         <div class="card-header d-flex flex-wrap align-items-center gap-3">
           <h5 class="mb-0"><i class="bx bx-search"></i> Search 查詢訂位</h5>
-          <select v-if="canSelectAllStores || stores.length > 1" v-model="selectedStoreId" class="form-select ms-auto store-select">
-            <option v-if="canSelectAllStores" value="">全部可管理分店</option>
-            <option v-for="store in stores" :key="store.storeId" :value="String(store.storeId)">
-              {{ store.storeName }}
-            </option>
-          </select>
-          <div v-else class="ms-auto text-muted">{{ fixedStoreName }}</div>
         </div>
 
         <!-- 查詢訂位 -->
@@ -525,10 +538,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.store-select {
-  max-width: 243px;
-}
-
 .special-request-cell {
   max-width: 220px;
   white-space: normal;

@@ -57,6 +57,10 @@ const openSlotDetails = reactive({})
 const canSelectAllStores = computed(() => canUseAllManagedStores())
 const canManageSettings = computed(() => canManageReservationSettings())
 const fixedStoreName = computed(() => stores.value[0]?.storeName || '尚無可管理分店')
+const currentStoreLabel = computed(() => {
+  if (!selectedStoreId.value) return canSelectAllStores.value ? '全部分店' : fixedStoreName.value
+  return stores.value.find((store) => String(store.storeId) === String(selectedStoreId.value))?.storeName || fixedStoreName.value
+})
 
 // 新增時段 modal 表單
 const form = reactive({
@@ -744,23 +748,29 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="container-xxl flex-grow-1 container-p-y">
-    <h2 class="py-3 mb-4">設定訂位日期＆時段<span class="text-muted fw-light"> / Reservation TimeSlot  Settings</span></h2>
+    <header class="admin-ops-header">
+      <div>
+        <span>RESERVATION OPS</span>
+        <h1>訂位日期＆時段</h1>
+        <p>設定分店可訂位日期、時段、開放天數與查詢剩餘桌數。</p>
+      </div>
+      <div class="admin-current-store">
+        <small>store</small>
+        <select v-if="canSelectAllStores || stores.length > 1" v-model="selectedStoreId" class="form-select">
+          <option v-if="canSelectAllStores" value="">全部可管理分店</option>
+          <option v-for="store in stores" :key="store.storeId" :value="String(store.storeId)">
+            {{ store.storeName }}
+          </option>
+        </select>
+        <strong v-else>{{ currentStoreLabel }}</strong>
+      </div>
+    </header>
 
-    <div class="card card-action mb-4">
+    <div class="card">
       <!-- 查詢時段區 -->
       <div class="card-header py-4">
         <div class="row g-3 align-items-end">
-          <div class="col-12 col-md-4">
-            <label class="form-label">分店</label>
-            <select v-if="canSelectAllStores || stores.length > 1" v-model="selectedStoreId" class="form-select">
-              <option v-if="canSelectAllStores" value="">全部</option>
-              <option v-for="store in stores" :key="store.storeId" :value="String(store.storeId)">
-                {{ store.storeName }}
-              </option>
-            </select>
-            <div v-else class="form-control bg-light">{{ fixedStoreName }}</div>
-          </div>
-          <div class="col-12 col-md-4">
+          <div class="col-12 col-md-5">
             <label class="form-label">查詢區間</label>
             <div class="multi-select dropdown-closable" @click.stop>
               <button type="button" class="form-select text-start" @click="showDateRangeDropdown = !showDateRangeDropdown">
@@ -810,7 +820,7 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </div>
-          <div class="col-6 col-md-4">
+          <div class="col-6 col-md-5">
             <label class="form-label">星期</label>
             <div class="multi-select dropdown-closable" @click.stop>
               <button type="button" class="form-select text-start" @click="showWeekdayDropdown = !showWeekdayDropdown">
@@ -1328,10 +1338,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.control-select {
-  max-width: 240px;
-}
-
 .date-select {
   max-width: 160px;
 }

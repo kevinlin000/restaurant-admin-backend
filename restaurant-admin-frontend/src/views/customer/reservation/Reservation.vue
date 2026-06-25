@@ -421,16 +421,19 @@ onBeforeUnmount(() => {
     <section class="reservation-hero" :style="{ backgroundImage: `linear-gradient(90deg, rgba(22, 28, 34, 0.76), rgba(22, 28, 34, 0.2)), url(${reservationHeroImage})` }">
       <div class="container reservation-hero-shell">
         <div class="reservation-hero-content">
-          <span class="eyebrow">線上訂位</span>
-          <h2 class="mb-3">訂位<span class="text-muted fw-light"> / Reservation</span></h2>
+          <p class="eyebrow">Reservation</p>
+          <h1>線上訂位</h1>
+          <p class="reservation-lead">選擇您的用餐日期、時段與人數，我們將為您保留專屬座位。</p>
         </div>
       </div>
     </section>
 
     <div class="page-container reservation-content">
     <!-- 分店篩選 -->
-    <div v-if="!successReservation" class="card mb-4 store-filter-card">
+    <div v-if="!successReservation" class="card mb-4 store-filter-card reservation-customer-card">
       <div class="card-body">
+        <h4 class="mb-4" style="color:#6f665d;">用餐門市</h4>
+        <hr class="my-4">
         <div class="row g-3">
           <div class="col-md-5">
             <label class="form-label" for="reservation-region-switch">區域</label>
@@ -455,20 +458,21 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- 訂位表單 -->
-    <div v-if="!successReservation" class="card mb-4">
-      <h5 class="card-header text-muted">訂位須知：</h5>
-      <ul class="text-muted">
-        <li>{{ reservationNotice }}</li>
-        <li>可選日期與時段會依店家後台設定顯示，公休日不可預訂。</li>
-        <li>送出後系統會即時確認剩餘可訂桌數。</li>
-      </ul>
-      <hr class="my-3" />
-
+    <div v-if="!successReservation" class="card mb-4 reservation-customer-card">
+      <section class="reservation-notice-card" aria-label="訂位須知">
+        <h4 class="mb-4" style="color:#6f665d;">訂位資訊</h4>
+        <hr class="my-4">
+        <div class="reservation-notice-tab">
+          <i class="bx bx-info-circle" aria-hidden="true"></i>
+          <div class="reservation-notice-text">
+            <p>{{ reservationNotice }}</p>
+          </div>
+        </div>
+      </section>
       <form class="card-body" @submit.prevent="submitReservation">
         <div v-if="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
         <div v-if="loading" class="alert alert-info">讀取可訂位資料中...</div>
 
-        <h5>訂位資訊</h5>
         <div class="row g-3">
           <div class="col-md-6">
             <label class="form-label" for="reservation-name">姓名</label>
@@ -585,7 +589,7 @@ onBeforeUnmount(() => {
 }
 
 .reservation-hero {
-  min-height: 340px;
+  min-height: 430px;
   padding: 138px 0 62px;
   background-position: center;
   background-size: cover;
@@ -604,27 +608,22 @@ onBeforeUnmount(() => {
   color: #ffffff;
 }
 
-.eyebrow {
-  display: inline-block;
-  margin-bottom: 12px;
-  color: #e5b582;
-  font-size: 13px;
+.eyebrow, p {
+  margin: 0;
+  color: #b98a52;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .reservation-hero-content h1 {
-  margin: 0 0 14px;
-  font-size: 56px;
-  font-weight: 900;
+  max-width: 680px;
+  margin: 12px 0 18px;
+  font-size: 58px;
+  font-weight: 700;
+  line-height: 1.05;
   letter-spacing: 0;
-}
-
-.reservation-hero-content p {
-  max-width: 660px;
-  margin: 0;
-  font-size: 18px;
-  line-height: 1.8;
 }
 
 .reservation-content {
@@ -633,15 +632,33 @@ onBeforeUnmount(() => {
   padding-bottom: 78px;
 }
 
+.reservation-lead {
+  max-width: 560px;
+  margin: 0;
+  color: rgba(255, 250, 240, 0.86);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
 .store-filter-card {
   position: relative;
   z-index: 5;
-  margin-top: -62px;
   box-shadow: 0 0.75rem 1.75rem rgba(52, 64, 81, 0.12);
   margin-top: -60px;
-  border-radius: 15px;
   margin-right: auto;
   margin-left: auto;
+}
+
+.reservation-customer-card {
+  border: 1px solid #e1d9cf;
+  border-radius: 5;
+  border-color: #dbd5cf;
+  background: #fffdf8;
+  box-shadow: 0 12px 34px rgba(36, 28, 21, 0.08);
+}
+
+.reservation-customer-card .card-body {
+  padding: 1.5rem;
 }
 
 .reservation-success-card {
@@ -654,6 +671,41 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+/* 訂位須知 */
+.reservation-notice-card {
+  padding: 1.5rem 1.5rem 0.25rem;
+}
+
+.reservation-notice-tab {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  border-left: 5px solid #c59a67;
+  background: #f8efe3;
+  padding: 1.1rem 1.25rem;
+  color: #735336;
+}
+
+.reservation-notice-tab i {
+  color: #735336;
+  font-size: 1.45rem;
+}
+
+.reservation-notice-text {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.reservation-notice-text p {
+  margin: 0;
+  color: #735336;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.55;
+  text-transform: none;
 }
 
 /* 自訂日曆樣式 */
@@ -764,6 +816,16 @@ onBeforeUnmount(() => {
 
   .reservation-form-actions .btn {
     width: 100%;
+  }
+
+  .reservation-notice-card {
+    padding: 1.25rem 1rem 0.15rem;
+  }
+
+  .reservation-notice-tab {
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 10px;
+    padding: 1rem;
   }
 }
 </style>

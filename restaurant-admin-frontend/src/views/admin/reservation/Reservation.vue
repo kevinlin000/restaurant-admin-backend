@@ -44,6 +44,10 @@ const selectedRangeDays = ref(1)
 const selectedDate = ref(formatDateInput(new Date()))
 const canSelectAllStores = computed(() => canUseAllManagedStores())
 const fixedStoreName = computed(() => stores.value[0]?.storeName || '尚無可管理分店')
+const currentStoreLabel = computed(() => {
+  if (!selectedStoreId.value) return canSelectAllStores.value ? '全部分店' : fixedStoreName.value
+  return stores.value.find((store) => String(store.storeId) === String(selectedStoreId.value))?.storeName || fixedStoreName.value
+})
 
 // 依選到的天數值，轉換標題顯示文字
 const selectedRangeLabel = computed(() => {
@@ -325,16 +329,23 @@ onMounted(loadStores)
 <template>
   <div class="content-wrapper">
     <div class="container-xxl flex-grow-1 container-p-y">
-      <div class="d-flex flex-wrap align-items-center gap-3 py-3 mb-4">
-        <h2 class="mb-0">訂位管理總覽<span class="text-muted fw-light"> / Reservation</span></h2>
-        <select v-if="canSelectAllStores || stores.length > 1" v-model="selectedStoreId" class="form-select ms-auto control-select">
-          <option v-if="canSelectAllStores" value="">全部可管理分店</option>
-          <option v-for="store in stores" :key="store.storeId" :value="String(store.storeId)">
-            {{ store.storeName }}
-          </option>
-        </select>
-        <div v-else class="ms-auto text-muted px-3">{{ fixedStoreName }}</div>
-      </div>
+      <header class="admin-ops-header">
+        <div>
+          <span>RESERVATION OPS</span>
+          <h1>訂位管理總覽</h1>
+          <p>查看訂位統計、近期訂位名單與當日入座狀態。</p>
+        </div>
+        <div class="admin-current-store">
+          <small>store</small>
+          <select v-if="canSelectAllStores || stores.length > 1" v-model="selectedStoreId" class="form-select">
+            <option v-if="canSelectAllStores" value="">全部可管理分店</option>
+            <option v-for="store in stores" :key="store.storeId" :value="String(store.storeId)">
+              {{ store.storeName }}
+            </option>
+          </select>
+          <strong v-else>{{ currentStoreLabel }}</strong>
+        </div>
+      </header>
 
       <div v-if="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
       <div v-if="loading" class="alert alert-info">讀取訂位總覽中...</div>
@@ -539,10 +550,6 @@ onMounted(loadStores)
 </template>
 
 <style scoped>
-.control-select {
-  max-width: 250px;
-}
-
 .search-control {
   max-width: 220px;
 }
