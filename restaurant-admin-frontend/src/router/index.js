@@ -16,6 +16,7 @@ import AdminMenuEdit from "@/views/admin/menu/menu-edit.vue";
 import AdminMenuSetting from "@/views/admin/menu/menu-setting.vue";
 import AdminStore from "@/views/admin/store/store.vue";
 import AdminNews from "@/views/admin/news/news.vue";
+import AdminHomepage from "@/views/admin/homepage/HomepageAdmin.vue";
 import AdminMember from "@/views/admin/member/member.vue";
 import AdminOrderManage from "@/views/admin/order/AdminOrderManage.vue";
 import CustomerMenu from "@/views/customer/menu/menu.vue";
@@ -172,6 +173,12 @@ const routers = [
         name: "AdminNews",
         component: AdminNews,
         meta: { roles: MANAGER_ROLES },
+      },
+      {
+        path: "homepage",
+        name: "AdminHomepage",
+        component: AdminHomepage,
+        meta: { roles: ADMIN_ONLY },
       },
     ],
   },

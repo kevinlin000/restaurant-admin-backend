@@ -53,6 +53,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/members/email/verify-code").permitAll()
 
                         // ===== 前台公開查詢 =====
+                        .requestMatchers(HttpMethod.GET, "/api/homepage/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/stores/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/stores/nearby").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/menu-categories/**").permitAll()
@@ -96,6 +97,7 @@ public class SecurityConfig {
 
                         // ===== 後台 API =====
                         // 門市與桌位管理：給 ADMIN、MANAGER
+                        .requestMatchers("/api/admin/homepage/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/admin/stores/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
                         .requestMatchers("/api/admin/tables/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
                         .requestMatchers("/api/admin/news/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")

@@ -66,6 +66,13 @@ const availableFeatures = computed(() => {
       path: "/admin/member",
       roles: ["ADMIN"],
     },
+    {
+      title: "首頁管理",
+      icon: "bx bx-layout",
+      description: "管理首頁 Hero、品牌文案與精選內容。",
+      path: "/admin/homepage",
+      roles: ["ADMIN"],
+    },
   ];
 
   return baseFeatures.filter((feature) => feature.roles.includes(role));
