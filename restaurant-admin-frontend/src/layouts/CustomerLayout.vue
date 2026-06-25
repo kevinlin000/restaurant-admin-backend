@@ -18,11 +18,24 @@ const dropdownItems = computed(() => {
     return [];
   }
 
-  // 前台首頁的下拉選單只呈現「消費者會員」相關功能。
-  // STAFF / MANAGER 雖然有後台權限，但在前台仍視為一般會員顯示。
-  // ADMIN 是共用管理帳號，不提供個人會員頁，因此只保留登出。
-  if (roleName.value === "ADMIN") {
-    return [];
+  // 前台首頁的下拉選單依角色顯示功能。
+  // MEMBER：顯示個人資料、訂位紀錄、消費紀錄。
+  // MANAGER / ADMIN：可以回後台，也可以切回餐廳首頁，但不進會員個人頁。
+  if (roleName.value === "ADMIN" || roleName.value === "MANAGER") {
+    return [
+      {
+        label: "返回後台首頁",
+        path: "/admin",
+        icon: "bi-speedometer2",
+        subtitle: "返回工作總覽",
+        menuClass: "back-office-item",
+      },
+      {
+        label: "前往餐廳首頁",
+        path: "/home",
+        icon: "bi-house",
+      },
+    ];
   }
 
   return [
@@ -79,21 +92,12 @@ const logout = async () => {
         <div class="navbar navbar-expand-lg">
           <!-- Logo -->
           <RouterLink to="/home" class="navbar-brand app-logo">
-            <img
-              src="../assets/images/logo.png"
-              alt="旭日 Logo"
-              class="logo-image"
-            />
+            <img src="../assets/images/logo.png" alt="旭日 Logo" class="logo-image" />
             <span class="logo-text new-tegomin-regular">敘日</span>
           </RouterLink>
 
           <!-- 縮小視窗按鈕 -->
-          <button
-            class="navbar-toggler border-0"
-            type="button"
-            data-bs-toggle="collapse"
-            data-bs-target="#navbarNav"
-          >
+          <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
             <i class="navbar-toggler-icon"></i>
           </button>
 
@@ -132,23 +136,15 @@ const logout = async () => {
               </li>
 
               <li v-else class="nav-item dropdown ms-lg-5">
-                <a
-                  class="login-btn dropdown-toggle"
-                  href="#"
-                  role="button"
-                  data-bs-toggle="dropdown"
-                  aria-expanded="false"
-                >
+                <a class="login-btn dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
+                  aria-expanded="false">
                   <i class="bi bi-person"></i>
                   Hi，{{ userInfo.name }}
                 </a>
 
                 <ul class="dropdown-menu dropdown-menu-end">
                   <li v-for="item in dropdownItems" :key="item.label">
-                    <RouterLink
-                      :class="['dropdown-item', item.menuClass]"
-                      :to="item.path"
-                    >
+                    <RouterLink :class="['dropdown-item', item.menuClass]" :to="item.path">
                       <i v-if="item.icon" :class="['bi', item.icon]"></i>
                       <span class="dropdown-text">
                         <span>{{ item.label }}</span>
@@ -162,11 +158,7 @@ const logout = async () => {
                   </li>
 
                   <li>
-                    <button
-                      class="dropdown-item text-danger"
-                      type="button"
-                      @click="logout"
-                    >
+                    <button class="dropdown-item text-danger" type="button" @click="logout">
                       <i class="bi bi-box-arrow-right me-2"></i>
                       登出
                     </button>
@@ -204,11 +196,30 @@ const logout = async () => {
 @import url("https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=New+Tegomin&display=swap");
 
+.dropdown-menu .back-office-item {
+  background: #e3ac7f;
+  color: white;
+}
+
+.dropdown-menu .back-office-item i {
+  color: white;
+}
+
+.dropdown-menu .back-office-item:hover {
+  background: #d9945f;
+  color: white;
+}
+
+.dropdown-menu .back-office-item:hover i {
+  color: white;
+}
+
 .yuji-boku-regular {
   font-family: "Yuji Boku", serif;
   font-weight: 400;
   font-style: normal;
 }
+
 .new-tegomin-regular {
   font-family: "New Tegomin", serif;
   font-weight: 400 bold;
@@ -387,12 +398,15 @@ const logout = async () => {
   .landing-navbar .navbar {
     border-radius: 16px;
   }
+
   .navbar-collapse {
     padding-top: 20px;
   }
+
   .navbar-nav {
     margin-bottom: 20px;
   }
+
   .navbar-nav .nav-link {
     margin: 10px 0;
   }

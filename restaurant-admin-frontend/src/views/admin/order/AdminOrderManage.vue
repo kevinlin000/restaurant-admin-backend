@@ -125,8 +125,12 @@
     </thead>
 
     <tbody>
-      <tr v-for="order in filteredOrders" :key="order.orderId">
-        <td>#{{ order.orderId }}</td>
+      <tr v-for="order in filteredOrders" :key="order.orderId" :class="{ 'new-order': isNewOrder(order.createdAt) }">
+        <td>#{{ order.orderId }}
+          <span v-if="isNewOrder(order.createdAt)" class="new-badge">
+            NEW
+          </span>
+        </td>
         <td>{{ order.userId }}</td>
         <td>{{ formatOrderType(order.orderType) }}</td>
         <td>${{ order.finalAmount }}</td>
@@ -363,6 +367,16 @@ function onQuickDateChange() {
   currentPage.value = 1
 }
 
+const isNewOrder = (createdAt) => {
+  if (!createdAt) return false
+
+  const now = new Date()
+  const orderTime = new Date(createdAt)
+
+  const diff = (now - orderTime) / 1000
+
+  return diff <= 300
+}
 
 const getPaymentStatusClass = (status) => {
   if (status === 'PAID') return 'payment-paid'
@@ -928,6 +942,46 @@ const formatDate = (date) => {
 </script>
 
 <style scoped>
+.new-badge {
+  margin-left: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ff4d4f;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  animation: pulse 1s infinite;
+}
+
+.new-badge {
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 999px;
+  animation: fadePulse 1.5s infinite;
+}
+
+tr.new-order {
+  background: #fff8dc;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.08);
+    opacity: 0.7;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 .date-range-box {
   display: flex;
   align-items: center;

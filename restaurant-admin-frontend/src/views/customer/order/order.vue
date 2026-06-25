@@ -84,6 +84,8 @@ const customerForm = ref({
     carrierNumber: "",
 });
 
+
+
 const touched = ref({
     customerName: false,
     phone: false,
@@ -475,6 +477,9 @@ function formatOnlyNumber(maxLength) {
         .slice(0, maxLength);
 }
 
+
+
+
 async function submitOrder() {
 
     if (
@@ -563,7 +568,6 @@ async function submitOrder() {
 
     const response = await axios.post("/api/orders", request);
     const orderId = response.data.orderId;
-
     // if (customerForm.value.paymentMethod === "LINE_PAY") {
     //     pusrouter.h(`/payment/linepay/${orderId}`);
     //     return;
@@ -592,7 +596,7 @@ async function submitOrder() {
         await Swal.fire({
             icon: "success",
             title: "訂單建立成功",
-            text: "即將前往 Line Pay 付款頁面",
+            text: "即將前往 LINE Pay 付款頁面",
             confirmButtonText: "前往付款",
             confirmButtonColor: "#e8ad78",
         });
@@ -601,6 +605,20 @@ async function submitOrder() {
             `http://localhost:8080/api/payments/linepay/request/${orderId}`;
         return;
     }
+
+    // if (customerForm.value.paymentMethod === "LINE_PAY") {
+    //     await Swal.fire({
+    //         icon: "success",
+    //         title: "訂單建立成功",
+    //         text: "即將前往 Line Pay 付款頁面",
+    //         confirmButtonText: "前往付款",
+    //         confirmButtonColor: "#e8ad78",
+    //     });
+
+    //     window.location.href =
+    //         `http://localhost:8080/api/payments/linepay/request/${orderId}`;
+    //     return;
+    // }
 
     // 現場付款
     await Swal.fire({
@@ -612,6 +630,9 @@ async function submitOrder() {
         confirmButtonColor: "#e8ad78",
     });
 
+    linePayOrderId.value = null;
+    linePayQr.value = "";
+    linePayUrl.value = "";
     cartItems.value = [];
 
     customerForm.value = {
@@ -843,9 +864,11 @@ onMounted(() => {
                     </div>
 
                     <div v-if="customerForm.paymentMethod === 'LINE_PAY'" class="payment-info-box">
-                        <p>Line Pay 掃碼付款</p>
-                        <div class="fake-qr">QR</div>
-                        <small>Demo 用：正式版會由後端金流 API 產生付款連結或 QR Code。</small>
+                        <p>LINE Pay 付款</p>
+                        <small>
+                            送出訂單後，系統將導向 LINE Pay 付款頁面。
+                            可使用 Sandbox 帳號登入，或掃描 LINE Pay 頁面提供的 QR Code 完成付款。
+                        </small>
                     </div>
 
                     <div v-if="customerForm.paymentMethod === 'CREDIT_CARD'" class="payment-info-box">
@@ -1037,6 +1060,8 @@ onMounted(() => {
 </template>
 
 <style scoped>
+
+
 .required {
     color: #d32f2f;
     font-weight: 700;
