@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.restaurant.order.service.LinePayService;
 import com.restaurant.order.service.PaymentService;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -19,9 +20,13 @@ import jakarta.servlet.http.HttpServletResponse;
 @RequestMapping("/api/payments")
 public class PaymentController {
     private final PaymentService paymentService;
+    private final LinePayService linePayService;
 
-    PaymentController(PaymentService paymentService) {
+    PaymentController(
+            PaymentService paymentService,
+            LinePayService linePayService) {
         this.paymentService = paymentService;
+        this.linePayService = linePayService;
     }
 
     @PostMapping("/{orderId}/success")
@@ -68,8 +73,52 @@ public class PaymentController {
         return "1|OK";
     }
 
+    // @GetMapping("/linepay/success/{orderId}")
+    // public void linePaySuccess(
+    // @PathVariable Long orderId,
+    // HttpServletResponse response) throws IOException {
+
+    // paymentService.simulatePaymentSuccess(orderId);
+
+    // response.setContentType("text/html;charset=UTF-8");
+    // response.getWriter().write(
+    // paymentService.buildPaymentSuccessHtml(orderId));
+    // }
+
+    // @GetMapping("/linepay/request/{orderId}")
+    // public void linePayRequest(
+    // @PathVariable Long orderId,
+    // HttpServletResponse response) throws IOException {
+
+    // String paymentUrl = linePayService.createPaymentUrl(orderId);
+    // response.sendRedirect(paymentUrl);
+    // }
+
+    @GetMapping("/linepay/payment-url/{orderId}")
+    public Map<String, String> linePayPaymentUrl(@PathVariable Long orderId) {
+        String paymentUrl = linePayService.createPaymentUrl(orderId);
+        return Map.of("paymentUrl", paymentUrl);
+    }
+
     @GetMapping("/linepay/request/{orderId}")
-    public String linePayRequest(@PathVariable Long orderId) {
-        return paymentService.createLinePayRequest(orderId);
+    public void linePayRequest(
+            @PathVariable Long orderId,
+            HttpServletResponse response) throws IOException {
+
+        String paymentUrl = linePayService.createPaymentUrl(orderId);
+        response.sendRedirect(paymentUrl);
+    }
+
+    @GetMapping("/linepay/confirm")
+    public void linePayConfirm(
+            @RequestParam Long orderId,
+            @RequestParam String transactionId,
+            HttpServletResponse response) throws IOException {
+
+        linePayService.confirmPayment(orderId, transactionId);
+
+        response.setContentType("text/html;charset=UTF-8");
+        response.getWriter().write(
+                paymentService.buildPaymentSuccessHtml(orderId));
     }
 }
