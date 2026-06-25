@@ -465,8 +465,30 @@ onMounted(() => {
   }
 
   .support-panel {
-    width: min(360px, calc(100vw - 24px));
-    max-height: calc(100vh - 96px);
+    position: fixed;
+    right: 12px;
+    bottom: 82px;
+    left: 12px;
+    width: auto;
+    max-height: min(74vh, 620px);
+    border-radius: 18px;
+  }
+
+  .support-header {
+    padding: 18px 18px 16px;
+  }
+
+  .support-body {
+    gap: 12px;
+    padding: 14px 14px 16px;
+  }
+
+  .message-bubble {
+    max-width: 100%;
+  }
+
+  .support-footer {
+    padding: 12px 14px 14px;
   }
 
   .support-toggle {

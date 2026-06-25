@@ -144,6 +144,13 @@ onMounted(loadFaqs);
           </p>
         </div>
 
+        <div class="service-notes" aria-label="用餐須知摘要">
+          <article v-for="note in policyNotes" :key="note.title">
+            <span>{{ note.title }}</span>
+            <p>{{ note.text }}</p>
+          </article>
+        </div>
+
         <div v-if="loading" class="faq-state">載入 FAQ 中...</div>
         <div v-else-if="errorMessage" class="faq-state danger">{{ errorMessage }}</div>
         <div v-else-if="!filteredFaqs.length" class="faq-state">
@@ -151,6 +158,11 @@ onMounted(loadFaqs);
         </div>
 
         <div v-else class="faq-list">
+          <div class="faq-toolbar">
+            <span>顯示 {{ visibleFaqs.length }} / {{ filteredFaqs.length }} 則</span>
+            <small v-if="searchText.trim()">搜尋「{{ searchText.trim() }}」</small>
+          </div>
+
           <article
             v-for="faq in visibleFaqs"
             :key="faq.faqId"
@@ -175,17 +187,6 @@ onMounted(loadFaqs);
           </button>
         </div>
       </section>
-
-      <aside class="policy-panel">
-        <span>Before Dining</span>
-        <h2>訂位與用餐須知</h2>
-        <ul>
-          <li v-for="note in policyNotes" :key="note.title">
-            <strong>{{ note.title }}</strong>
-            <small>{{ note.text }}</small>
-          </li>
-        </ul>
-      </aside>
     </section>
   </main>
 </template>
@@ -212,8 +213,7 @@ onMounted(loadFaqs);
 
 .eyebrow,
 .side-label,
-.faq-summary span,
-.policy-panel span {
+.faq-summary span {
   color: #b7774d;
   font-size: 12px;
   font-weight: 800;
@@ -265,16 +265,15 @@ onMounted(loadFaqs);
 
 .faq-shell {
   display: grid;
-  grid-template-columns: 252px minmax(0, 1fr) 292px;
+  grid-template-columns: 252px minmax(0, 1fr);
   gap: 24px;
-  width: min(1180px, calc(100% - 48px));
+  width: min(1120px, calc(100% - 48px));
   margin: -36px auto 96px;
   align-items: start;
 }
 
 .faq-side,
-.faq-content,
-.policy-panel {
+.faq-content {
   border: 1px solid #dfd3c7;
   background: #fffdf9;
 }
@@ -332,8 +331,7 @@ onMounted(loadFaqs);
   padding-bottom: 26px;
 }
 
-.faq-summary h2,
-.policy-panel h2 {
+.faq-summary h2 {
   margin: 6px 0 0;
   color: #2f2924;
   font-family: "Noto Serif TC", serif;
@@ -348,10 +346,59 @@ onMounted(loadFaqs);
   line-height: 1.7;
 }
 
+.service-notes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 24px;
+  border-top: 1px solid #e1d6cb;
+  border-bottom: 1px solid #e1d6cb;
+}
+
+.service-notes article {
+  min-width: 0;
+  padding: 16px 18px;
+}
+
+.service-notes article + article {
+  border-left: 1px solid #e8ded4;
+}
+
+.service-notes span {
+  display: block;
+  color: #9a5d35;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.service-notes p {
+  margin: 8px 0 0;
+  color: #615850;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
 .faq-list {
   display: grid;
   gap: 12px;
   margin-top: 26px;
+}
+
+.faq-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: #8a7768;
+  font-size: 13px;
+}
+
+.faq-toolbar span {
+  font-weight: 800;
+}
+
+.faq-toolbar small {
+  min-width: 0;
+  color: #9a5d35;
 }
 
 .faq-item {
@@ -424,53 +471,29 @@ onMounted(loadFaqs);
   color: #9b2f1f;
 }
 
-.policy-panel {
-  position: sticky;
-  top: 126px;
-  padding: 24px 24px 26px;
-}
-
-.policy-panel ul {
-  display: grid;
-  gap: 14px;
-  margin: 22px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.policy-panel li {
-  border-top: 1px solid #eaded2;
-  padding-top: 14px;
-}
-
-.policy-panel li strong,
-.policy-panel li small {
-  display: block;
-}
-
-.policy-panel li strong {
-  color: #2f2924;
-  font-size: 15px;
-}
-
-.policy-panel li small {
-  margin-top: 5px;
-  color: #615850;
-  line-height: 1.7;
-}
-
 @media (max-width: 1080px) {
   .faq-shell {
     grid-template-columns: 1fr;
   }
 
-  .faq-side,
-  .policy-panel {
+  .faq-side {
     position: static;
   }
 
   .faq-side {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .service-notes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .service-notes article:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .service-notes article:nth-child(n + 3) {
+    border-top: 1px solid #e8ded4;
   }
 }
 
@@ -484,12 +507,65 @@ onMounted(loadFaqs);
     width: min(100% - 32px, 1180px);
   }
 
+  .faq-shell {
+    gap: 14px;
+    margin-bottom: 72px;
+  }
+
   .faq-side {
-    grid-template-columns: 1fr;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    width: calc(100% + 32px);
+    margin-inline: -16px;
+    padding: 10px 16px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+
+  .faq-side::-webkit-scrollbar {
+    display: none;
+  }
+
+  .faq-side .side-label {
+    flex: 0 0 auto;
+    align-self: center;
+    margin: 0 2px 0 0;
+    white-space: nowrap;
+  }
+
+  .faq-side button {
+    flex: 0 0 142px;
+    min-height: 58px;
+    padding: 10px 34px 10px 12px;
+    scroll-snap-align: start;
+  }
+
+  .faq-side small {
+    display: none;
+  }
+
+  .faq-side em {
+    top: 12px;
+    right: 12px;
+  }
+
+  .faq-content {
+    padding: 24px 18px 28px;
   }
 
   .faq-summary {
     display: grid;
+  }
+
+  .service-notes {
+    grid-template-columns: 1fr;
+  }
+
+  .service-notes article + article,
+  .service-notes article:nth-child(n + 3) {
+    border-top: 1px solid #e8ded4;
+    border-left: 0;
   }
 
   .faq-item button {
@@ -500,5 +576,8 @@ onMounted(loadFaqs);
     grid-column: 1 / -1;
   }
 
+  .faq-toolbar {
+    display: grid;
+  }
 }
 </style>
