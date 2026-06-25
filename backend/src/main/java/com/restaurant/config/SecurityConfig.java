@@ -59,6 +59,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/menu-items/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/menu-component/stores/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/news/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/faqs/**").permitAll()
 
                         // ===== 前台訂位（允許未登入訂位）=====
                         .requestMatchers(HttpMethod.GET, "/api/reservations/slots/**").permitAll()
@@ -99,6 +100,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/stores/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
                         .requestMatchers("/api/admin/tables/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
                         .requestMatchers("/api/admin/news/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
+                        .requestMatchers("/api/admin/faqs/**").hasAuthority("ROLE_ADMIN")
 
                         // 後台訂位管理：給 STAFF、MANAGER、ADMIN
                         .requestMatchers("/api/admin/reservations/**")

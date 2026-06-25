@@ -16,12 +16,14 @@ import AdminMenuEdit from "@/views/admin/menu/menu-edit.vue";
 import AdminMenuSetting from "@/views/admin/menu/menu-setting.vue";
 import AdminStore from "@/views/admin/store/store.vue";
 import AdminNews from "@/views/admin/news/news.vue";
+import AdminFaq from "@/views/admin/faq/faq.vue";
 import AdminMember from "@/views/admin/member/member.vue";
 import AdminOrderManage from "@/views/admin/order/AdminOrderManage.vue";
 import CustomerMenu from "@/views/customer/menu/menu.vue";
 import CustomerOrder from "@/views/customer/order/order.vue";
 import CustomerStore from "@/views/customer/store/store.vue";
 import CustomerNews from "@/views/customer/news/news.vue";
+import CustomerFaq from "@/views/customer/faq/faq.vue";
 
 const ROLE = {
   STAFF: "STAFF",
@@ -75,6 +77,11 @@ const routers = [
         path: "news",
         name: "CustomerNews",
         component: CustomerNews,
+      },
+      {
+        path: "faq",
+        name: "CustomerFaq",
+        component: CustomerFaq,
       },
       {
         path: "login",
@@ -172,6 +179,12 @@ const routers = [
         name: "AdminNews",
         component: AdminNews,
         meta: { roles: MANAGER_ROLES },
+      },
+      {
+        path: "faqs",
+        name: "AdminFaq",
+        component: AdminFaq,
+        meta: { roles: ADMIN_ONLY },
       },
     ],
   },
