@@ -20,6 +20,7 @@ const quickPrompts = [
 ];
 
 const visibleAnswers = computed(() => (results.value.length ? results.value : suggestions.value));
+const answerCount = computed(() => visibleAnswers.value.length);
 
 const openChat = () => {
   isOpen.value = true;
@@ -67,64 +68,83 @@ onMounted(() => {
       <section v-if="isOpen" class="support-panel" aria-label="敘日服務台">
         <header class="support-header">
           <div>
-            <span>FAQ Desk</span>
+            <span>Live FAQ Desk</span>
             <h2>敘日服務台</h2>
+            <small>訂位、訂金、外帶與門市規則</small>
           </div>
           <button type="button" class="icon-btn" aria-label="關閉客服視窗" @click="closeChat">
             <i class="bi bi-x-lg"></i>
           </button>
         </header>
 
-        <div class="support-intro">
-          <p>查詢訂位、訂金、外帶與門市規則。回覆來源為已發布常見問答。</p>
-        </div>
-
-        <form class="support-search" @submit.prevent="submitSearch">
-          <label class="visually-hidden" for="support-query">搜尋問題</label>
-          <input
-            id="support-query"
-            v-model="query"
-            type="search"
-            placeholder="輸入關鍵字或問題"
-          />
-          <button type="submit" :disabled="loading">
-            <i class="bi bi-search"></i>
-          </button>
-        </form>
-
-        <div class="quick-prompts">
-          <span>常用查詢</span>
-          <button
-            v-for="prompt in quickPrompts"
-            :key="prompt"
-            type="button"
-            @click="search(prompt)"
-          >
-            {{ prompt }}
-          </button>
-        </div>
-
         <div class="support-body">
-          <div v-if="loading" class="support-state">查詢中...</div>
-          <div v-else-if="errorMessage" class="support-state danger">{{ errorMessage }}</div>
-          <div v-else-if="hasSearched && !results.length" class="support-state">
-            沒有完全相符的規則。可換個關鍵字，或前往完整 FAQ 查看所有條款。
+          <div class="message-row assistant">
+            <div class="assistant-avatar">敘</div>
+            <div class="message-bubble">
+              <strong>想確認哪一項規則？</strong>
+              <p>我會從已發布的 FAQ 裡找最接近的答案，適合快速確認訂位、訂金、外帶與門市資訊。</p>
+              <div class="quick-prompts">
+                <button
+                  v-for="prompt in quickPrompts"
+                  :key="prompt"
+                  type="button"
+                  @click="search(prompt)"
+                >
+                  {{ prompt }}
+                </button>
+              </div>
+            </div>
           </div>
 
-          <div class="support-section-label">
-            {{ results.length ? "查詢結果" : "推薦規則" }}
+          <div v-if="hasSearched" class="message-row guest">
+            <div class="message-bubble">{{ query }}</div>
           </div>
 
-          <article v-for="item in visibleAnswers" :key="item.faqId" class="answer-card">
-            <span>{{ item.categoryLabel }}</span>
-            <h3>{{ item.question }}</h3>
-            <p>{{ item.answer }}</p>
-            <small>已發布 FAQ</small>
-          </article>
+          <div v-if="loading" class="message-row assistant">
+            <div class="assistant-avatar">敘</div>
+            <div class="message-bubble muted">正在查詢規則...</div>
+          </div>
+
+          <div v-else-if="errorMessage" class="message-row assistant">
+            <div class="assistant-avatar">敘</div>
+            <div class="message-bubble danger">{{ errorMessage }}</div>
+          </div>
+
+          <div v-else-if="hasSearched && !results.length" class="message-row assistant">
+            <div class="assistant-avatar">敘</div>
+            <div class="message-bubble">
+              <strong>目前沒有完全相符的規則</strong>
+              <p>可以換個關鍵字，或到完整 FAQ 看所有訂位、付款與門市條款。</p>
+            </div>
+          </div>
+
+          <div v-else class="message-row assistant">
+            <div class="assistant-avatar">敘</div>
+            <div class="message-bubble result-bubble">
+              <strong>{{ results.length ? `找到 ${answerCount} 則相關規則` : "先給你幾個常用規則" }}</strong>
+              <article v-for="item in visibleAnswers" :key="item.faqId" class="answer-card">
+                <span>{{ item.categoryLabel }}</span>
+                <h3>{{ item.question }}</h3>
+                <p>{{ item.answer }}</p>
+              </article>
+            </div>
+          </div>
         </div>
 
         <footer class="support-footer">
-          <button type="button" @click="goFaq">查看完整 FAQ</button>
+          <form class="support-search" @submit.prevent="submitSearch">
+            <label class="visually-hidden" for="support-query">搜尋問題</label>
+            <input
+              id="support-query"
+              v-model="query"
+              type="search"
+              placeholder="輸入問題，例如：訂金可以退嗎？"
+            />
+            <button type="submit" :disabled="loading" aria-label="送出查詢">
+              <i class="bi bi-send"></i>
+            </button>
+          </form>
+          <button type="button" class="faq-link" @click="goFaq">查看完整 FAQ</button>
         </footer>
       </section>
 
@@ -135,8 +155,13 @@ onMounted(() => {
         aria-label="開啟敘日服務台"
         @click="openChat"
       >
-        <i class="bi bi-chat-dots"></i>
-        <span>客服</span>
+        <span class="support-toggle-icon">
+          <i class="bi bi-chat-dots"></i>
+        </span>
+        <span class="support-toggle-copy">
+          <strong>問問敘日</strong>
+          <small>FAQ 快速查詢</small>
+        </span>
       </button>
     </div>
   </Teleport>
@@ -154,39 +179,80 @@ onMounted(() => {
 .support-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 48px;
-  border: 1px solid rgba(46, 33, 24, 0.12);
+  gap: 12px;
+  min-height: 58px;
+  border: 1px solid rgba(220, 168, 116, 0.46);
   border-radius: 999px;
-  background: #211814;
+  background: #241914;
   color: #fff;
-  padding: 0 18px;
+  padding: 0 20px 0 12px;
   font-weight: 700;
-  box-shadow: 0 18px 42px rgba(22, 14, 9, 0.24);
+  box-shadow: 0 18px 42px rgba(22, 14, 9, 0.34);
+}
+
+.support-toggle-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: #dca874;
+  color: #241914;
+}
+
+.support-toggle-icon::after {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #241914;
+  border-radius: 999px;
+  background: #5fd18a;
+  content: "";
+}
+
+.support-toggle-copy {
+  display: grid;
+  gap: 1px;
+  text-align: left;
+}
+
+.support-toggle-copy strong {
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.support-toggle-copy small {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .support-panel {
   position: absolute;
   right: 0;
-  bottom: 64px;
+  bottom: 76px;
   display: grid;
-  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
-  width: min(380px, calc(100vw - 32px));
-  max-height: min(680px, calc(100vh - 120px));
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 120px));
   overflow: hidden;
   border: 1px solid #ded4ca;
-  background: #fffdf9;
-  box-shadow: 0 30px 80px rgba(20, 14, 9, 0.28);
+  border-radius: 18px;
+  background: #f8f2ea;
+  box-shadow: 0 30px 80px rgba(20, 14, 9, 0.34);
 }
 
 .support-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background:
-    linear-gradient(90deg, rgba(33, 24, 20, 0.98), rgba(54, 38, 31, 0.98));
+  background: #2a1d18;
   color: #fff;
-  padding: 18px 20px;
+  padding: 20px 22px;
 }
 
 .support-header span {
@@ -201,34 +267,28 @@ onMounted(() => {
   margin: 4px 0 0;
   color: #fff;
   font-family: "Noto Serif TC", serif;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 700;
 }
 
+.support-header small {
+  display: block;
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+}
+
 .icon-btn {
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: transparent;
   color: #fff;
 }
 
-.support-intro {
-  border-bottom: 1px solid #eaded2;
-  padding: 15px 20px;
-}
-
-.support-intro p {
-  margin: 0;
-  color: #675c54;
-  font-size: 14px;
-  line-height: 1.7;
-}
-
 .support-search {
   display: grid;
   grid-template-columns: 1fr 46px;
-  margin: 16px 20px 10px;
   border: 1px solid #d8cbbf;
   background: #fff;
 }
@@ -256,55 +316,100 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 0 20px 16px;
-}
-
-.quick-prompts span {
-  flex: 0 0 100%;
-  color: #9a5d35;
-  font-size: 12px;
-  font-weight: 800;
+  margin-top: 14px;
 }
 
 .quick-prompts button {
   border: 1px solid #dccdbf;
-  background: #fbf6ef;
+  border-radius: 999px;
+  background: #fffdf9;
   color: #7c6250;
-  padding: 7px 10px;
+  padding: 8px 12px;
   font-size: 13px;
+  text-align: left;
 }
 
 .support-body {
   display: grid;
-  gap: 10px;
+  align-content: start;
+  gap: 14px;
   overflow: auto;
   min-height: 0;
-  padding: 0 20px 18px;
+  padding: 18px 20px 20px;
 }
 
-.support-section-label {
+.message-row {
+  display: flex;
+  gap: 10px;
+}
+
+.message-row.guest {
+  justify-content: flex-end;
+}
+
+.assistant-avatar {
+  display: grid;
+  flex: 0 0 34px;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #dfc5ae;
+  border-radius: 999px;
+  background: #fffdf9;
   color: #9a5d35;
-  font-size: 12px;
+  font-family: "Noto Serif TC", serif;
   font-weight: 800;
 }
 
-.support-state {
-  border: 1px dashed #d8cbbf;
-  background: #fff;
+.message-bubble {
+  max-width: min(320px, 100%);
+  border: 1px solid #e0d2c5;
+  border-radius: 16px;
+  border-top-left-radius: 4px;
+  background: #fffdf9;
   color: #6f6259;
-  padding: 14px;
+  padding: 14px 15px;
   font-size: 14px;
   line-height: 1.6;
 }
 
-.support-state.danger {
+.message-row.guest .message-bubble {
+  border-color: #c98e63;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 4px;
+  background: #fff3e5;
+  color: #2f2924;
+  font-weight: 700;
+}
+
+.message-bubble strong {
+  display: block;
+  color: #2f2924;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.message-bubble p {
+  margin: 8px 0 0;
+}
+
+.message-bubble.muted {
+  color: #6f6259;
+}
+
+.message-bubble.danger {
   color: #9b2f1f;
+}
+
+.result-bubble {
+  display: grid;
+  gap: 10px;
 }
 
 .answer-card {
   border: 1px solid #e2d8ce;
   background: #fff;
-  padding: 15px 16px;
+  padding: 13px 14px;
 }
 
 .answer-card span {
@@ -328,26 +433,18 @@ onMounted(() => {
   line-height: 1.75;
 }
 
-.answer-card small {
-  display: block;
-  margin-top: 12px;
-  border-top: 1px solid #efe6dc;
-  color: #8b7a6d;
-  font-size: 12px;
-  padding-top: 10px;
-}
-
 .support-footer {
   border-top: 1px solid #ded4ca;
-  background: #fffaf4;
-  padding: 14px 20px;
+  background: #fffdf9;
+  padding: 14px 20px 16px;
 }
 
-.support-footer button {
+.faq-link {
   width: 100%;
-  min-height: 42px;
-  border: 1px solid #c98e63;
-  background: #fff;
+  min-height: 38px;
+  margin-top: 10px;
+  border: 0;
+  background: transparent;
   color: #8a512d;
   font-weight: 800;
 }
@@ -363,12 +460,22 @@ onMounted(() => {
 
 @media (max-width: 640px) {
   .support-widget {
-    right: 16px;
-    bottom: 16px;
+    right: 14px;
+    bottom: 14px;
   }
 
   .support-panel {
+    width: min(360px, calc(100vw - 24px));
     max-height: calc(100vh - 96px);
+  }
+
+  .support-toggle {
+    min-height: 52px;
+    padding-right: 16px;
+  }
+
+  .support-toggle-copy small {
+    display: none;
   }
 }
 </style>

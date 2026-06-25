@@ -1,6 +1,8 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { faqApi } from "@/api/faq";
+
+const INITIAL_VISIBLE_COUNT = 8;
 
 const faqs = ref([]);
 const loading = ref(false);
@@ -8,6 +10,7 @@ const errorMessage = ref("");
 const selectedCategory = ref("ALL");
 const searchText = ref("");
 const openedId = ref(null);
+const visibleCount = ref(INITIAL_VISIBLE_COUNT);
 
 const categories = [
   { value: "ALL", label: "全部", note: "所有規則" },
@@ -26,8 +29,6 @@ const policyNotes = [
   { title: "訂金確認", text: "特殊餐期、包廂或大人數訂位可能需於期限內完成付款。" },
   { title: "現場為準", text: "營業異動、候位與特殊需求，仍以當日門市回覆為準。" },
 ];
-
-const featuredFaqs = computed(() => faqs.value.filter((faq) => faq.isFeatured).slice(0, 6));
 
 const activeCategory = computed(() =>
   categoryCounts.value.find((category) => category.value === selectedCategory.value),
@@ -55,6 +56,12 @@ const categoryCounts = computed(() =>
   })),
 );
 
+const visibleFaqs = computed(() => filteredFaqs.value.slice(0, visibleCount.value));
+
+const remainingFaqCount = computed(() =>
+  Math.max(filteredFaqs.value.length - visibleFaqs.value.length, 0),
+);
+
 const loadFaqs = async () => {
   loading.value = true;
   errorMessage.value = "";
@@ -69,9 +76,21 @@ const loadFaqs = async () => {
   }
 };
 
+const selectCategory = (category) => {
+  selectedCategory.value = category;
+};
+
 const toggleFaq = (faqId) => {
   openedId.value = openedId.value === faqId ? null : faqId;
 };
+
+const showMoreFaqs = () => {
+  visibleCount.value += 8;
+};
+
+watch([selectedCategory, searchText], () => {
+  visibleCount.value = INITIAL_VISIBLE_COUNT;
+});
 
 onMounted(loadFaqs);
 </script>
@@ -106,7 +125,7 @@ onMounted(loadFaqs);
           :key="category.value"
           type="button"
           :class="{ active: selectedCategory === category.value }"
-          @click="selectedCategory = category.value"
+          @click="selectCategory(category.value)"
         >
           <strong>{{ category.label }}</strong>
           <small>{{ category.note }}</small>
@@ -125,17 +144,6 @@ onMounted(loadFaqs);
           </p>
         </div>
 
-        <div v-if="featuredFaqs.length" class="featured-list" aria-label="常用規則">
-          <div class="featured-list-head">
-            <span>常用規則</span>
-            <small>顧客最常確認的餐期與服務條款</small>
-          </div>
-          <article v-for="faq in featuredFaqs" :key="faq.faqId">
-            <span>{{ faq.categoryLabel }}</span>
-            <strong>{{ faq.question }}</strong>
-          </article>
-        </div>
-
         <div v-if="loading" class="faq-state">載入 FAQ 中...</div>
         <div v-else-if="errorMessage" class="faq-state danger">{{ errorMessage }}</div>
         <div v-else-if="!filteredFaqs.length" class="faq-state">
@@ -144,7 +152,7 @@ onMounted(loadFaqs);
 
         <div v-else class="faq-list">
           <article
-            v-for="faq in filteredFaqs"
+            v-for="faq in visibleFaqs"
             :key="faq.faqId"
             class="faq-item"
             :class="{ open: openedId === faq.faqId }"
@@ -156,6 +164,15 @@ onMounted(loadFaqs);
             </button>
             <p v-show="openedId === faq.faqId">{{ faq.answer }}</p>
           </article>
+
+          <button
+            v-if="remainingFaqCount"
+            type="button"
+            class="faq-more"
+            @click="showMoreFaqs"
+          >
+            再顯示 {{ Math.min(remainingFaqCount, 8) }} 則
+          </button>
         </div>
       </section>
 
@@ -196,7 +213,6 @@ onMounted(loadFaqs);
 .eyebrow,
 .side-label,
 .faq-summary span,
-.featured-list span,
 .policy-panel span {
   color: #b7774d;
   font-size: 12px;
@@ -332,46 +348,10 @@ onMounted(loadFaqs);
   line-height: 1.7;
 }
 
-.featured-list {
-  display: grid;
-  grid-template-columns: 1fr;
-  margin: 26px 0;
-  border: 1px solid #e3d8cd;
-  background: #fffaf4;
-}
-
-.featured-list-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  border-bottom: 1px solid #e3d8cd;
-  padding: 14px 18px;
-}
-
-.featured-list-head small {
-  color: #75685d;
-  line-height: 1.6;
-}
-
-.featured-list article {
-  display: grid;
-  grid-template-columns: 128px minmax(0, 1fr);
-  gap: 18px;
-  padding: 16px 18px;
-}
-
-.featured-list article + article {
-  border-top: 1px solid #eaded2;
-}
-
-.featured-list strong {
-  color: #2f2924;
-  line-height: 1.55;
-}
-
 .faq-list {
   display: grid;
   gap: 12px;
+  margin-top: 26px;
 }
 
 .faq-item {
@@ -419,6 +399,18 @@ onMounted(loadFaqs);
   color: #615850;
   padding: 20px;
   line-height: 1.9;
+}
+
+.faq-more {
+  min-height: 48px;
+  border: 1px solid #c98e63;
+  background: #fff;
+  color: #8a512d;
+  font-weight: 800;
+}
+
+.faq-more:hover {
+  background: #fff3e5;
 }
 
 .faq-state {
@@ -492,8 +484,7 @@ onMounted(loadFaqs);
     width: min(100% - 32px, 1180px);
   }
 
-  .faq-side,
-  .featured-list {
+  .faq-side {
     grid-template-columns: 1fr;
   }
 
@@ -509,9 +500,5 @@ onMounted(loadFaqs);
     grid-column: 1 / -1;
   }
 
-  .featured-list article,
-  .featured-list-head {
-    grid-template-columns: 1fr;
-  }
 }
 </style>
