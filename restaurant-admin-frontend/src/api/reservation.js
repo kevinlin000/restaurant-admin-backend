@@ -42,6 +42,11 @@ export const reservationApi = {
   cancelReservation(reservationId) {
     return http.delete(`/reservations/${reservationId}`)
   },
+
+  // 取得訂位訂金付款頁網址
+  depositCheckoutUrl(reservationId) {
+    return `http://localhost:8080/api/reservation-payments/ecpay/checkout/${reservationId}`
+  },
 }
 
 // ========== 後台訂位管理 API (訂位總覽、訂位名單、分配桌位) ==========

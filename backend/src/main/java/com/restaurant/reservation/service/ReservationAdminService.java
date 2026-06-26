@@ -227,6 +227,7 @@ public class ReservationAdminService {
                 .orElseThrow(() -> new ResourceNotFoundException("訂位", reservationId));
     }
 
+    // 過濾顯示的狀態
     private boolean isCountableReservation(ReservationResponse item) {
         return !"CANCELLED".equals(item.getStatus())
                 && !"NO_SHOW".equals(item.getStatus())

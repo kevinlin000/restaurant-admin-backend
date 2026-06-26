@@ -298,7 +298,7 @@ onBeforeUnmount(() => {
       <div class="card">
         <!-- 查詢篩選 -->
         <div class="card-header d-flex flex-wrap align-items-center gap-2">
-          <h5 class="mb-0">桌位分配名單</h5>
+          <h5 class="mb-0">桌位分配名單<span class="text-muted fs-5 fw-normal"> / Table List </span></h5>
           <div class="multi-select dropdown-closable date-select ms-auto" @click.stop>
             <button type="button" class="form-select text-start" @click="showDateRangeDropdown = !showDateRangeDropdown">
               {{ selectedDateRangeText }}
@@ -435,11 +435,11 @@ onBeforeUnmount(() => {
                         <button
                           v-if="item.status === 'ASSIGNED' && !reassigningReservations[item.reservationId]"
                           type="button"
-                          class="btn btn-sm btn-label-primary"
+                          class="btn btn-sm btn-outline-dark"
                           @click="startReassign(item)">
                           重新配桌
                         </button>
-                        <button v-else type="button" class="btn btn-sm btn-primary" @click="assignTable(item.reservationId)">
+                        <button v-else type="button" class="btn btn-sm btn-dark" @click="assignTable(item.reservationId)">
                           分配
                         </button>
                         <button

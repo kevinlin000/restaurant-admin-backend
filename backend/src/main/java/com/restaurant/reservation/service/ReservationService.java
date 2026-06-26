@@ -20,12 +20,16 @@ import com.restaurant.store.repository.StoreHourRepository;
 // import com.restaurant.store.repository.StoreRepository;
 import com.restaurant.store.repository.TableInfoRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -85,7 +89,20 @@ public class ReservationService {
             throw new BusinessException("訂位分店與時段分店不一致");
         }
         validateWithinBusinessHours(slot);
+        BigDecimal depositAmount = resolveReservationDepositAmount(slot);
+        String paymentStatus = depositAmount.compareTo(BigDecimal.ZERO) > 0 ? "UNPAID" : "NOT_REQUIRED";
+        Reservation reservation = createReservationRecord(request, slot, depositAmount, paymentStatus);
+        ReservationResponse response = toResponse(reservation);
+        if ("UNPAID".equals(paymentStatus)) {
+            sendReservationPaymentPendingEmailAfterCommit(response);
+        } else {
+            sendReservationCreatedEmailAfterCommit(response);
+        }
+        return response;
+    }
 
+    // 需訂金也會先建立 UNPAID 訂位並扣容量，避免付款期間超賣
+    private Reservation createReservationRecord(CreateReservationRequest request, TimeSlot slot, BigDecimal depositAmount, String paymentStatus) {
         ReservationCapacity selected = capacityRepository
                 .findFirstBySlotIdAndTableSizeGreaterThanEqualOrderByTableSizeAsc(slot.getSlotId(), request.getPartySize())
                 .orElseThrow(() -> new BusinessException("此人數目前沒有可訂桌位"));
@@ -105,16 +122,27 @@ public class ReservationService {
                 .slotId(request.getSlotId())
                 .partySize(request.getPartySize())
                 .status("PENDING")
+                .depositAmount(depositAmount == null ? BigDecimal.ZERO : depositAmount)
+                .paymentStatus(paymentStatus)
                 .customerName(request.getCustomerName())
                 .customerPhone(request.getCustomerPhone())
                 .customerEmail(request.getCustomerEmail())
                 .accessToken(generateReservationAccessToken())
                 .specialRequest(request.getSpecialRequest())
                 .build());
-        // 寄訂位成功 gmail
-        ReservationResponse response = toResponse(reservation);
-        sendReservationCreatedEmailAfterCommit(response);
-        return response;
+        return reservation;
+    }
+
+    // 依時段設定是否需要訂金；需要訂金時會先建立 UNPAID 訂位，扣除桌位容量
+    private BigDecimal resolveReservationDepositAmount(TimeSlot slot) {
+        if (!Boolean.TRUE.equals(slot.getRequiresDeposit())) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal depositAmount = slot.getDepositAmount() == null ? BigDecimal.ZERO : slot.getDepositAmount();
+        if (depositAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("訂金金額設定錯誤");
+        }
+        return depositAmount;
     }
 
     // 讀取單筆訂位：給訂位成功頁、編輯頁使用
@@ -235,6 +263,30 @@ public class ReservationService {
                 });
     }
 
+    // ＊每分鐘檢查一次：訂金訂位建立後超過 1 小時仍未付款，就自動取消並釋放容量＊
+    @Scheduled(fixedDelay = 60_000)
+    @Transactional
+    public void cancelExpiredUnpaidDepositReservations() {
+        LocalDateTime deadline = LocalDateTime.now().minusHours(1);
+        reservationRepository.findExpiredUnpaidDepositReservations(deadline).forEach(reservation -> {
+            cancelExpiredUnpaidDepositReservationNow(reservation.getReservationId());
+        });
+    }
+
+    // ＊付款頁檢查到逾時時也會呼叫；新交易可避免後續拋錯導致取消被 rollback＊
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void cancelExpiredUnpaidDepositReservationNow(Long reservationId) {
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ResourceNotFoundException("訂位", reservationId));
+        if ("CANCELLED".equals(reservation.getStatus()) || "PAID".equals(reservation.getPaymentStatus())) {
+            return;
+        }
+        releaseCapacity(reservation.getSlotId(), reservation.getPartySize());
+        reservationTableRepository.deleteByReservationId(reservation.getReservationId());
+        reservation.setStatus("CANCELLED");
+        reservationRepository.save(reservation);
+    }
+
     // 分店營業時間判斷
     private boolean isWithinBusinessHours(TimeSlot slot) {
         if (slot == null || slot.getReservationDate() == null || slot.getStartTime() == null || slot.getEndTime() == null) {
@@ -273,6 +325,21 @@ public class ReservationService {
         });
     }
 
+    // 寄待付款信，讓顧客一小時內能從信件連結回成功頁繼續付款
+    private void sendReservationPaymentPendingEmailAfterCommit(ReservationResponse response) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            reservationEmailService.sendReservationPaymentPendingEmail(response);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                reservationEmailService.sendReservationPaymentPendingEmail(response);
+            }
+        });
+    }
+
     // AccessToken
     private String generateReservationAccessToken() {
         String token;
@@ -305,6 +372,7 @@ public class ReservationService {
                 .endTime(slot == null ? null : slot.getEndTime())
                 .partySize(reservation.getPartySize())
                 .status(reservation.getStatus())
+                .depositAmount(reservation.getDepositAmount())
                 .paymentStatus(reservation.getPaymentStatus())
                 .specialRequest(reservation.getSpecialRequest())
                 .customerName(reservation.getCustomerName())

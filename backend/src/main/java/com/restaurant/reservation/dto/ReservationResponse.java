@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -30,6 +31,7 @@ public class ReservationResponse {
     // 其他訂位基本資料、狀態
     private Integer partySize;
     private String status;
+    private BigDecimal depositAmount;
     private String paymentStatus;
     private String specialRequest;
     private String customerName;

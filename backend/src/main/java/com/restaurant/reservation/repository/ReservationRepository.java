@@ -4,8 +4,10 @@ import com.restaurant.reservation.entity.Reservation;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
@@ -47,6 +49,17 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     Optional<Reservation> findByReservationIdAndAccessToken(Long reservationId, String accessToken);
 
     boolean existsByAccessToken(String accessToken);
+
+    // 訂金訂位超過付款期限仍未付款時，由排程自動取消並釋放容量。
+    @Query("""
+            select r
+            from Reservation r
+            where r.depositAmount > 0
+              and r.paymentStatus = 'UNPAID'
+              and r.status <> 'CANCELLED'
+              and r.createdAt <= :deadline
+            """)
+    List<Reservation> findExpiredUnpaidDepositReservations(@Param("deadline") LocalDateTime deadline);
 
     // 分配桌位時檢查同一時段其他訂位，避免同一桌被重複分配
     List<Reservation> findBySlotIdAndReservationIdNot(Long slotId, Long reservationId);

@@ -228,6 +228,8 @@ CREATE TABLE time_slot (
     end_time        TIME NOT NULL COMMENT '時段結束',
     is_open         BOOLEAN NOT NULL DEFAULT TRUE COMMENT '是否開放訂位',
     is_rule_generated BOOLEAN NOT NULL DEFAULT FALSE COMMENT '是否由星期規則批次產生',
+    requires_deposit BOOLEAN NOT NULL DEFAULT FALSE COMMENT '此時段是否需要支付訂金',
+    deposit_amount  DECIMAL(10, 2) NOT NULL DEFAULT 0.00 COMMENT '此時段訂金金額',
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (store_id) REFERENCES store(store_id),
     UNIQUE KEY uk_time_slot (store_id, reservation_date, start_time)

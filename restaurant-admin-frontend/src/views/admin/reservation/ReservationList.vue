@@ -81,6 +81,12 @@ const statusOptions = [
 
 const tableText = (item) => item.tableNumbers?.length ? item.tableNumbers.join('、') : '未分配'
 const timeLabel = reservationTimeLabel
+const depositText = (item) => {
+  const amount = Number(item.depositAmount || 0)
+  if (amount <= 0) return '-'
+  return `${item.paymentStatus === 'PAID' ? '已支付' : '未付款'} $${amount.toLocaleString()}`
+}
+const depositClass = (item) => item.paymentStatus === 'PAID' ? 'bg-label-success' : 'bg-label-warning'
 
 // 不能編輯的狀態
 const canEdit = (item) => ['PENDING', 'RESERVED', 'ASSIGNED'].includes(item.status)
@@ -300,10 +306,6 @@ onBeforeUnmount(() => {
 
     <div class="content-wrapper">
       <div class="card">
-        <div class="card-header d-flex flex-wrap align-items-center gap-3">
-          <h5 class="mb-0"><i class="bx bx-search"></i> Search 查詢訂位</h5>
-        </div>
-
         <!-- 查詢訂位 -->
         <div class="card-body">
           <div class="row g-3">
@@ -438,7 +440,7 @@ onBeforeUnmount(() => {
               <template v-for="dateGroup in groupedReservations" :key="dateGroup.date">
                 <tbody class="reservation-date-header">
                   <tr>
-                    <td :colspan="showStoreColumn ? 9 : 8">
+                    <td :colspan="showStoreColumn ? 10 : 9">
                       <i class="bx bx-calendar"></i>&nbsp;
                       {{ dateGroup.dateLabel }}</td>
                   </tr>
@@ -453,6 +455,7 @@ onBeforeUnmount(() => {
                       <th>Persons</th>
                       <th>Table</th>
                       <th>Status</th>
+                      <th>Deposit</th>
                       <th>note</th>
                       <th></th>
                     </tr>
@@ -495,27 +498,33 @@ onBeforeUnmount(() => {
                     </td>
                     <td>{{ tableText(item) }}</td>
                     <td><span class="badge me-1" :class="statusClass[item.status]">{{ statusText[item.status] || item.status }}</span></td>
+                    <td>
+                      <span v-if="Number(item.depositAmount || 0) > 0" class="badge" :class="depositClass(item)">
+                        {{ depositText(item) }}
+                      </span>
+                      <span v-else class="text-muted">-</span>
+                    </td>
                     <td class="special-request-cell">{{ item.specialRequest || '-' }}</td>
                     <td>
-                      <div class="d-flex gap-2">
+                      <div class="d-flex">
                         <template v-if="editingReservationId === item.reservationId">
-                          <button type="button" class="btn btn-sm btn-primary" @click="saveEdit(item)">儲存</button>
-                          <button type="button" class="btn btn-sm btn-label-secondary" @click="cancelEdit">取消</button>
+                          <button type="button" class="btn btn-sm btn-outline-success" @click="saveEdit(item)"><i class="bx bx-check"></i></button>
+                          <button type="button" class="btn btn-sm btn-outline-danger" @click="cancelEdit"><i class="bx bx-x"></i></button>
                         </template>
                         <template v-else>
                           <button
                             v-if="canEdit(item)"
                             type="button"
-                            class="btn btn-sm btn-label-primary"
+                            class="btn btn-sm"
                             @click="startEdit(item)">
-                            編輯
+                            <i class="bx bx-edit-alt"></i>
                           </button>
                           <button
                             v-if="!['CHECKED_IN', 'COMPLETED', 'CANCELLED'].includes(item.status)"
                             type="button"
-                            class="btn btn-sm btn-label-danger"
+                            class="btn btn-sm"
                             @click="cancelReservation(item.reservationId)">
-                            取消
+                            <i class="bx bx-trash"></i>
                           </button>
                         </template>
                       </div>
@@ -527,7 +536,7 @@ onBeforeUnmount(() => {
             </template>
             <tbody v-else-if="!loading">
               <tr>
-                <td :colspan="showStoreColumn ? 9 : 8" class="text-center text-muted py-4">目前沒有符合條件的訂位</td>
+                <td :colspan="showStoreColumn ? 10 : 9" class="text-center text-muted py-4">目前沒有符合條件的訂位</td>
               </tr>
             </tbody>
           </table>
