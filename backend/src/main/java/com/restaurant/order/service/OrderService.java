@@ -87,8 +87,12 @@ public class OrderService {
                 String orderType = normalizeOrderType(request.getOrderType());
 
                 // 1. 查詢 User
-                User user = userRepository.findById(request.getUserId())
-                                .orElseThrow(() -> new BusinessException("找不到會員"));
+                User user = null;
+
+                if (request.getUserId() != null) {
+                        user = userRepository.findById(request.getUserId())
+                                        .orElseThrow(() -> new BusinessException("找不到會員"));
+                }
 
                 // 2. 查詢 Store
                 Store store = storeRepository.findByStoreIdAndIsDeletedFalse(request.getStoreId())
@@ -115,20 +119,30 @@ public class OrderService {
                                 ? request.getPointsUsed()
                                 : 0;
 
-                int actualPointsUsed = pointService.usePointsForOrder(
-                                user.getUserId(),
-                                store.getStoreId(),
-                                null,
-                                requestedPointsUsed);
+                int actualPointsUsed = 0;
+
+                if (user != null && requestedPointsUsed > 0) {
+                        actualPointsUsed = pointService.usePointsForOrder(
+                                        user.getUserId(),
+                                        store.getStoreId(),
+                                        null,
+                                        requestedPointsUsed);
+                }
+
+                BigDecimal depositDiscount = BigDecimal.ZERO;
+
+                // TODO Reservation 完成訂金流程後，改由 Reservation 帶入 depositAmount
 
                 BigDecimal pointsDiscount = BigDecimal.valueOf(actualPointsUsed);
 
-                BigDecimal finalAmount = totalAmount.subtract(pointsDiscount);
+                BigDecimal finalAmount = totalAmount
+                                .subtract(depositDiscount)
+                                .subtract(pointsDiscount);
 
                 if (finalAmount.compareTo(BigDecimal.ZERO) < 0) {
                         finalAmount = BigDecimal.ZERO;
                 }
-                
+
                 // 8. pointsEarned 由會員模組計算，這邊先放 0
 
                 // 9. 建立 Order
@@ -235,7 +249,7 @@ public class OrderService {
                 } else {
                         order.setStatus(newStatus);
 
-                        if ("COMPLETED".equals(newStatus)) {
+                        if ("COMPLETED".equals(newStatus) && order.getUser() != null) {
                                 int earnedPoints = pointService.earnPointsFromOrder(
                                                 order.getUser().getUserId(),
                                                 order.getStore().getStoreId(),
@@ -267,7 +281,7 @@ public class OrderService {
                                 .collect(Collectors.toList());
                 return OrderResponse.builder()
                                 .orderId(order.getOrderId())
-                                .userId(order.getUser().getUserId())
+                                .userId(order.getUser() != null ? order.getUser().getUserId() : null)
                                 .storeId(order.getStore().getStoreId())
                                 .tableId(order.getTable() != null ? order.getTable().getTableId() : null)
                                 .reservationId(order.getReservation() != null
@@ -303,7 +317,7 @@ public class OrderService {
 
                 return OrderSummaryResponse.builder()
                                 .orderId(order.getOrderId())
-                                .userId(order.getUser().getUserId())
+                                .userId(order.getUser() != null ? order.getUser().getUserId() : null)
                                 .storeId(order.getStore().getStoreId())
                                 .orderType(order.getOrderType())
                                 .totalAmount(order.getTotalAmount())
@@ -345,7 +359,7 @@ public class OrderService {
                         throw new BusinessException("訂位門市與訂單門市不一致");
                 }
 
-                if (reservation.getUserId() != null &&
+                if (reservation.getUserId() != null && user != null &&
                                 !reservation.getUserId().equals(user.getUserId())) {
                         throw new BusinessException("訂位會員與訂單會員不一致");
                 }
