@@ -940,14 +940,16 @@ onMounted(() => {
                 </div>
 
                 <div class="checkout-total">
-                    <span>總付款金額</span>
+                    <span>應付金額</span>
                     <strong>NT${{ estimatedFinalAmount }}</strong>
                 </div>
             </div>
 
             <div class="checkout-form">
-                <h2>確認訂單與填寫聯絡資訊</h2>
-
+                <div class="checkout-header">
+                    <h2>填寫付款與聯絡資訊</h2>
+                    
+                </div>
                 <div class="form-card">
                     <h3>付款方式</h3>
 
@@ -1030,7 +1032,7 @@ onMounted(() => {
                     </div>
 
                     <div class="checkout-total final">
-                        <span>總付款金額</span>
+                        <span>應付金額</span>
                         <strong>NT${{ estimatedFinalAmount }}</strong>
                     </div>
                 </div>
@@ -1278,6 +1280,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
+
 .feature-tags {
     display: flex;
     flex-wrap: wrap;
@@ -1816,9 +1819,8 @@ onMounted(() => {
     box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
 }
 
-.checkout-summary h2,
-.checkout-form h2 {
-    margin-bottom: 24px;
+.checkout-summary h2{
+    margin-bottom:24px;
 }
 
 .checkout-item {
@@ -1830,10 +1832,30 @@ onMounted(() => {
 }
 
 .checkout-total {
-    margin-top: 24px;
+    margin-top: 18px;
     display: flex;
     justify-content: space-between;
-    font-size: 22px;
+    align-items: center;
+    color: #123b67;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.checkout-total strong {
+    color: #d88938;
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.checkout-total.final {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed #f0d2b4;
+    font-size: 18px;
+}
+
+.checkout-total.final strong {
+    font-size: 24px;
 }
 
 .checkout-form {
@@ -2241,102 +2263,105 @@ onMounted(() => {
     cursor: pointer;
     font-weight: 700;
 }
-.cart-preview{
-    background:#fff9f2;
-    border:1.5px solid #efc18c;
-    border-radius:18px;
-    padding:18px;
+
+.cart-preview {
+    background: #fff9f2;
+    border: 1.5px solid #efc18c;
+    border-radius: 18px;
+    padding: 18px;
 }
 
-.cart-preview-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:15px;
-    font-weight:700;
+.cart-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    font-weight: 700;
 }
 
-.cart-preview-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:15px;
-    font-weight:700;
+.cart-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    font-weight: 700;
 }
 
-.cart-preview-header span:first-child{
-    color:#123b67;
-    font-size:20px;
+.cart-preview-header span:first-child {
+    color: #123b67;
+    font-size: 20px;
 }
 
-.cart-preview-header span:last-child{
-    color:#d88b3a;
-    background:#fff;
-    padding:4px 10px;
-    border-radius:20px;
+.cart-preview-header span:last-child {
+    color: #d88b3a;
+    background: #fff;
+    padding: 4px 10px;
+    border-radius: 20px;
 }
 
 .cart-empty {
-  font-size: 13px;
-  color: #999;
+    font-size: 13px;
+    color: #999;
 }
 
 .cart-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
-.cart-row{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    padding:12px 0;
-    border-bottom:1px solid #f4d8b5;
-}
-
-.cart-row:last-child{
-    border:none;
+.cart-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f4d8b5;
 }
 
 .cart-row:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
+    border: none;
 }
 
-.cart-name{
-    font-size:18px;
-    font-weight:700;
-    color:#123b67;
+.cart-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
 }
 
-.cart-qty{
-    margin-top:5px;
-    color:#999;
-    font-size:13px;
+.cart-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #123b67;
 }
 
-.cart-price{
-    color:#d88938;
-    font-size:22px;
-    font-weight:bold;
+.cart-qty {
+    margin-top: 5px;
+    color: #999;
+    font-size: 13px;
 }
-.cart-open-btn{
-    width:100%;
-    margin-top:18px;
-    padding:14px;
-    border:none;
-    border-radius:12px;
-    background:#e8a96d;
-    color:white;
-    font-size:16px;
-    font-weight:700;
-    cursor:pointer;
-    transition:.2s;
+
+.cart-price {
+    color: #d88938;
+    font-size: 22px;
+    font-weight: bold;
 }
-.cart-open-btn:hover{
-    background:#d9904d;
-    transform:translateY(-2px);
+
+.cart-open-btn {
+    width: 100%;
+    margin-top: 18px;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    background: #e8a96d;
+    color: white;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: .2s;
+}
+
+.cart-open-btn:hover {
+    background: #d9904d;
+    transform: translateY(-2px);
 }
 
 .points-box {
@@ -2427,4 +2452,30 @@ onMounted(() => {
     box-shadow: none;
 }
 
+.submit-btn:hover:not(:disabled) {
+    background: #d8924d;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 18px rgba(216, 146, 77, 0.35);
+}
+.checkout-header {
+    margin-bottom: 8px;
+    padding: 20px 24px;
+    background: #fff9f2;
+    border: 1.5px solid #efc18c;
+    border-radius: 18px;
+}
+
+.checkout-header h2 {
+    margin: 0;
+    color: #23466b;
+    font-size: 32px;
+    font-weight: 800;
+}
+
+.checkout-header p {
+    margin: 8px 0 0;
+    color: #8c6335;
+    font-size: 15px;
+    line-height: 1.6;
+}
 </style>
