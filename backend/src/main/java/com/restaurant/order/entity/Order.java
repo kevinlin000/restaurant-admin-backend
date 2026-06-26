@@ -7,6 +7,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import com.restaurant.member.entity.User;
+import com.restaurant.reservation.entity.Reservation;
 import com.restaurant.store.entity.Store;
 import com.restaurant.store.entity.TableInfo;
 
@@ -61,8 +62,12 @@ public class Order {
     // @Column(name = "table_id")
     // private Long tableId;
 
-    @Column(name = "reservation_id")
-    private Long reservationId;
+    // @Column(name = "reservation_id")
+    // private Long reservationId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reservation_id")
+    private Reservation reservation;
 
     @Column(name = "order_type", length = 20)
     private String orderType;
@@ -87,7 +92,7 @@ public class Order {
 
     @Column(name = "carrier_number", length = 20)
     private String carrierNumber;
-    
+
     @CreationTimestamp
     @Column(name = "created_at")
     private LocalDateTime createdAt;
