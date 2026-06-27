@@ -37,4 +37,9 @@ public interface PointService {
      * 依照目前點數更新會員等級。
      */
     void updateMemberLevel(Long userId);
+
+    /**
+     * 取消訂單時退點數回去會員
+     */
+    int refundPointsForOrder(Long userId, Long storeId, Long orderId, Integer pointsToRefund);
 }

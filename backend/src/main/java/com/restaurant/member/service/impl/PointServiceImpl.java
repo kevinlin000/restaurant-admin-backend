@@ -142,6 +142,37 @@ public class PointServiceImpl implements PointService {
 
     @Override
     @Transactional
+    public int refundPointsForOrder(Long userId, Long storeId, Long orderId, Integer pointsToRefund) {
+        if (userId == null || pointsToRefund == null || pointsToRefund <= 0) {
+            return 0;
+        }
+
+        User user = getUser(userId);
+        MemberProfile profile = getMemberProfile(userId);
+        Store store = getStoreOrNull(storeId);
+
+        if (orderId != null && pointTransactionRepository
+                .existsByReferenceIdAndTransactionType(orderId, PointTransaction.TransactionType.REFUND)) {
+            return 0;
+        }
+
+        profile.setPointBalance(safePoints(profile.getPointBalance()) + pointsToRefund);
+        profile.setMemberLevel(calculateMemberLevel(profile.getPointBalance()));
+        memberProfileRepository.save(profile);
+
+        pointTransactionRepository.save(PointTransaction.builder()
+                .user(user)
+                .store(store)
+                .pointChange(pointsToRefund)
+                .transactionType(PointTransaction.TransactionType.REFUND)
+                .referenceId(orderId)
+                .build());
+
+        return pointsToRefund;
+    }
+
+    @Override
+    @Transactional
     public void updateMemberLevel(Long userId) {
         MemberProfile profile = getMemberProfile(userId);
         profile.setMemberLevel(calculateMemberLevel(safePoints(profile.getPointBalance())));

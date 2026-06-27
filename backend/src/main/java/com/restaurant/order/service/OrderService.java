@@ -442,6 +442,17 @@ public class OrderService {
                         paymentRepository.save(payment);
                 }
 
+                if (order.getUser() != null
+                                && order.getPointsUsed() != null
+                                && order.getPointsUsed() > 0) {
+
+                        pointService.refundPointsForOrder(
+                                        order.getUser().getUserId(),
+                                        order.getStore().getStoreId(),
+                                        order.getOrderId(),
+                                        order.getPointsUsed());
+                }
+
                 order.setStatus("CANCELLED");
         }
 
