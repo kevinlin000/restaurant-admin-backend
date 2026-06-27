@@ -79,8 +79,23 @@ const orderForm = ref({
     pointsUsed: 0,
 });
 
-const selectedStoreName = computed(() => firstQueryValue(route.query.storeName) || `門市 ${orderForm.value.storeId}`);
-
+const storeInfo = ref(null);
+const selectedStoreName = computed(() => {
+    return (
+        firstQueryValue(route.query.storeName) ||
+        storeInfo.value?.storeName ||
+        `門市 ${orderForm.value.storeId}`
+    );
+});
+async function loadStoreInfo(storeId) {
+    try {
+        const response = await axios.get(`/api/stores/${storeId}`);
+        storeInfo.value = response.data?.data ?? response.data ?? null;
+    } catch (error) {
+        console.error("取得門市資料失敗", error);
+        storeInfo.value = null;
+    }
+}
 const step = ref("MENU");
 // MENU = 點餐畫面
 // CHECKOUT = 結帳確認畫面
@@ -297,9 +312,34 @@ const estimatedFinalAmount = computed(() => {
 
     return Math.max(totalAmount.value - safePointsUsed.value, 0);
 });
+const memberPointBalance = ref(0);
+async function loadMemberPoints() {
+    if (!isLogin.value) return;
 
-const memberPointBalance = ref(120); // 先寫死測試，之後改成會員點數 API
+    try {
+        const token = localStorage.getItem("accessToken");
 
+        const response = await axios.get("/api/members/me/points", {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        console.log("會員點數 API 回傳：", response.data);
+
+        const data = response.data.data;
+
+        memberPointBalance.value =
+            data.pointBalance ??
+            data.point_balance ??
+            data.balance ??
+            0;
+
+    } catch (error) {
+        console.error("取得會員點數失敗", error.response?.data || error);
+        memberPointBalance.value = 0;
+    }
+}
 const maxUsablePoints = computed(() => {
     const maxByOrder = Math.floor(totalAmount.value * 0.3); // 單筆最多折抵 30%
     return Math.min(memberPointBalance.value, maxByOrder);
@@ -423,6 +463,70 @@ async function loadStoreMenu(storeId) {
         menuItems.value = [...fallbackMenuItems];
         menuLoadError.value = "門市菜單暫時無法載入，暫時顯示示範菜單";
     }
+}
+
+const showStorePicker = ref(false);
+const storeOptions = ref([]);
+const selectedPickerStoreId = ref(null);
+const pickupTime = ref("ASAP");
+
+const pickupTimeOptions = [];
+
+for (let hour = 11; hour <= 20; hour++) {
+    pickupTimeOptions.push({
+        value: `${String(hour).padStart(2, "0")}:00`,
+        label: `${String(hour).padStart(2, "0")}:00`,
+    });
+
+    if (hour !== 20) {
+        pickupTimeOptions.push({
+            value: `${String(hour).padStart(2, "0")}:30`,
+            label: `${String(hour).padStart(2, "0")}:30`,
+        });
+    }
+}
+
+const selectedPickupTime = computed(() => {
+    return firstQueryValue(route.query.pickupTime) || pickupTime.value;
+});
+
+async function loadStoreOptions() {
+    const response = await axios.get("/api/stores");
+    storeOptions.value = response.data?.data ?? response.data ?? [];
+
+    if (storeOptions.value.length > 0) {
+        selectedPickerStoreId.value = storeOptions.value[0].storeId;
+    }
+}
+
+async function confirmStorePicker() {
+    if (!selectedPickerStoreId.value) {
+        showError("請選擇取餐門市");
+        return;
+    }
+
+    const store = storeOptions.value.find(
+        item => item.storeId === selectedPickerStoreId.value
+    );
+
+    router.replace({
+        name: "CustomerOrder",
+        query: {
+            storeId: store.storeId,
+            storeName: store.storeName,
+            orderType: "TAKEOUT",
+            pickupTime: pickupTime.value,
+        },
+    });
+
+    showStorePicker.value = false;
+
+    orderForm.value.storeId = store.storeId;
+    orderForm.value.orderType = "TAKEOUT";
+    cartItems.value = [];
+
+    await loadStoreInfo(store.storeId);
+    await loadStoreMenu(store.storeId);
 }
 
 watch(
@@ -646,7 +750,38 @@ async function submitOrder() {
         alert("內用訂單需要桌位資訊，請從訂位或桌邊 QR Code 進入點餐");
         return;
     }
+    const confirmResult = await Swal.fire({
+        icon: "question",
+        title: "確認送出訂單？",
+        html: `
+        <div style="text-align:left; line-height:1.9">
+            <p><strong>取餐門市：</strong>${selectedStoreName.value}</p>
+            <p><strong>取餐時間：</strong>${selectedPickupTime.value === "ASAP" ? "立即取餐" : selectedPickupTime.value}</p>
 
+            <hr />
+
+            <p><strong>訂單明細：</strong></p>
+            ${cartItems.value.map(item => `
+                <p>${item.itemName} × ${item.quantity}　NT$${item.price * item.quantity}</p>
+            `).join("")}
+
+            <hr />
+
+            <p><strong>餐點總額：</strong>NT$${totalAmount.value}</p>
+            <p><strong>點數折抵：</strong>NT$${safePointsUsed.value}</p>
+            <p><strong>應付金額：</strong>NT$${estimatedFinalAmount.value}</p>
+        </div>
+    `,
+        showCancelButton: true,
+        confirmButtonText: "確認送出",
+        cancelButtonText: "返回修改",
+        confirmButtonColor: "#e8ad78",
+        cancelButtonColor: "#aaa",
+    });
+
+    if (!confirmResult.isConfirmed) {
+        return;
+    }
     const request = {
         userId: isLogin.value ? userInfo.value.userId : null,
         storeId: orderForm.value.storeId,
@@ -705,28 +840,24 @@ async function submitOrder() {
             `http://localhost:8080/api/payments/linepay/request/${orderId}`;
         return;
     }
-
-    // if (customerForm.value.paymentMethod === "LINE_PAY") {
-    //     await Swal.fire({
-    //         icon: "success",
-    //         title: "訂單建立成功",
-    //         text: "即將前往 Line Pay 付款頁面",
-    //         confirmButtonText: "前往付款",
-    //         confirmButtonColor: "#e8ad78",
-    //     });
-
-    //     window.location.href =
-    //         `http://localhost:8080/api/payments/linepay/request/${orderId}`;
-    //     return;
-    // }
-
-    // 現場付款
+   
     await Swal.fire({
         icon: "success",
-        title: "訂單送出成功",
-        text: "請至櫃台完成付款與取餐",
-        confirmButtonText: "確認",
-        timer: 3000,
+        title: "訂單建立成功",
+        html: `
+        <div style="text-align:left; line-height:1.9">
+            <p><strong>取餐門市：</strong>${selectedStoreName.value}</p>
+            <p><strong>取餐時間：</strong>${selectedPickupTime.value === "ASAP" ? "立即取餐" : selectedPickupTime.value}</p>
+            <p><strong>付款方式：</strong>現場付款</p>
+
+            <hr />
+
+            <p style="color:#d88938; font-weight:700">
+                請於取餐時間至櫃台完成付款並領取餐點。
+            </p>
+        </div>
+    `,
+        confirmButtonText: "回首頁",
         confirmButtonColor: "#e8ad78",
     });
 
@@ -753,14 +884,20 @@ async function submitOrder() {
     showItemModal.value = false;
     step.value = "MENU";
 
-    window.scrollTo({
-        top: 0,
-        behavior: "smooth",
-    });
+    router.push("/");
 }
 
-onMounted(() => {
-    loadStoreMenu(orderForm.value.storeId);
+onMounted(async () => {
+    await loadMemberPoints();
+
+    if (!route.query.storeId) {
+        await loadStoreOptions();
+        showStorePicker.value = true;
+        return;
+    }
+
+    await loadStoreInfo(orderForm.value.storeId);
+    await loadStoreMenu(orderForm.value.storeId);
 });
 // =========================
 </script>
@@ -776,7 +913,9 @@ onMounted(() => {
                     <p>選擇餐點加入購物車，確認後送出訂單。</p>
                     <p class="store-context">
                         目前門市：<strong>{{ selectedStoreName }}</strong>
-                        <span>#{{ orderForm.storeId }}</span>
+                        <span v-if="selectedPickupTime">
+                            取餐時間：{{ selectedPickupTime === "ASAP" ? "立即取餐" : selectedPickupTime }}
+                        </span>
                     </p>
                 </div>
 
@@ -818,7 +957,7 @@ onMounted(() => {
                         <article v-for="item in filteredMenuItems" :key="item.id" class="menu-card">
                             <div class="menu-main">
                                 <div class="menu-text">
-                                    <span class="menu-id">#{{ item.id }}</span>
+
 
                                     <h3>{{ item.itemName }}</h3>
 
@@ -948,7 +1087,7 @@ onMounted(() => {
             <div class="checkout-form">
                 <div class="checkout-header">
                     <h2>填寫付款與聯絡資訊</h2>
-                    
+
                 </div>
                 <div class="form-card">
                     <h3>付款方式</h3>
@@ -1276,10 +1415,66 @@ onMounted(() => {
                 </button>
             </div>
         </div>
+        <div v-if="showStorePicker" class="modal-mask">
+            <div class="store-picker-modal">
+                <h2>選擇取餐門市</h2>
+                <p>請先選擇門市與取餐時間，再開始點餐。</p>
+
+                <label>取餐門市</label>
+                <select v-model="selectedPickerStoreId">
+                    <option v-for="store in storeOptions" :key="store.storeId" :value="store.storeId">
+                        {{ store.storeName }}｜{{ store.city }}{{ store.district }}
+                    </option>
+                </select>
+
+                <label>取餐時間</label>
+                <select v-model="pickupTime">
+                    <option v-for="time in pickupTimeOptions" :key="time.value" :value="time.value">
+                        {{ time.label }}
+                    </option>
+                </select>
+
+                <button class="modal-add-btn" type="button" @click="confirmStorePicker">
+                    開始點餐
+                </button>
+            </div>
+        </div>
     </main>
 </template>
 
 <style scoped>
+.store-picker-modal {
+    width: min(520px, 100%);
+    background: #fff;
+    border-radius: 22px;
+    padding: 32px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+}
+
+.store-picker-modal h2 {
+    margin: 0 0 10px;
+    color: #23466b;
+}
+
+.store-picker-modal p {
+    margin-bottom: 24px;
+    color: #667;
+}
+
+.store-picker-modal label {
+    display: block;
+    margin: 16px 0 8px;
+    color: #23466b;
+    font-weight: 800;
+}
+
+.store-picker-modal select {
+    width: 100%;
+    height: 46px;
+    border: 1px solid #efc18c;
+    border-radius: 10px;
+    padding: 0 12px;
+}
 
 .feature-tags {
     display: flex;
@@ -1819,8 +2014,8 @@ onMounted(() => {
     box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
 }
 
-.checkout-summary h2{
-    margin-bottom:24px;
+.checkout-summary h2 {
+    margin-bottom: 24px;
 }
 
 .checkout-item {
@@ -2457,6 +2652,7 @@ onMounted(() => {
     transform: translateY(-3px);
     box-shadow: 0 8px 18px rgba(216, 146, 77, 0.35);
 }
+
 .checkout-header {
     margin-bottom: 8px;
     padding: 20px 24px;
@@ -2477,5 +2673,9 @@ onMounted(() => {
     color: #8c6335;
     font-size: 15px;
     line-height: 1.6;
+}
+
+.store-picker-modal .modal-add-btn {
+    margin-top: 28px;
 }
 </style>
