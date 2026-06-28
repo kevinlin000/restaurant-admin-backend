@@ -129,6 +129,24 @@ class FaqItemServiceImplTest {
     }
 
     @Test
+    void adminCanCreateFaqWithLongKeywordsForSearchCoverage() {
+        Authentication auth = adminAuth();
+        FaqItemRequest request = request();
+        String longKeywords = "訂位,訂金,取消,退款,包廂,大人數,特殊餐期,候位,保留座位,門市,外帶,點餐,付款,發票,過敏,兒童椅,慶生,停車,營業狀態,會員紀錄"
+                .repeat(5);
+        request.setKeywords(longKeywords);
+        when(faqItemRepository.save(any(FaqItem.class))).thenAnswer(invocation -> {
+            FaqItem faq = invocation.getArgument(0);
+            faq.setFaqId(10L);
+            return faq;
+        });
+
+        FaqItemResponse result = faqItemService.createFaq(request, auth);
+
+        assertThat(result.getKeywords()).isEqualTo(longKeywords);
+    }
+
+    @Test
     void updateTrimsTextAndKeepsStatus() {
         Authentication auth = adminAuth();
         FaqItem faq = faq(3L, "舊問題", "舊回答", FaqCategory.ORDER, FaqStatus.DRAFT, false);

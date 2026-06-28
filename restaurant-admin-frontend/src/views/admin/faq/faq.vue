@@ -296,7 +296,7 @@ onMounted(async () => {
 
         <label class="full-field">
           問題
-          <input v-model="form.question" type="text" maxlength="180" placeholder="例如：取消訂位後訂金可以退嗎？" />
+          <input v-model="form.question" type="text" maxlength="255" placeholder="例如：取消訂位後訂金可以退嗎？" />
         </label>
 
         <label class="full-field">
@@ -306,7 +306,7 @@ onMounted(async () => {
 
         <label class="full-field">
           搜尋關鍵字
-          <input v-model="form.keywords" type="text" maxlength="320" placeholder="訂金,退款,取消,未到,no show" />
+          <input v-model="form.keywords" type="text" maxlength="1000" placeholder="訂金,退款,取消,未到,no show" />
         </label>
 
         <div class="actions">
