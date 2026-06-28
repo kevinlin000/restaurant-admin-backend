@@ -66,6 +66,27 @@ const availableFeatures = computed(() => {
       path: "/admin/member",
       roles: ["ADMIN"],
     },
+    {
+      title: "首頁管理",
+      icon: "bx bx-layout",
+      description: "管理首頁 Hero、品牌文案與精選內容。",
+      path: "/admin/homepage",
+      roles: ["ADMIN"],
+    },
+    {
+      title: "常見問答",
+      icon: "bx bx-help-circle",
+      description: "管理 FAQ 與客服窗知識庫。",
+      path: "/admin/faqs",
+      roles: ["ADMIN"],
+    },
+    {
+      title: "客服查詢紀錄",
+      icon: "bx bx-message-square-detail",
+      description: "查看熱門查詢與未命中問題。",
+      path: "/admin/faq-analytics",
+      roles: ["ADMIN"],
+    },
   ];
 
   return baseFeatures.filter((feature) => feature.roles.includes(role));
@@ -212,7 +233,7 @@ const roleSummary = computed(() => {
 }
 
 .feature-grid.is-admin-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
 
 .feature-card {

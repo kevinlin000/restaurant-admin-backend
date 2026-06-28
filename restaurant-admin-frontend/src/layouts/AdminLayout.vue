@@ -65,11 +65,19 @@ const currentPageTitle = computed(() => {
   const path = route.path;
 
   if (path.startsWith("/admin/reservation")) return "訂位管理";
+  if (path.startsWith("/admin/order-dashboard")) return "營收分析";
   if (path.startsWith("/admin/order")) return "訂單管理";
   if (path.startsWith("/admin/store")) return "分店管理";
   if (path.startsWith("/admin/menu")) return "菜單管理";
   if (path.startsWith("/admin/member")) return "員工管理";
-  if (path.startsWith("/admin/news")) return "品牌內容";
+  if (path.startsWith("/admin/homepage")) return "首頁管理";
+  if (
+    path.startsWith("/admin/news") ||
+    path.startsWith("/admin/faqs") ||
+    path.startsWith("/admin/faq-analytics")
+  ) {
+    return "品牌內容";
+  }
   if (path.startsWith("/admin/home")) return "後台管理首頁";
 
   return "後台管理首頁";
@@ -121,6 +129,11 @@ const sidebarGroups = computed(() => [
       {
         label: "訂單管理",
         path: "/admin/order-manage",
+        roles: ["STAFF", "MANAGER", "ADMIN"],
+      },
+      {
+        label: "營收分析",
+        path: "/admin/order-dashboard",
         roles: ["STAFF", "MANAGER", "ADMIN"],
       },
     ],
@@ -176,9 +189,24 @@ const sidebarGroups = computed(() => [
     roles: ["MANAGER", "ADMIN"],
     children: [
       {
+        label: "首頁管理",
+        path: "/admin/homepage",
+        roles: ["ADMIN"],
+      },
+      {
         label: "最新消息",
         path: "/admin/news",
         roles: ["MANAGER", "ADMIN"],
+      },
+      {
+        label: "常見問答",
+        path: "/admin/faqs",
+        roles: ["ADMIN"],
+      },
+      {
+        label: "客服查詢紀錄",
+        path: "/admin/faq-analytics",
+        roles: ["ADMIN"],
       },
     ],
   },
@@ -197,7 +225,11 @@ const openMenu = ref({
   menu: route.path.startsWith("/admin/menu"),
   order: route.path.startsWith("/admin/order"),
   store: route.path.startsWith("/admin/store"),
-  content: route.path.startsWith("/admin/news"),
+  content:
+    route.path.startsWith("/admin/news") ||
+    route.path.startsWith("/admin/faqs") ||
+    route.path.startsWith("/admin/faq-analytics") ||
+    route.path.startsWith("/admin/homepage"),
 });
 
 const toggleMenu = (menu) => {
@@ -254,18 +286,9 @@ const logout = () => {
       </div>
 
       <ul class="sidebar-menu">
-        <li
-          v-for="group in visibleSidebarGroups"
-          :key="group.key"
-          class="menu-group"
-        >
-          <button
-            v-if="group.type === 'single'"
-            type="button"
-            class="menu-title menu-button"
-            :class="{ active: isActive(group.path) }"
-            @click="goTo(group.path, group.roles)"
-          >
+        <li v-for="group in visibleSidebarGroups" :key="group.key" class="menu-group">
+          <button v-if="group.type === 'single'" type="button" class="menu-title menu-button"
+            :class="{ active: isActive(group.path) }" @click="goTo(group.path, group.roles)">
             <div>
               <i :class="group.icon"></i>
               {{ group.label }}
@@ -278,22 +301,12 @@ const logout = () => {
                 <i :class="group.icon"></i>
                 {{ group.label }}
               </div>
-              <i
-                class="bx bx-chevron-down menu-arrow"
-                :class="{ open: openMenu[group.key] }"
-              ></i>
+              <i class="bx bx-chevron-down menu-arrow" :class="{ open: openMenu[group.key] }"></i>
             </div>
 
             <ul v-show="openMenu[group.key]" class="submenu">
-              <li
-                v-for="child in group.children.filter((item) => hasPermission(item.roles))"
-                :key="child.path"
-              >
-                <a
-                  href="#"
-                  :class="{ active: isActive(child.path) }"
-                  @click.prevent="goTo(child.path, child.roles)"
-                >
+              <li v-for="child in group.children.filter((item) => hasPermission(item.roles))" :key="child.path">
+                <a href="#" :class="{ active: isActive(child.path) }" @click.prevent="goTo(child.path, child.roles)">
                   {{ child.label }}
                 </a>
               </li>
@@ -326,14 +339,12 @@ const logout = () => {
               </RouterLink>
             </li>
 
-            <li><hr class="dropdown-divider" /></li>
+            <li>
+              <hr class="dropdown-divider" />
+            </li>
 
             <li v-for="item in adminDropdownItems" :key="item.label">
-              <a
-                href="#"
-                :class="['dropdown-item', item.menuClass]"
-                @click.prevent="goTo(item.path, item.roles)"
-              >
+              <a href="#" :class="['dropdown-item', item.menuClass]" @click.prevent="goTo(item.path, item.roles)">
                 <i :class="item.icon"></i>
                 <span class="dropdown-text">
                   <span>{{ item.label }}</span>
@@ -342,14 +353,12 @@ const logout = () => {
               </a>
             </li>
 
-            <li><hr class="dropdown-divider" /></li>
+            <li>
+              <hr class="dropdown-divider" />
+            </li>
 
             <li>
-              <button
-                class="dropdown-item text-danger"
-                type="button"
-                @click="logout"
-              >
+              <button class="dropdown-item text-danger" type="button" @click="logout">
                 <i class="bx bx-log-out"></i>
                 <span>登出</span>
               </button>

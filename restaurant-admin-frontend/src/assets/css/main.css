@@ -53,6 +53,86 @@
   width: 110px;
 }
 
+/* 後台管理標題列 */
+.admin-ops-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid #ddd6cc;
+  padding: 0 0 18px;
+  margin-bottom: 24px;
+  color: #24211e;
+}
+
+.admin-ops-header span {
+  color: #9a6b42;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.admin-ops-header h1 {
+  margin: 4px 0;
+  color: #24211e;
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.admin-ops-header p {
+  margin: 0;
+  color: #6b625a;
+  font-style: normal;
+}
+
+.admin-current-store {
+  min-width: 220px;
+  border-left: 3px solid #9a6b42;
+  background: #fffdf8;
+  padding: 12px 16px;
+  text-align: right;
+}
+
+.admin-current-store small {
+  display: block;
+  color: #9a6b42;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.admin-current-store strong {
+  display: block;
+  margin-top: 4px;
+  color: #24211e;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.admin-current-store .form-select {
+  min-width: 220px;
+  margin-top: 6px;
+  border: 1px solid #d8d0c6;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #24211e;
+  font-weight: 800;
+  text-align: left;
+  box-shadow: none;
+}
+
+@media (max-width: 768px) {
+  .admin-ops-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-current-store {
+    width: 100%;
+    text-align: left;
+  }
+}
+
 /* 多選下拉選單 */
 .multi-select {
   position: relative;

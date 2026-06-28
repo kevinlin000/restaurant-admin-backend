@@ -33,5 +33,13 @@ spring.mail.password=你的Gmail應用程式密碼
 spring.mail.properties.mail.smtp.auth=true
 spring.mail.properties.mail.smtp.starttls.enable=true
 
+# LINE Pay Sandbox
+# 若只測一般訂單可保留預設；要測 LINE Pay 請填 LINE Pay sandbox 後台提供的 channel id / secret。
+linepay.channel-id=demo-channel-id
+linepay.channel-secret=demo-channel-secret
+linepay.api-base-url=https://sandbox-api-pay.line.me
+linepay.confirm-url=http://localhost:5173/payment/linepay/confirm
+linepay.cancel-url=http://localhost:5173/order
+
 # Server
 server.port=8080

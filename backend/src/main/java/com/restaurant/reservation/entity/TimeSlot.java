@@ -12,6 +12,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -52,6 +53,16 @@ public class TimeSlot {
     @Column(name = "is_rule_generated", nullable = false)
     @Builder.Default
     private Boolean ruleGenerated = false;
+
+    // 此時段是否需要先支付訂金（後台新增、修改時段時設定）
+    @Column(name = "requires_deposit", nullable = false)
+    @Builder.Default
+    private Boolean requiresDeposit = false;
+
+    // 此時段需要支付的訂金金額
+    @Column(name = "deposit_amount", nullable = false, precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal depositAmount = BigDecimal.ZERO;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

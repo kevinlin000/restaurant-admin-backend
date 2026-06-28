@@ -58,8 +58,20 @@ const normalizeRouteOrderType = (value) => {
     return normalized === "DINE_IN" ? "DINE_IN" : "TAKEOUT";
 };
 
+
+const getUserInfo = () => {
+    try {
+        return JSON.parse(localStorage.getItem("userInfo") || "{}");
+    } catch {
+        return {};
+    }
+};
+
+const userInfo = computed(() => getUserInfo());
+const isLogin = computed(() => !!userInfo.value?.userId);
+
 const orderForm = ref({
-    userId: 1,
+    userId: userInfo.value?.userId ?? null,
     storeId: parsePositiveId(route.query.storeId, 1),
     tableId: parsePositiveId(route.query.tableId),
     reservationId: parsePositiveId(route.query.reservationId),
@@ -67,8 +79,23 @@ const orderForm = ref({
     pointsUsed: 0,
 });
 
-const selectedStoreName = computed(() => firstQueryValue(route.query.storeName) || `門市 ${orderForm.value.storeId}`);
-
+const storeInfo = ref(null);
+const selectedStoreName = computed(() => {
+    return (
+        firstQueryValue(route.query.storeName) ||
+        storeInfo.value?.storeName ||
+        `門市 ${orderForm.value.storeId}`
+    );
+});
+async function loadStoreInfo(storeId) {
+    try {
+        const response = await axios.get(`/api/stores/${storeId}`);
+        storeInfo.value = response.data?.data ?? response.data ?? null;
+    } catch (error) {
+        console.error("取得門市資料失敗", error);
+        storeInfo.value = null;
+    }
+}
 const step = ref("MENU");
 // MENU = 點餐畫面
 // CHECKOUT = 結帳確認畫面
@@ -83,6 +110,8 @@ const customerForm = ref({
     invoiceType: "NONE",
     carrierNumber: "",
 });
+
+
 
 const touched = ref({
     customerName: false,
@@ -241,6 +270,11 @@ const menuItems = ref([...fallbackMenuItems]);
 
 const cartItems = ref([]);
 
+const selectedMenuItem = ref(null);
+const selectedQuantity = ref(1);
+const selectedNote = ref("");
+const showItemModal = ref(false);
+const showCartModal = ref(false);
 // =========================
 // Computed
 // =========================
@@ -265,6 +299,67 @@ const totalAmount = computed(() => {
         return sum + item.price * item.quantity;
     }, 0);
 });
+
+const safePointsUsed = computed(() => {
+    const points = Number(orderForm.value.pointsUsed || 0);
+    return Math.max(points, 0);
+});
+
+const estimatedFinalAmount = computed(() => {
+    if (!isLogin.value) {
+        return totalAmount.value;
+    }
+
+    return Math.max(totalAmount.value - safePointsUsed.value, 0);
+});
+const memberPointBalance = ref(0);
+async function loadMemberPoints() {
+    if (!isLogin.value) return;
+
+    try {
+        const token = localStorage.getItem("accessToken");
+
+        const response = await axios.get("/api/members/me/points", {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        console.log("會員點數 API 回傳：", response.data);
+
+        const data = response.data.data;
+
+        memberPointBalance.value =
+            data.pointBalance ??
+            data.point_balance ??
+            data.balance ??
+            0;
+
+    } catch (error) {
+        console.error("取得會員點數失敗", error.response?.data || error);
+        memberPointBalance.value = 0;
+    }
+}
+const maxUsablePoints = computed(() => {
+    const maxByOrder = Math.floor(totalAmount.value * 0.3); // 單筆最多折抵 30%
+    return Math.min(memberPointBalance.value, maxByOrder);
+});
+
+watch(
+    () => orderForm.value.pointsUsed,
+    (value) => {
+        const points = Number(value || 0);
+
+        if (points < 0) {
+            orderForm.value.pointsUsed = 0;
+            return;
+        }
+
+        if (points > maxUsablePoints.value) {
+            orderForm.value.pointsUsed = maxUsablePoints.value;
+        }
+    }
+);
 
 const isCarrierValid = computed(() => {
     return /^\/(?=.*[A-Z])(?=.*\d)[0-9A-Z.+-]{7}$/.test(
@@ -334,17 +429,18 @@ const getMenuItemImage = (item) => {
     return tofuImg;
 };
 
-const unwrap = (response) => response.data?.data ?? response.data ?? [];
+const unwrap = (response) => response.data?.data ?? [];
 
 const normalizeStoreMenuItem = (item) => ({
-    id: item.id ?? item.menuItemId,
+    id: item.id,
     categoryId: Number(item.categoryId),
     itemName: item.itemName,
     description: item.description || "",
-    price: Number(item.finalPrice ?? item.price ?? 0),
+    price: Number(item.finalPrice),
     imageUrl: getMenuItemImage(item),
-    status: item.isSelectable === false ? "SOLD_OUT" : "AVAILABLE",
+    status: item.isSelectable ? "AVAILABLE" : "SOLD_OUT",
     allergenInfo: item.allergenInfo || "無",
+    featureTags: item.featureTags || [],
 });
 
 const menuLoadError = ref("");
@@ -355,16 +451,82 @@ async function loadStoreMenu(storeId) {
     try {
         const response = await axios.get(`/api/menu-items/store/${storeId}`);
         const items = unwrap(response);
+
         if (Array.isArray(items) && items.length > 0) {
             menuItems.value = items.map(normalizeStoreMenuItem);
             return;
         }
+
         menuItems.value = [...fallbackMenuItems];
         menuLoadError.value = "此門市目前沒有可供應菜單，暫時顯示示範菜單";
     } catch (error) {
         menuItems.value = [...fallbackMenuItems];
         menuLoadError.value = "門市菜單暫時無法載入，暫時顯示示範菜單";
     }
+}
+
+const showStorePicker = ref(false);
+const storeOptions = ref([]);
+const selectedPickerStoreId = ref(null);
+const pickupTime = ref("ASAP");
+
+const pickupTimeOptions = [];
+
+for (let hour = 11; hour <= 20; hour++) {
+    pickupTimeOptions.push({
+        value: `${String(hour).padStart(2, "0")}:00`,
+        label: `${String(hour).padStart(2, "0")}:00`,
+    });
+
+    if (hour !== 20) {
+        pickupTimeOptions.push({
+            value: `${String(hour).padStart(2, "0")}:30`,
+            label: `${String(hour).padStart(2, "0")}:30`,
+        });
+    }
+}
+
+const selectedPickupTime = computed(() => {
+    return firstQueryValue(route.query.pickupTime) || pickupTime.value;
+});
+
+async function loadStoreOptions() {
+    const response = await axios.get("/api/stores");
+    storeOptions.value = response.data?.data ?? response.data ?? [];
+
+    if (storeOptions.value.length > 0) {
+        selectedPickerStoreId.value = storeOptions.value[0].storeId;
+    }
+}
+
+async function confirmStorePicker() {
+    if (!selectedPickerStoreId.value) {
+        showError("請選擇取餐門市");
+        return;
+    }
+
+    const store = storeOptions.value.find(
+        item => item.storeId === selectedPickerStoreId.value
+    );
+
+    router.replace({
+        name: "CustomerOrder",
+        query: {
+            storeId: store.storeId,
+            storeName: store.storeName,
+            orderType: "TAKEOUT",
+            pickupTime: pickupTime.value,
+        },
+    });
+
+    showStorePicker.value = false;
+
+    orderForm.value.storeId = store.storeId;
+    orderForm.value.orderType = "TAKEOUT";
+    cartItems.value = [];
+
+    await loadStoreInfo(store.storeId);
+    await loadStoreMenu(store.storeId);
 }
 
 watch(
@@ -399,14 +561,28 @@ watch(
 
 // =========================
 // Cart Functions
-
 function addItem(menuItem) {
+    selectedMenuItem.value = menuItem;
+    selectedQuantity.value = 1;
+    selectedNote.value = "";
+    showItemModal.value = true;
+}
+
+function confirmAddItem() {
+    if (!selectedMenuItem.value) return;
+
+    const menuItem = selectedMenuItem.value;
+
     const existItem = cartItems.value.find(
         (item) => item.menuItemId === menuItem.id
     );
 
     if (existItem) {
-        existItem.quantity += 1;
+        existItem.quantity += selectedQuantity.value;
+
+        if (selectedNote.value.trim()) {
+            existItem.note = selectedNote.value.trim();
+        }
     } else {
         cartItems.value.push({
             menuItemId: menuItem.id,
@@ -415,12 +591,29 @@ function addItem(menuItem) {
             price: menuItem.price,
             imageUrl: menuItem.imageUrl,
             allergenInfo: menuItem.allergenInfo,
-            quantity: 1,
-            note: "",
+            quantity: selectedQuantity.value,
+            note: selectedNote.value.trim(),
         });
     }
-}
 
+    showItemModal.value = false;
+
+    Swal.fire({
+        icon: "success",
+        title: "已加入購物車",
+        text: `${menuItem.itemName} 已加入購物車`,
+        showCancelButton: true,
+        confirmButtonText: "查看購物車",
+        cancelButtonText: "繼續點餐",
+        confirmButtonColor: "#e8ad78",
+    }).then((result) => {
+        if (result.isConfirmed) {
+            showCartModal.value = true;
+        }
+    });
+
+    selectedMenuItem.value = null;
+}
 function increaseQuantity(item) {
     item.quantity += 1;
 }
@@ -475,7 +668,23 @@ function formatOnlyNumber(maxLength) {
         .slice(0, maxLength);
 }
 
+
+
 async function submitOrder() {
+
+    if (customerForm.value.paymentMethod === "CASH" && !isLogin.value) {
+        await Swal.fire({
+            icon: "warning",
+            title: "現金付款需登入會員",
+            text: "為避免未取餐或假訂單，現金付款請先登入或註冊會員。",
+            confirmButtonText: "前往登入",
+            confirmButtonColor: "#e8ad78",
+        });
+
+        router.push("/login");
+        return;
+    }
+
 
     if (
         customerForm.value.invoiceType === "MOBILE_BARCODE" &&
@@ -541,14 +750,45 @@ async function submitOrder() {
         alert("內用訂單需要桌位資訊，請從訂位或桌邊 QR Code 進入點餐");
         return;
     }
+    const confirmResult = await Swal.fire({
+        icon: "question",
+        title: "確認送出訂單？",
+        html: `
+        <div style="text-align:left; line-height:1.9">
+            <p><strong>取餐門市：</strong>${selectedStoreName.value}</p>
+            <p><strong>取餐時間：</strong>${selectedPickupTime.value === "ASAP" ? "立即取餐" : selectedPickupTime.value}</p>
 
+            <hr />
+
+            <p><strong>訂單明細：</strong></p>
+            ${cartItems.value.map(item => `
+                <p>${item.itemName} × ${item.quantity}　NT$${item.price * item.quantity}</p>
+            `).join("")}
+
+            <hr />
+
+            <p><strong>餐點總額：</strong>NT$${totalAmount.value}</p>
+            <p><strong>點數折抵：</strong>NT$${safePointsUsed.value}</p>
+            <p><strong>應付金額：</strong>NT$${estimatedFinalAmount.value}</p>
+        </div>
+    `,
+        showCancelButton: true,
+        confirmButtonText: "確認送出",
+        cancelButtonText: "返回修改",
+        confirmButtonColor: "#e8ad78",
+        cancelButtonColor: "#aaa",
+    });
+
+    if (!confirmResult.isConfirmed) {
+        return;
+    }
     const request = {
-        userId: orderForm.value.userId,
+        userId: isLogin.value ? userInfo.value.userId : null,
         storeId: orderForm.value.storeId,
         tableId: orderForm.value.orderType === "DINE_IN" ? orderForm.value.tableId : null,
         reservationId: orderForm.value.reservationId,
         orderType: orderForm.value.orderType,
-        pointsUsed: orderForm.value.pointsUsed,
+        pointsUsed: isLogin.value ? Number(orderForm.value.pointsUsed || 0) : 0,
         invoiceType: customerForm.value.invoiceType,
         carrierNumber: customerForm.value.carrierNumber,
         paymentMethod: customerForm.value.paymentMethod,
@@ -563,7 +803,6 @@ async function submitOrder() {
 
     const response = await axios.post("/api/orders", request);
     const orderId = response.data.orderId;
-
     // if (customerForm.value.paymentMethod === "LINE_PAY") {
     //     pusrouter.h(`/payment/linepay/${orderId}`);
     //     return;
@@ -592,7 +831,7 @@ async function submitOrder() {
         await Swal.fire({
             icon: "success",
             title: "訂單建立成功",
-            text: "即將前往 Line Pay 付款頁面",
+            text: "即將前往 LINE Pay 付款頁面",
             confirmButtonText: "前往付款",
             confirmButtonColor: "#e8ad78",
         });
@@ -601,18 +840,29 @@ async function submitOrder() {
             `http://localhost:8080/api/payments/linepay/request/${orderId}`;
         return;
     }
-
-    // 現場付款
+   
     await Swal.fire({
         icon: "success",
-        title: "訂單送出成功",
-        text: "請至櫃台完成付款與取餐",
-        confirmButtonText: "確認",
-        timer: 5000,
+        title: "訂單建立成功",
+        html: `
+        <div style="text-align:left; line-height:1.9">
+            <p><strong>取餐門市：</strong>${selectedStoreName.value}</p>
+            <p><strong>取餐時間：</strong>${selectedPickupTime.value === "ASAP" ? "立即取餐" : selectedPickupTime.value}</p>
+            <p><strong>付款方式：</strong>現場付款</p>
+
+            <hr />
+
+            <p style="color:#d88938; font-weight:700">
+                請於取餐時間至櫃台完成付款並領取餐點。
+            </p>
+        </div>
+    `,
+        confirmButtonText: "回首頁",
         confirmButtonColor: "#e8ad78",
     });
 
     cartItems.value = [];
+    orderForm.value.pointsUsed = 0;
 
     customerForm.value = {
         customerName: "",
@@ -630,15 +880,24 @@ async function submitOrder() {
         phone: false,
     };
 
+    showCartModal.value = false;
+    showItemModal.value = false;
     step.value = "MENU";
-    window.scrollTo({
-        top: 0,
-        behavior: "smooth",
-    });
+
+    router.push("/");
 }
 
-onMounted(() => {
-    loadStoreMenu(orderForm.value.storeId);
+onMounted(async () => {
+    await loadMemberPoints();
+
+    if (!route.query.storeId) {
+        await loadStoreOptions();
+        showStorePicker.value = true;
+        return;
+    }
+
+    await loadStoreInfo(orderForm.value.storeId);
+    await loadStoreMenu(orderForm.value.storeId);
 });
 // =========================
 </script>
@@ -654,7 +913,9 @@ onMounted(() => {
                     <p>選擇餐點加入購物車，確認後送出訂單。</p>
                     <p class="store-context">
                         目前門市：<strong>{{ selectedStoreName }}</strong>
-                        <span>#{{ orderForm.storeId }}</span>
+                        <span v-if="selectedPickupTime">
+                            取餐時間：{{ selectedPickupTime === "ASAP" ? "立即取餐" : selectedPickupTime }}
+                        </span>
                     </p>
                 </div>
 
@@ -694,37 +955,41 @@ onMounted(() => {
                         <!-- 之後可拆 MenuCard.vue -->
                         <!-- ========================= -->
                         <article v-for="item in filteredMenuItems" :key="item.id" class="menu-card">
-                            <div class="menu-info">
-                                <span class="menu-id">#{{ item.id }}</span>
+                            <div class="menu-main">
+                                <div class="menu-text">
 
-                                <h3>{{ item.itemName }}</h3>
 
-                                <p class="description">
-                                    {{ item.description }}
-                                </p>
+                                    <h3>{{ item.itemName }}</h3>
 
-                                <p class="category">
-                                    分類：
-                                    {{
-                                        categories.find((category) => category.id === item.categoryId)
-                                            ?.name
-                                    }}
-                                </p>
+                                    <p class="description">
+                                        {{ item.description }}
+                                    </p>
 
-                                <p class="status">狀態：{{ item.status }}</p>
+                                    <div class="menu-meta">
+                                        <span>
+                                            分類：{{
+                                                categories.find((category) => category.id === item.categoryId)?.name
+                                            }}
+                                        </span>
+                                        <span>過敏原：{{ item.allergenInfo }}</span>
+                                    </div>
+                                </div>
 
-                                <small class="allergen">
-                                    過敏原：{{ item.allergenInfo }}
-                                </small>
-
-                                <div class="menu-bottom">
-                                    <button @click="addItem(item)">＋</button>
-                                    <strong>NT${{ item.price }}</strong>
+                                <div class="image-wrapper">
+                                    <img :src="item.imageUrl" :alt="item.itemName" />
                                 </div>
                             </div>
 
-                            <div class="image-wrapper">
-                                <img :src="item.imageUrl" :alt="item.itemName" />
+                            <div class="menu-bottom">
+                                <strong>NT${{ item.price }}</strong>
+
+                                <button v-if="item.status === 'AVAILABLE'" type="button" @click="addItem(item)">
+                                    ＋
+                                </button>
+
+                                <button v-else type="button" disabled class="sold-out-btn">
+                                    已售完
+                                </button>
                             </div>
                         </article>
                     </div>
@@ -733,47 +998,68 @@ onMounted(() => {
                 <aside class="cart-section">
                     <h2>您的訂單</h2>
 
-                    <div v-if="cartItems.length === 0" class="empty-cart">
-                        尚未加入餐點
-                    </div>
+                    <div class="cart-preview">
+                        <div class="cart-preview-header">
+                            <span>購物車明細</span>
+                            <span>{{ cartItems.length }} 項</span>
+                        </div>
 
-                    <div v-else class="cart-list">
-                        <div v-for="item in cartItems" :key="item.menuItemId" class="cart-item">
-                            <img :src="item.imageUrl" :alt="item.itemName" />
+                        <div v-if="cartItems.length === 0" class="empty-cart">
+                            尚未加入餐點
+                        </div>
 
-                            <div class="cart-info">
-                                <small>#{{ item.menuItemId }}</small>
+                        <div v-else class="cart-list">
+                            <div v-for="item in cartItems" :key="item.menuItemId" class="cart-row">
+                                <div>
+                                    <div class="cart-name">{{ item.itemName }}</div>
+                                    <div class="cart-qty">數量 × {{ item.quantity }}</div>
+                                </div>
 
-                                <h4>{{ item.itemName }}</h4>
-
-                                <p>NT${{ item.price }}</p>
-
-                                <small>過敏原：{{ item.allergenInfo }}</small>
-
-                                <textarea v-model="item.note" placeholder="餐點備註，例如：不要蔥、少辣"></textarea>
+                                <div class="cart-price">
+                                    NT${{ item.price * item.quantity }}
+                                </div>
                             </div>
 
-                            <div class="quantity-control">
-                                <button @click="decreaseQuantity(item)">－</button>
-                                <span>{{ item.quantity }}</span>
-                                <button @click="increaseQuantity(item)">＋</button>
-                            </div>
-
-                            <div class="cart-price">
-                                NT${{ item.price * item.quantity }}
-                                <button @click="removeItem(item.menuItemId)">移除</button>
-                            </div>
+                            <button class="cart-open-btn" type="button" @click="showCartModal = true">
+                                查看完整購物車
+                            </button>
                         </div>
                     </div>
 
-                    <div class="points-box">
-                        <label>使用點數</label>
-                        <input v-model.number="orderForm.pointsUsed" type="number" min="0" />
+
+
+                    <div v-if="isLogin" class="points-box">
+                        <div class="points-header">
+                            <label>使用點數</label>
+                            <span>可用 {{ memberPointBalance }} 點</span>
+                        </div>
+
+                        <input v-model.number="orderForm.pointsUsed" type="number" min="0" :max="maxUsablePoints" />
+
+                        <small>
+                            本單最多可折抵 {{ maxUsablePoints }} 點，送出訂單後才會扣點
+                        </small>
                     </div>
 
-                    <div class="total-box">
-                        <span>預估總金額</span>
-                        <strong>NT${{ totalAmount }}</strong>
+                    <div v-else class="guest-hint">
+                        非會員可使用線上支付點餐；現金付款需先登入會員。
+                    </div>
+
+                    <div class="amount-summary">
+                        <div class="amount-row">
+                            <span>餐點總額</span>
+                            <strong>NT${{ totalAmount }}</strong>
+                        </div>
+
+                        <div v-if="isLogin && safePointsUsed > 0" class="amount-row discount">
+                            <span>點數折抵</span>
+                            <strong>- NT${{ safePointsUsed }}</strong>
+                        </div>
+
+                        <div class="amount-row final">
+                            <span>應付金額</span>
+                            <strong>NT${{ estimatedFinalAmount }}</strong>
+                        </div>
                     </div>
 
                     <button class="submit-btn" :disabled="cartItems.length === 0" @click="goCheckout">
@@ -793,14 +1079,16 @@ onMounted(() => {
                 </div>
 
                 <div class="checkout-total">
-                    <span>總付款金額</span>
-                    <strong>NT${{ totalAmount }}</strong>
+                    <span>應付金額</span>
+                    <strong>NT${{ estimatedFinalAmount }}</strong>
                 </div>
             </div>
 
             <div class="checkout-form">
-                <h2>確認訂單與填寫聯絡資訊</h2>
+                <div class="checkout-header">
+                    <h2>填寫付款與聯絡資訊</h2>
 
+                </div>
                 <div class="form-card">
                     <h3>付款方式</h3>
 
@@ -843,9 +1131,11 @@ onMounted(() => {
                     </div>
 
                     <div v-if="customerForm.paymentMethod === 'LINE_PAY'" class="payment-info-box">
-                        <p>Line Pay 掃碼付款</p>
-                        <div class="fake-qr">QR</div>
-                        <small>Demo 用：正式版會由後端金流 API 產生付款連結或 QR Code。</small>
+                        <p>LINE Pay 付款</p>
+                        <small>
+                            送出訂單後，系統將導向 LINE Pay 付款頁面。
+                            可使用 Sandbox 帳號登入，或掃描 LINE Pay 頁面提供的 QR Code 完成付款。
+                        </small>
                     </div>
 
                     <div v-if="customerForm.paymentMethod === 'CREDIT_CARD'" class="payment-info-box">
@@ -870,9 +1160,19 @@ onMounted(() => {
                         </div>
                     </div>
 
-                    <div class="payment-total">
-                        付款金額
+                    <div class="checkout-total">
+                        <span>餐點總額</span>
                         <strong>NT${{ totalAmount }}</strong>
+                    </div>
+
+                    <div v-if="isLogin && safePointsUsed > 0" class="checkout-total discount">
+                        <span>點數折抵</span>
+                        <strong>- NT${{ safePointsUsed }}</strong>
+                    </div>
+
+                    <div class="checkout-total final">
+                        <span>應付金額</span>
+                        <strong>NT${{ estimatedFinalAmount }}</strong>
                     </div>
                 </div>
 
@@ -1033,10 +1333,165 @@ onMounted(() => {
                 </button>
             </div>
         </section>
+        <div v-if="showItemModal && selectedMenuItem" class="modal-mask">
+            <div class="item-modal">
+                <button class="modal-close" @click="showItemModal = false">×</button>
+
+                <img class="modal-food-img" :src="selectedMenuItem.imageUrl" :alt="selectedMenuItem.itemName" />
+
+                <div class="modal-food-info">
+                    <h2>{{ selectedMenuItem.itemName }}</h2>
+                    <p>{{ selectedMenuItem.description }}</p>
+                    <strong>NT${{ selectedMenuItem.price }}</strong>
+                    <small>過敏原：{{ selectedMenuItem.allergenInfo }}</small>
+                </div>
+
+                <textarea v-model="selectedNote" class="modal-note" placeholder="餐點備註，例如：不要蔥、少辣"></textarea>
+
+                <div class="modal-bottom">
+                    <div class="modal-qty">
+                        <button @click="selectedQuantity = Math.max(1, selectedQuantity - 1)">－</button>
+                        <span>{{ selectedQuantity }}</span>
+                        <button @click="selectedQuantity++">＋</button>
+                    </div>
+
+                    <button class="modal-add-btn" @click="confirmAddItem">
+                        加入購物車 NT${{ selectedMenuItem.price * selectedQuantity }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="showCartModal" class="modal-mask">
+            <div class="cart-modal">
+                <button class="modal-close" @click="showCartModal = false">×</button>
+
+                <h2>您的購物車</h2>
+
+                <div v-for="item in cartItems" :key="item.menuItemId" class="modal-cart-item">
+                    <img :src="item.imageUrl" :alt="item.itemName" />
+
+                    <div>
+                        <h4>{{ item.itemName }}</h4>
+                        <p>NT${{ item.price }}</p>
+                        <small v-if="item.note">備註：{{ item.note }}</small>
+
+                        <div class="modal-qty small">
+                            <button @click="decreaseQuantity(item)">－</button>
+                            <span>{{ item.quantity }}</span>
+                            <button @click="increaseQuantity(item)">＋</button>
+                        </div>
+
+                        <button class="modal-remove-btn" @click="removeItem(item.menuItemId)">
+                            移除
+                        </button>
+                    </div>
+
+                    <strong>NT${{ item.price * item.quantity }}</strong>
+                </div>
+
+                <div class="amount-summary">
+                    <div class="amount-row">
+                        <span>餐點總額</span>
+                        <strong>NT${{ totalAmount }}</strong>
+                    </div>
+
+                    <div v-if="isLogin && safePointsUsed > 0" class="amount-row discount">
+                        <span>點數折抵</span>
+                        <strong>- NT${{ safePointsUsed }}</strong>
+                    </div>
+
+                    <div class="amount-row final">
+                        <span>應付金額</span>
+                        <strong>NT${{ estimatedFinalAmount }}</strong>
+                    </div>
+                </div>
+
+                <button class="modal-add-btn" @click="
+                    showCartModal = false;
+                goCheckout();
+                ">
+                    前往結帳
+                </button>
+            </div>
+        </div>
+        <div v-if="showStorePicker" class="modal-mask">
+            <div class="store-picker-modal">
+                <h2>選擇取餐門市</h2>
+                <p>請先選擇門市與取餐時間，再開始點餐。</p>
+
+                <label>取餐門市</label>
+                <select v-model="selectedPickerStoreId">
+                    <option v-for="store in storeOptions" :key="store.storeId" :value="store.storeId">
+                        {{ store.storeName }}｜{{ store.city }}{{ store.district }}
+                    </option>
+                </select>
+
+                <label>取餐時間</label>
+                <select v-model="pickupTime">
+                    <option v-for="time in pickupTimeOptions" :key="time.value" :value="time.value">
+                        {{ time.label }}
+                    </option>
+                </select>
+
+                <button class="modal-add-btn" type="button" @click="confirmStorePicker">
+                    開始點餐
+                </button>
+            </div>
+        </div>
     </main>
 </template>
 
 <style scoped>
+.store-picker-modal {
+    width: min(520px, 100%);
+    background: #fff;
+    border-radius: 22px;
+    padding: 32px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+}
+
+.store-picker-modal h2 {
+    margin: 0 0 10px;
+    color: #23466b;
+}
+
+.store-picker-modal p {
+    margin-bottom: 24px;
+    color: #667;
+}
+
+.store-picker-modal label {
+    display: block;
+    margin: 16px 0 8px;
+    color: #23466b;
+    font-weight: 800;
+}
+
+.store-picker-modal select {
+    width: 100%;
+    height: 46px;
+    border: 1px solid #efc18c;
+    border-radius: 10px;
+    padding: 0 12px;
+}
+
+.feature-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0;
+}
+
+.feature-tag {
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #fff3e4;
+    color: #8c6335;
+    font-size: 12px;
+    font-weight: 600;
+}
+
 .required {
     color: #d32f2f;
     font-weight: 700;
@@ -1375,12 +1830,14 @@ onMounted(() => {
 }
 
 .menu-card {
-    display: grid;
-    grid-template-columns: 1fr 210px;
-    gap: 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 260px;
     background: white;
-    border-radius: 16px;
-    padding: 20px;
+    border-radius: 18px;
+    padding: 22px;
     box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
 }
 
@@ -1421,22 +1878,7 @@ onMounted(() => {
     color: #667;
 }
 
-.menu-bottom {
-    margin-top: auto;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
 
-.menu-bottom button {
-    width: 34px;
-    height: 34px;
-    border: none;
-    background: #ff8500;
-    color: white;
-    font-size: 22px;
-    cursor: pointer;
-}
 
 .cart-section {
     position: sticky;
@@ -1572,8 +2014,7 @@ onMounted(() => {
     box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
 }
 
-.checkout-summary h2,
-.checkout-form h2 {
+.checkout-summary h2 {
     margin-bottom: 24px;
 }
 
@@ -1586,10 +2027,30 @@ onMounted(() => {
 }
 
 .checkout-total {
-    margin-top: 24px;
+    margin-top: 18px;
     display: flex;
     justify-content: space-between;
-    font-size: 22px;
+    align-items: center;
+    color: #123b67;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.checkout-total strong {
+    color: #d88938;
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.checkout-total.final {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed #f0d2b4;
+    font-size: 18px;
+}
+
+.checkout-total.final strong {
+    font-size: 24px;
 }
 
 .checkout-form {
@@ -1632,5 +2093,589 @@ onMounted(() => {
     border-radius: 12px;
     font-size: 18px;
     cursor: pointer;
+}
+
+.menu-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 260px;
+    background: white;
+    border-radius: 18px;
+    padding: 22px;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+}
+
+.menu-main {
+    display: grid;
+    grid-template-columns: 1fr 180px;
+    gap: 18px;
+    align-items: start;
+}
+
+.menu-text {
+    min-width: 0;
+}
+
+.menu-id {
+    font-size: 13px;
+    color: #888;
+}
+
+.menu-text h3 {
+    font-size: 22px;
+    margin: 8px 0 10px;
+    color: #23466b;
+}
+
+.description {
+    margin: 0 0 14px;
+    line-height: 1.7;
+    color: #667;
+}
+
+.menu-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: #888;
+    font-size: 13px;
+}
+
+.image-wrapper {
+    width: 180px;
+    height: 130px;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #f7f1ea;
+}
+
+.image-wrapper img,
+.cart-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.menu-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #f1e3d6;
+    overflow: visible;
+}
+
+.menu-bottom strong {
+    color: #23466b;
+    font-size: 20px;
+}
+
+.menu-bottom button {
+    width: 42px;
+    height: 42px;
+    border: none;
+    border-radius: 50%;
+    background: #e8ad78;
+    color: white;
+    font-size: 24px;
+    font-weight: 800;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.menu-bottom button:hover {
+    background: #d8955e;
+}
+
+.menu-bottom .sold-out-btn {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.cart-item-image {
+    width: 72px !important;
+    height: 72px !important;
+    border-radius: 12px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #f7f1ea;
+}
+
+.points-box {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid #f1e3d6;
+}
+
+.points-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.points-header label {
+    margin: 0;
+    color: #23466b;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.points-header span {
+    color: #8c6335;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.points-box input {
+    width: 100%;
+    height: 42px;
+    padding: 0 12px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    font-size: 15px;
+}
+
+.points-box small {
+    display: block;
+    margin-top: 6px;
+    color: #8a99a8;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.amount-summary {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid #f1e3d6;
+}
+
+.amount-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    color: #40566f;
+    font-size: 15px;
+}
+
+.amount-row strong {
+    font-size: 16px;
+    color: #23466b;
+}
+
+.amount-row.discount {
+    color: #8c6335;
+}
+
+.amount-row.discount strong {
+    color: #8c6335;
+}
+
+.amount-row.final {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed #ead7c5;
+    font-size: 18px;
+    font-weight: 900;
+}
+
+.amount-row.final strong {
+    font-size: 24px;
+    color: #23466b;
+}
+
+.cart-brief {
+    padding: 14px 0;
+    color: #40566f;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.modal-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.item-modal,
+.cart-modal {
+    position: relative;
+    width: min(680px, 100%);
+    max-height: 90vh;
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 22px;
+    padding: 32px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+}
+
+.cart-modal {
+    width: min(620px, 100%);
+}
+
+.modal-close {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 50%;
+    background: #ccc;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.modal-food-img {
+    width: 260px;
+    height: 180px;
+    border-radius: 16px;
+    object-fit: cover;
+    margin-bottom: 20px;
+}
+
+.modal-food-info h2 {
+    color: #23466b;
+    margin: 0 0 10px;
+}
+
+.modal-food-info p {
+    color: #667;
+    line-height: 1.7;
+}
+
+.modal-food-info strong {
+    display: block;
+    color: #23466b;
+    font-size: 26px;
+    margin: 12px 0;
+}
+
+.modal-food-info small {
+    color: #888;
+}
+
+.modal-note {
+    width: 100%;
+    min-height: 86px;
+    margin-top: 20px;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    resize: vertical;
+}
+
+.modal-bottom {
+    display: grid;
+    grid-template-columns: 170px 1fr;
+    gap: 18px;
+    margin-top: 22px;
+}
+
+.modal-qty {
+    display: grid;
+    grid-template-columns: 46px 1fr 46px;
+    height: 48px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.modal-qty button {
+    border: none;
+    background: #fff;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.modal-qty span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+}
+
+.modal-qty.small {
+    width: 120px;
+    height: 34px;
+    grid-template-columns: 34px 1fr 34px;
+    margin-top: 10px;
+}
+
+.modal-add-btn {
+    border: none;
+    border-radius: 12px;
+    background: #ff8500;
+    color: white;
+    font-size: 18px;
+    font-weight: 900;
+    cursor: pointer;
+    padding: 14px;
+}
+
+.modal-cart-item {
+    display: grid;
+    grid-template-columns: 74px 1fr auto;
+    gap: 14px;
+    align-items: start;
+    padding: 16px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.modal-cart-item img {
+    width: 74px;
+    height: 74px;
+    border-radius: 12px;
+    object-fit: cover;
+}
+
+.modal-cart-item h4 {
+    margin: 0 0 4px;
+    color: #23466b;
+}
+
+.modal-cart-item p,
+.modal-cart-item small {
+    margin: 0;
+    color: #888;
+}
+
+.modal-remove-btn {
+    margin-top: 8px;
+    border: none;
+    background: transparent;
+    color: #ff8500;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.cart-preview {
+    background: #fff9f2;
+    border: 1.5px solid #efc18c;
+    border-radius: 18px;
+    padding: 18px;
+}
+
+.cart-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    font-weight: 700;
+}
+
+.cart-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    font-weight: 700;
+}
+
+.cart-preview-header span:first-child {
+    color: #123b67;
+    font-size: 20px;
+}
+
+.cart-preview-header span:last-child {
+    color: #d88b3a;
+    background: #fff;
+    padding: 4px 10px;
+    border-radius: 20px;
+}
+
+.cart-empty {
+    font-size: 13px;
+    color: #999;
+}
+
+.cart-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cart-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f4d8b5;
+}
+
+.cart-row:last-child {
+    border: none;
+}
+
+.cart-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.cart-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #123b67;
+}
+
+.cart-qty {
+    margin-top: 5px;
+    color: #999;
+    font-size: 13px;
+}
+
+.cart-price {
+    color: #d88938;
+    font-size: 22px;
+    font-weight: bold;
+}
+
+.cart-open-btn {
+    width: 100%;
+    margin-top: 18px;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    background: #e8a96d;
+    color: white;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: .2s;
+}
+
+.cart-open-btn:hover {
+    background: #d9904d;
+    transform: translateY(-2px);
+}
+
+.points-box {
+    margin-top: 22px;
+    padding: 18px;
+    background: #fff9f2;
+    border: 1.5px solid #efc18c;
+    border-radius: 18px;
+}
+
+.points-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.points-header label {
+    margin: 0;
+    color: #123b67;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.points-header span {
+    background: #ffffff;
+    color: #d88938;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.points-box input {
+    width: 100%;
+    height: 42px;
+    border: 1px solid #efc18c;
+    border-radius: 10px;
+    padding: 0 12px;
+    font-size: 15px;
+    color: #123b67;
+    box-sizing: border-box;
+    transition: 0.2s;
+}
+
+.points-box input:focus {
+    outline: none;
+    border-color: #e8a96d;
+    box-shadow: 0 0 0 3px rgba(232, 169, 109, 0.2);
+}
+
+.points-box small {
+    display: block;
+    margin-top: 8px;
+    color: #8a99a8;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.submit-btn {
+    margin-top: 24px;
+    width: 100%;
+    border: none;
+    background: #e8ad78;
+    color: white;
+    padding: 14px;
+    border-radius: 12px;
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.submit-btn:hover:not(:disabled) {
+    background: #d8924d;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 18px rgba(216, 146, 77, 0.35);
+}
+
+.submit-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.submit-btn:disabled {
+    background: #e3c3a4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.submit-btn:hover:not(:disabled) {
+    background: #d8924d;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 18px rgba(216, 146, 77, 0.35);
+}
+
+.checkout-header {
+    margin-bottom: 8px;
+    padding: 20px 24px;
+    background: #fff9f2;
+    border: 1.5px solid #efc18c;
+    border-radius: 18px;
+}
+
+.checkout-header h2 {
+    margin: 0;
+    color: #23466b;
+    font-size: 32px;
+    font-weight: 800;
+}
+
+.checkout-header p {
+    margin: 8px 0 0;
+    color: #8c6335;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.store-picker-modal .modal-add-btn {
+    margin-top: 28px;
 }
 </style>

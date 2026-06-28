@@ -43,6 +43,10 @@ const pageSize = ref(10)
 const currentPage = ref(1)
 const canSelectAllStores = computed(() => canUseAllManagedStores())
 const fixedStoreName = computed(() => stores.value[0]?.storeName || '尚無可管理分店')
+const currentStoreLabel = computed(() => {
+  if (!selectedStoreId.value) return canSelectAllStores.value ? '全部分店' : fixedStoreName.value
+  return stores.value.find((store) => String(store.storeId) === String(selectedStoreId.value))?.storeName || fixedStoreName.value
+})
 const showStoreColumn = computed(() => canSelectAllStores.value)
 const storeNameById = computed(() => buildStoreNameLookup(stores.value))
 const storeName = (storeId) => storeDisplayName(storeNameById.value, storeId)
@@ -272,23 +276,30 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="container-xxl flex-grow-1 container-p-y">
-    <div class="d-flex flex-wrap align-items-center gap-3 py-3 mb-4">
-      <h2 class="mb-0">桌位分配<span class="text-muted fw-light"> / Reservation Table</span></h2>
-    </div>
+    <header class="admin-ops-header">
+      <div>
+        <span>RESERVATION OPS</span>
+        <h1>桌位分配</h1>
+        <p>管理未配桌、已保留與已配桌訂位。</p>
+      </div>
+      <div class="admin-current-store">
+        <small>store</small>
+        <select v-if="canSelectAllStores || stores.length > 1" v-model="selectedStoreId" class="form-select">
+          <option v-if="canSelectAllStores" value="">全部可管理分店</option>
+          <option v-for="store in stores" :key="store.storeId" :value="String(store.storeId)">
+            {{ store.storeName }}
+          </option>
+        </select>
+        <strong v-else>{{ currentStoreLabel }}</strong>
+      </div>
+    </header>
 
     <div class="content-wrapper">
       <div class="card">
         <!-- 查詢篩選 -->
         <div class="card-header d-flex flex-wrap align-items-center gap-2">
-          <h5 class="mb-0">桌位分配名單</h5>
-          <select v-if="canSelectAllStores || stores.length > 1" v-model="selectedStoreId" class="form-select ms-auto store-select">
-            <option v-if="canSelectAllStores" value="">全部可管理分店</option>
-            <option v-for="store in stores" :key="store.storeId" :value="String(store.storeId)">
-              {{ store.storeName }}
-            </option>
-          </select>
-          <div v-else class="ms-auto text-muted px-3">{{ fixedStoreName }}</div>
-          <div class="multi-select dropdown-closable date-select" @click.stop>
+          <h5 class="mb-0">桌位分配名單<span class="text-muted fs-5 fw-normal"> / Table List </span></h5>
+          <div class="multi-select dropdown-closable date-select ms-auto" @click.stop>
             <button type="button" class="form-select text-start" @click="showDateRangeDropdown = !showDateRangeDropdown">
               {{ selectedDateRangeText }}
             </button>
@@ -424,11 +435,11 @@ onBeforeUnmount(() => {
                         <button
                           v-if="item.status === 'ASSIGNED' && !reassigningReservations[item.reservationId]"
                           type="button"
-                          class="btn btn-sm btn-label-primary"
+                          class="btn btn-sm btn-outline-dark"
                           @click="startReassign(item)">
                           重新配桌
                         </button>
-                        <button v-else type="button" class="btn btn-sm btn-primary" @click="assignTable(item.reservationId)">
+                        <button v-else type="button" class="btn btn-sm btn-dark" @click="assignTable(item.reservationId)">
                           分配
                         </button>
                         <button
@@ -457,10 +468,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.store-select {
-  max-width: 200px;
-}
-
 .date-select {
   width: 260px;
   max-width: 100%;

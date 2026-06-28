@@ -303,11 +303,11 @@ INSERT INTO role (role_name, description) VALUES
 -- user_id 依序：1=admin 2=manager 3=staff 4=陳小明 5=林小美 6=store manager
 -- ============================================================
 INSERT INTO user (role_id, email, password_hash, name, phone, birthday) VALUES
-(4, 'admin@xuri.com',     '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '系統管理員', '0900-000-000', '1990-01-01'),
-(3, 'manager@xuri.com',   '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '王店長',     '0911-111-111', '1985-06-15'),
-(2, 'staff@xuri.com',     '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '李店員',     '0955-555-555', '1997-09-10'),
-(1, 'user1@example.com',  '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '陳小明',     '0922-222-222', '1995-03-20'),
-(1, 'user2@example.com',  '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '林小美',     '0933-333-333', '1998-11-08'),
+(4, 'admin@xuri.com',     '$2a$10$rJDF6fkfGR8sCuqi/N6mOuyTqvK0UYIm3Q61GWsbNl/t9.e6HK87.', '系統管理員', '0900-000-000', '1990-01-01'),
+(3, 'manager@xuri.com',   '$2a$10$rJDF6fkfGR8sCuqi/N6mOuyTqvK0UYIm3Q61GWsbNl/t9.e6HK87.', '王店長',     '0911-111-111', '1985-06-15'),
+(2, 'staff@xuri.com',     '$2a$10$rJDF6fkfGR8sCuqi/N6mOuyTqvK0UYIm3Q61GWsbNl/t9.e6HK87.', '李店員',     '0955-555-555', '1997-09-10'),
+(1, 'user1@example.com',  '$2a$10$rJDF6fkfGR8sCuqi/N6mOuyTqvK0UYIm3Q61GWsbNl/t9.e6HK87.', '陳小明',     '0922-222-222', '1995-03-20'),
+(1, 'user2@example.com',  '$2a$10$rJDF6fkfGR8sCuqi/N6mOuyTqvK0UYIm3Q61GWsbNl/t9.e6HK87.', '林小美',     '0933-333-333', '1998-11-08'),
 (3, 'storemanager@store.local', '$2a$10$rJDF6fkfGR8sCuqi/N6mOuyTqvK0UYIm3Q61GWsbNl/t9.e6HK87.', '店長', '0966-666-666', '1992-06-15');
 
 -- ============================================================

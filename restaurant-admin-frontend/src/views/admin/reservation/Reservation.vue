@@ -39,11 +39,15 @@ const rangeOptions = [
   { label: '近一週', value: 7 },
   { label: '近一個月', value: 30 },
 ]
-const selectedRangeDays = ref(1)
+const selectedRangeDays = ref(30)
 
 const selectedDate = ref(formatDateInput(new Date()))
 const canSelectAllStores = computed(() => canUseAllManagedStores())
 const fixedStoreName = computed(() => stores.value[0]?.storeName || '尚無可管理分店')
+const currentStoreLabel = computed(() => {
+  if (!selectedStoreId.value) return canSelectAllStores.value ? '全部分店' : fixedStoreName.value
+  return stores.value.find((store) => String(store.storeId) === String(selectedStoreId.value))?.storeName || fixedStoreName.value
+})
 
 // 依選到的天數值，轉換標題顯示文字
 const selectedRangeLabel = computed(() => {
@@ -86,6 +90,12 @@ const todayStats = computed(() => {
 
 const statusText = reservationStatusText
 const statusClass = reservationStatusClass
+const depositText = (item) => {
+  const amount = Number(item.depositAmount || 0)
+  if (amount <= 0) return '-'
+  return `${item.paymentStatus === 'PAID' ? '已支付' : '未付款'} $${amount.toLocaleString()}`
+}
+const depositClass = (item) => item.paymentStatus === 'PAID' ? 'bg-label-success' : 'bg-label-warning'
 
 // 判斷訂位是否已超過時段；排除在「接下來訂位總數」
 const isPastReservationTime = (item) => {
@@ -325,16 +335,23 @@ onMounted(loadStores)
 <template>
   <div class="content-wrapper">
     <div class="container-xxl flex-grow-1 container-p-y">
-      <div class="d-flex flex-wrap align-items-center gap-3 py-3 mb-4">
-        <h2 class="mb-0">訂位管理總覽<span class="text-muted fw-light"> / Reservation</span></h2>
-        <select v-if="canSelectAllStores || stores.length > 1" v-model="selectedStoreId" class="form-select ms-auto control-select">
-          <option v-if="canSelectAllStores" value="">全部可管理分店</option>
-          <option v-for="store in stores" :key="store.storeId" :value="String(store.storeId)">
-            {{ store.storeName }}
-          </option>
-        </select>
-        <div v-else class="ms-auto text-muted px-3">{{ fixedStoreName }}</div>
-      </div>
+      <header class="admin-ops-header">
+        <div>
+          <span>RESERVATION OPS</span>
+          <h1>訂位管理總覽</h1>
+          <p>查看訂位統計、近期訂位名單與當日入座狀態。</p>
+        </div>
+        <div class="admin-current-store">
+          <small>store</small>
+          <select v-if="canSelectAllStores || stores.length > 1" v-model="selectedStoreId" class="form-select">
+            <option v-if="canSelectAllStores" value="">全部可管理分店</option>
+            <option v-for="store in stores" :key="store.storeId" :value="String(store.storeId)">
+              {{ store.storeName }}
+            </option>
+          </select>
+          <strong v-else>{{ currentStoreLabel }}</strong>
+        </div>
+      </header>
 
       <div v-if="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
       <div v-if="loading" class="alert alert-info">讀取訂位總覽中...</div>
@@ -343,9 +360,8 @@ onMounted(loadStores)
         <!-- 全部訂位數統計 card -->
         <div class="col-sm-6 col-lg-4 mb-4">
           <RouterLink
-            class="card dashboard-card card-border-shadow-primary h-100 text-reset text-decoration-none"
-            :to="{ name: 'AdminReservationList', query: { storeId: selectedStoreId } }"
-          >
+            class="card dashboard-card h-100 text-reset text-decoration-none"
+            :to="{ name: 'AdminReservationList', query: { storeId: selectedStoreId } }">
             <div class="card-body">
               <div class="d-flex align-items-center mb-2 pb-1">
                 <div class="avatar me-2"><span class="avatar-initial rounded bg-label-primary"><i class="bx bx-calendar bx-sm"></i></span></div>
@@ -357,9 +373,8 @@ onMounted(loadStores)
         </div>
         <div class="col-sm-6 col-lg-4 mb-4">
           <RouterLink
-            class="card dashboard-card card-border-shadow-warning h-100 text-reset text-decoration-none"
-            :to="{ name: 'AdminReservationList', query: { storeId: selectedStoreId, status: 'RESERVED' } }"
-          >
+            class="card dashboard-card h-100 text-reset text-decoration-none"
+            :to="{ name: 'AdminReservationList', query: { storeId: selectedStoreId, status: 'RESERVED' } }">
             <div class="card-body">
               <div class="d-flex align-items-center mb-2 pb-1">
                 <div class="avatar me-2"><span class="avatar-initial rounded bg-label-warning"><i class="bx bx-check-double"></i></span></div>
@@ -371,9 +386,8 @@ onMounted(loadStores)
         </div>
         <div class="col-sm-6 col-lg-4 mb-4">
           <RouterLink
-            class="card dashboard-card card-border-shadow-danger h-100 text-reset text-decoration-none"
-            :to="{ name: 'AdminReservationTable', query: { storeId: selectedStoreId } }"
-          >
+            class="card dashboard-card h-100 text-reset text-decoration-none"
+            :to="{ name: 'AdminReservationTable', query: { storeId: selectedStoreId } }">
             <div class="card-body">
               <div class="d-flex align-items-center mb-2 pb-1">
                 <div class="avatar me-2"><span class="avatar-initial rounded bg-label-danger"><i class="bx bx-error"></i></span></div>
@@ -388,7 +402,7 @@ onMounted(loadStores)
       <div class="card mb-4">
         <!-- 今日訂位數統計 card -->
         <div class="card-widget-separator-wrapper">
-          <div class="card-body card-widget-separator">
+          <div class="card-body card-widget-separator" style="border: 1px solid #e1d7cb; border-radius: 0.8cap;">
             <div class="row gy-4 gy-sm-1">
               <div class="col-sm-6 col-lg-3">
                 <div class="d-flex justify-content-between align-items-start card-widget-1 border-end pb-3 pb-sm-0">
@@ -512,20 +526,25 @@ onMounted(loadStores)
                     </div>
                     <div class="three-day-actions">
                       <button v-if="item.status === 'PENDING'" type="button" class="btn btn-sm btn-label-warning" @click="reserveReservation(item)">
-                        確認保留
+                        保留
                       </button>
-                      <button v-if="canEdit(item) && canAssignTable(item) && canSelectTable(item)" type="button" class="btn btn-sm btn-primary" @click="assignTable(item.reservationId)">
+                      <button v-if="canEdit(item) && canAssignTable(item) && canSelectTable(item)" type="button" class="btn btn-sm btn-dark" @click="assignTable(item.reservationId)">
                         分配
                       </button>
                       <button v-if="canEdit(item) && item.status === 'ASSIGNED' && canSelectTable(item)" type="button" class="btn btn-sm btn-label-secondary" @click="cancelReassign(item.reservationId)">
                         取消
                       </button>
-                      <button v-if="canEdit(item) && item.status === 'ASSIGNED' && !canSelectTable(item)" type="button" class="btn btn-sm btn-label-primary" @click="startReassign(item)">
+                      <button v-if="canEdit(item) && item.status === 'ASSIGNED' && !canSelectTable(item)" type="button" class="btn btn-sm btn btn-outline-dark" @click="startReassign(item)">
                         重新配桌
                       </button>
                     </div>
-                    <div v-if="item.specialRequest" class="special-request">
-                      備註：{{ item.specialRequest }}
+                    <div class="d-flex align-items-center gap-2">
+                      <span v-if="Number(item.depositAmount || 0) > 0" class="badge" :class="depositClass(item)">
+                        {{ depositText(item) }}
+                      </span>
+                      <span v-if="item.specialRequest" class="special-request">
+                        備註：{{ item.specialRequest }}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -539,10 +558,6 @@ onMounted(loadStores)
 </template>
 
 <style scoped>
-.control-select {
-  max-width: 250px;
-}
-
 .search-control {
   max-width: 220px;
 }
@@ -555,6 +570,7 @@ onMounted(loadStores)
   display: block;
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+  border: 1px solid #e1d7cb;
 }
 
 .dashboard-card:hover {

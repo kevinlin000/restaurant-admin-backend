@@ -57,6 +57,10 @@ const openSlotDetails = reactive({})
 const canSelectAllStores = computed(() => canUseAllManagedStores())
 const canManageSettings = computed(() => canManageReservationSettings())
 const fixedStoreName = computed(() => stores.value[0]?.storeName || '尚無可管理分店')
+const currentStoreLabel = computed(() => {
+  if (!selectedStoreId.value) return canSelectAllStores.value ? '全部分店' : fixedStoreName.value
+  return stores.value.find((store) => String(store.storeId) === String(selectedStoreId.value))?.storeName || fixedStoreName.value
+})
 
 // 新增時段 modal 表單
 const form = reactive({
@@ -69,6 +73,8 @@ const form = reactive({
   startTime: '12:00',
   endTime: '14:00',
   isOpen: true,
+  requiresDeposit: false,
+  depositAmount: 0,
 })
 
 // 修改時段 modal 表單
@@ -78,6 +84,8 @@ const editForm = reactive({
   startTime: '',
   endTime: '',
   isOpen: true,
+  requiresDeposit: false,
+  depositAmount: 0,
 })
 
 // 新增時段的日期規則(多選下拉選單)
@@ -178,7 +186,7 @@ const buildAggregateSlots = (dateGroups) => {
   const slotsByTime = dateGroups
     .flatMap((group) => group.slots)
     .reduce((items, slot) => {
-      const key = `${slot.startTime?.slice(0, 5)}-${slot.endTime?.slice(0, 5)}-${slot.isOpen ? 1 : 0}`
+      const key = `${slot.startTime?.slice(0, 5)}-${slot.endTime?.slice(0, 5)}-${slot.isOpen ? 1 : 0}-${slot.requiresDeposit ? 1 : 0}-${slot.depositAmount || 0}`
       if (!items[key]) {
         items[key] = {
           ...slot,
@@ -272,7 +280,7 @@ const weekdaySlotGroups = computed(() => {
       weekday: group.weekday,
       reservationDate: '',
       dates: dateGroups.map((dateGroup) => dateGroup.reservationDate).sort(),
-      dateCount: dateGroups.length,
+      // dateCount: dateGroups.length,
       isWeekdayGroup: true,
       slots: buildAggregateSlots(dateGroups),
     }
@@ -453,6 +461,10 @@ const createTimeSlot = async () => {
     createModalError.value = '請至少選擇一個星期規則、區間，或新增自訂日期'
     return
   }
+  if (form.requiresDeposit && Number(form.depositAmount || 0) <= 0) {
+    createModalError.value = '請輸入大於 0 的訂金金額'
+    return
+  }
   saving.value = true
   createModalError.value = ''
   successMessage.value = ''
@@ -464,6 +476,8 @@ const createTimeSlot = async () => {
       endTime: `${form.endTime}:00`,
       isOpen: form.isOpen,
       ruleGenerated: isRuleGeneratedDate(reservationDate),
+      requiresDeposit: form.requiresDeposit,
+      depositAmount: form.requiresDeposit ? Number(form.depositAmount || 0) : 0,
     })))
     const successCount = results.filter((result) => result.status === 'fulfilled').length
     const failedCount = results.length - successCount
@@ -498,6 +512,8 @@ const openEditModal = (slot) => {
   editForm.startTime = firstSlot.startTime?.slice(0, 5) || ''
   editForm.endTime = firstSlot.endTime?.slice(0, 5) || ''
   editForm.isOpen = Boolean(firstSlot.isOpen)
+  editForm.requiresDeposit = Boolean(firstSlot.requiresDeposit)
+  editForm.depositAmount = Number(firstSlot.depositAmount || 0)
   errorMessage.value = ''
   editModalError.value = ''
   successMessage.value = ''
@@ -515,6 +531,10 @@ const closeEditModal = () => {
 // 儲存修改訂位時段
 const updateTimeSlot = async () => {
   if (!editingSlotId.value || !editingSlots.value.length) return
+  if (editForm.requiresDeposit && Number(editForm.depositAmount || 0) <= 0) {
+    editModalError.value = '請輸入大於 0 的訂金金額'
+    return
+  }
   updating.value = true
   editModalError.value = ''
   successMessage.value = ''
@@ -526,6 +546,8 @@ const updateTimeSlot = async () => {
       endTime: `${editForm.endTime}:00`,
       isOpen: editForm.isOpen,
       ruleGenerated: isBulkEditing.value,
+      requiresDeposit: editForm.requiresDeposit,
+      depositAmount: editForm.requiresDeposit ? Number(editForm.depositAmount || 0) : 0,
     })))
     await loadPageData()
     successMessage.value = isBulkEditing.value ? `已統一更新 ${editingSlots.value.length} 筆星期時段` : '訂位時段已更新'
@@ -658,6 +680,8 @@ const openCreateModal = () => {
   form.ruleSelections = []
   form.customDate = ''
   form.customDates = []
+  form.requiresDeposit = false
+  form.depositAmount = 0
   loadModalStoreHolidays()
   showCreateModal.value = true
   showRuleDropdown.value = false
@@ -744,23 +768,29 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="container-xxl flex-grow-1 container-p-y">
-    <h2 class="py-3 mb-4">設定訂位日期＆時段<span class="text-muted fw-light"> / Reservation TimeSlot  Settings</span></h2>
+    <header class="admin-ops-header">
+      <div>
+        <span>RESERVATION OPS</span>
+        <h1>訂位日期＆時段</h1>
+        <p>設定分店可訂位日期、時段、開放天數與查詢剩餘桌數。</p>
+      </div>
+      <div class="admin-current-store">
+        <small>store</small>
+        <select v-if="canSelectAllStores || stores.length > 1" v-model="selectedStoreId" class="form-select">
+          <option v-if="canSelectAllStores" value="">全部可管理分店</option>
+          <option v-for="store in stores" :key="store.storeId" :value="String(store.storeId)">
+            {{ store.storeName }}
+          </option>
+        </select>
+        <strong v-else>{{ currentStoreLabel }}</strong>
+      </div>
+    </header>
 
-    <div class="card card-action mb-4">
+    <div class="card">
       <!-- 查詢時段區 -->
       <div class="card-header py-4">
         <div class="row g-3 align-items-end">
-          <div class="col-12 col-md-4">
-            <label class="form-label">分店</label>
-            <select v-if="canSelectAllStores || stores.length > 1" v-model="selectedStoreId" class="form-select">
-              <option v-if="canSelectAllStores" value="">全部</option>
-              <option v-for="store in stores" :key="store.storeId" :value="String(store.storeId)">
-                {{ store.storeName }}
-              </option>
-            </select>
-            <div v-else class="form-control bg-light">{{ fixedStoreName }}</div>
-          </div>
-          <div class="col-12 col-md-4">
+          <div class="col-12 col-md-5">
             <label class="form-label">查詢區間</label>
             <div class="multi-select dropdown-closable" @click.stop>
               <button type="button" class="form-select text-start" @click="showDateRangeDropdown = !showDateRangeDropdown">
@@ -777,13 +807,13 @@ onBeforeUnmount(() => {
                   </button>
                 </div>
                 <div class="calendar-grid calendar-weekdays">
+                  <span>日</span>
                   <span>一</span>
                   <span>二</span>
                   <span>三</span>
                   <span>四</span>
                   <span>五</span>
                   <span>六</span>
-                  <span>日</span>
                 </div>
                 <div class="calendar-grid">
                   <button
@@ -810,7 +840,7 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </div>
-          <div class="col-6 col-md-4">
+          <div class="col-6 col-md-5">
             <label class="form-label">星期</label>
             <div class="multi-select dropdown-closable" @click.stop>
               <button type="button" class="form-select text-start" @click="showWeekdayDropdown = !showWeekdayDropdown">
@@ -857,9 +887,9 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div class="col-6 col-md-4 d-flex flex-wrap gap-3">
-            <button type="button" class="btn btn-label-secondary" @click="clearSlotFilters">顯示全部</button>
-            <button type="button" class="btn btn-label-primary" :disabled="loading" @click="loadPageData">
-              查詢時段剩餘桌位
+            <button type="button" class="btn btn-dark" @click="clearSlotFilters">顯示全部</button>
+            <button type="button" class="btn btn-dark" :disabled="loading" @click="loadPageData">
+              查詢剩餘桌位
             </button>
           </div>
         </div>
@@ -879,7 +909,7 @@ onBeforeUnmount(() => {
             <input v-model.number="reservationOpenDays" type="number" min="1" class="form-control" :disabled="!canManageSettings" />
           </div>
           <div class="col-12 col-md-3">
-            <button type="button" class="btn btn-label-primary w-100" :disabled="savingOpenDays || !selectedStoreId || !canManageSettings" @click="saveReservationOpenDays">
+            <button type="button" class="btn btn-dark w-100" :disabled="savingOpenDays || !selectedStoreId || !canManageSettings" @click="saveReservationOpenDays">
               {{ savingOpenDays ? '儲存中...' : '儲存開放天數' }}
             </button>
           </div>
@@ -895,13 +925,13 @@ onBeforeUnmount(() => {
             <h5 class="mb-0">訂位時段{{ listMode === 'weekday' ? '星期' : '日期' }}列表</h5>
             <button
               type="button"
-              class="btn btn-sm"
-              :class="listMode === 'weekday' ? 'btn-primary' : 'btn-label-primary'"
+              class="btn btn-sm rounded-pill"
+              :class="listMode === 'weekday' ? 'btn-secondary' : 'btn-secondary'"
               @click="listMode = listMode === 'weekday' ? 'date' : 'weekday'">
               {{ listMode === 'weekday' ? '切換「日期」列表顯示' : '切換「星期」列表顯示' }}
             </button>
           </div>
-          <button v-if="canManageSettings" type="button" class="btn btn-primary" :disabled="loading" @click="openCreateModal">
+          <button v-if="canManageSettings" type="button" class="btn btn-label-primary" :disabled="loading" @click="openCreateModal">
             ＋ 新增訂位時段
           </button>
         </div>
@@ -939,13 +969,15 @@ onBeforeUnmount(() => {
                 {{ storeNameById[String(group.storeId)] || `分店 ${group.storeId}` }}
               </div>
               <template v-if="group.isWeekdayGroup">
-                <div class="fw-semibold">{{ group.weekday }}</div>
-                <span class="badge bg-label-primary">共 {{ group.dateCount }} 天</span>
+                <div class="fw-semibold py-3 px-2">{{ group.weekday }}</div>
+                <!-- <span class="badge bg-label-primary">共 {{ group.dateCount }} 天</span> -->
               </template>
               <template v-else>
                 <div class="fw-semibold">{{ group.reservationDate }}</div>
-                <span class="badge bg-label-primary">{{ group.weekday }}</span>
-                <span v-if="group.isException" class="badge bg-label-warning">單日調整</span>
+                <div class="d-flex align-items-center gap-3 mt-1">
+                  <span class="text-muted small fw-normal">{{ group.weekday }}</span>
+                  <span v-if="group.isException" class="btn btn-sm btn-label-secondary">單日調整</span>
+                </div>
               </template>
             </div>
             <div class="time-slot-items">
@@ -960,19 +992,18 @@ onBeforeUnmount(() => {
                       <span class="badge" :class="slot.isOpen ? 'bg-label-success' : 'bg-label-secondary'">
                         {{ slot.isOpen ? '開放' : '未開放' }}
                       </span>
-                      <span v-if="slot.isAggregate" class="badge bg-label-info">
-                        共 {{ slot.sourceDates.length }} 天
+                      <span v-if="slot.requiresDeposit" class="badge bg-label-warning">
+                        訂金 ${{ Number(slot.depositAmount || 0).toLocaleString() }}
                       </span>
+                      <!-- <span v-if="slot.isAggregate" class="badge bg-label-info">
+                        共 {{ slot.sourceDates.length }} 天
+                      </span> -->
                     </div>
                   </div>
                 </div>
                 <div v-if="canManageSettings" class="time-slot-actions">
-                  <button type="button" class="btn btn-sm btn-label-primary" @click="openEditModal(slot)">
-                    {{ slot.isAggregate && slot.sourceDates.length > 1 ? '統一修改' : '修改' }}
-                  </button>
-                  <button type="button" class="btn btn-sm btn-label-danger" @click="deleteTimeSlot(slot)">
-                    {{ slot.isAggregate && slot.sourceDates.length > 1 ? '統一刪除' : '刪除' }}
-                  </button>
+                  <button type="button" class="btn btn-sm btn-label-secondary" @click="openEditModal(slot)"><i class="bx bx-edit-alt"></i></button>
+                  <button type="button" class="btn btn-sm btn-label-secondary" @click="deleteTimeSlot(slot)"><i class="bx bx-trash"></i></button>
                 </div>
                 <div v-if="openSlotDetails[slotDisplayKey(slot)]" class="slot-capacity-list">
                   <template v-if="slot.isAggregate">
@@ -1074,13 +1105,13 @@ onBeforeUnmount(() => {
                       </button>
                     </div>
                     <div class="calendar-grid calendar-weekdays">
+                      <span>日</span>
                       <span>一</span>
                       <span>二</span>
                       <span>三</span>
                       <span>四</span>
                       <span>五</span>
                       <span>六</span>
-                      <span>日</span>
                     </div>
                     <div class="calendar-grid">
                       <button
@@ -1187,6 +1218,23 @@ onBeforeUnmount(() => {
                   <input v-model="form.isOpen" class="form-check-input" type="checkbox" />
                   <span class="form-check-label">開放訂位</span>
                 </label>
+              </div>
+              <div class="col-12">
+                <label class="form-check">
+                  <input v-model="form.requiresDeposit" class="form-check-input" type="checkbox" />
+                  <span class="form-check-label">需支付訂金</span>
+                </label>
+              </div>
+              <div v-if="form.requiresDeposit" class="col-12">
+                <label class="form-label">訂金金額</label>
+                <input
+                  v-model.number="form.depositAmount"
+                  type="number"
+                  min="1"
+                  step="1"
+                  class="form-control"
+                  placeholder="請輸入訂金金額"
+                  required />
               </div>
               <div class="col-12">
                 <div class="alert alert-info mb-0">
@@ -1307,6 +1355,23 @@ onBeforeUnmount(() => {
                   <span class="form-check-label">開放訂位</span>
                 </label>
               </div>
+              <div class="col-12">
+                <label class="form-check">
+                  <input v-model="editForm.requiresDeposit" class="form-check-input" type="checkbox" />
+                  <span class="form-check-label">需支付訂金</span>
+                </label>
+              </div>
+              <div v-if="editForm.requiresDeposit" class="col-12">
+                <label class="form-label">訂金金額</label>
+                <input
+                  v-model.number="editForm.depositAmount"
+                  type="number"
+                  min="1"
+                  step="1"
+                  class="form-control"
+                  placeholder="請輸入訂金金額"
+                  required />
+              </div>
               <div v-if="editModalError" class="col-12">
                 <div class="alert alert-danger mb-0">
                   {{ editModalError }}
@@ -1328,10 +1393,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.control-select {
-  max-width: 240px;
-}
-
 .date-select {
   max-width: 160px;
 }

@@ -47,6 +47,28 @@ public class ReservationEmailService {
         }
     }
 
+    // 需訂金的訂位先寄待付款通知；顧客可在一小時內從信件連回訂位頁完成付款。
+    public void sendReservationPaymentPendingEmail(ReservationResponse reservation) {
+        if (reservation == null || !StringUtils.hasText(reservation.getCustomerEmail())) {
+            return;
+        }
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            if (StringUtils.hasText(mailFrom)) {
+                message.setFrom(mailFrom);
+            }
+            message.setTo(reservation.getCustomerEmail());
+            message.setSubject("敘日訂位待付款通知");
+            message.setText(buildReservationPaymentPendingText(reservation));
+            mailSender.send(message);
+        } catch (Exception error) {
+            log.warn("訂位待付款信寄送失敗 reservationId={}, email={}",
+                    reservation.getReservationId(),
+                    reservation.getCustomerEmail(),
+                    error);
+        }
+    }
+
     private String buildReservationCreatedText(ReservationResponse reservation) {
         String storeName = storeRepository.findByStoreIdAndIsDeletedFalse(reservation.getStoreId())
                 .map(Store::getStoreName)
@@ -80,6 +102,46 @@ public class ReservationEmailService {
                 reservation.getReservationDate(),
                 timeRange,
                 reservation.getPartySize(),
+                defaultText(reservation.getCustomerPhone(), "-"),
+                defaultText(reservation.getSpecialRequest(), "無"),
+                successUrl
+        );
+    }
+
+    private String buildReservationPaymentPendingText(ReservationResponse reservation) {
+        String storeName = storeRepository.findByStoreIdAndIsDeletedFalse(reservation.getStoreId())
+                .map(Store::getStoreName)
+                .orElse("敘日餐廳");
+        String timeRange = "%s - %s".formatted(
+                formatTime(reservation.getStartTime()),
+                formatTime(reservation.getEndTime())
+        );
+        String successUrl = buildSuccessUrl(reservation);
+
+        return """
+                %s 您好：
+
+                您的訂位已送出，目前尚未完成訂金付款。系統會先保留此時段桌位 1 小時，請於期限內完成付款；逾時未付款會自動取消訂位。
+
+                分店：%s
+                日期：%s
+                時段：%s
+                人數：%s 位
+                訂金：%s 元
+                手機：%s
+                備註：%s
+
+                請點擊下方連結回到訂位頁面完成付款：
+                %s
+
+                敘日餐廳 敬上
+                """.formatted(
+                defaultText(reservation.getCustomerName(), "顧客"),
+                storeName,
+                reservation.getReservationDate(),
+                timeRange,
+                reservation.getPartySize(),
+                reservation.getDepositAmount().intValue(),
                 defaultText(reservation.getCustomerPhone(), "-"),
                 defaultText(reservation.getSpecialRequest(), "無"),
                 successUrl

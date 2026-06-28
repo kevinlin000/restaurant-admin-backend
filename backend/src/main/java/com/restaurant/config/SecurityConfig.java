@@ -53,12 +53,14 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/members/email/verify-code").permitAll()
 
                         // ===== 前台公開查詢 =====
+                        .requestMatchers(HttpMethod.GET, "/api/homepage/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/stores/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/stores/nearby").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/menu-categories/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/menu-items/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/menu-component/stores/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/news/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/faqs/**").permitAll()
 
                         // ===== 前台訂位（允許未登入訂位）=====
                         .requestMatchers(HttpMethod.GET, "/api/reservations/slots/**").permitAll()
@@ -73,6 +75,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/orders").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/orders/**").permitAll()
                         .requestMatchers("/api/payments/**").permitAll()
+                        .requestMatchers("/api/reservation-payments/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/favicon.ico").permitAll()
 
                         // ===== 個人資料路由（所有已登入角色都可以看 / 修改自己的資料）=====
@@ -96,9 +99,11 @@ public class SecurityConfig {
 
                         // ===== 後台 API =====
                         // 門市與桌位管理：給 ADMIN、MANAGER
+                        .requestMatchers("/api/admin/homepage/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/admin/stores/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
                         .requestMatchers("/api/admin/tables/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
                         .requestMatchers("/api/admin/news/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")
+                        .requestMatchers("/api/admin/faqs/**").hasAuthority("ROLE_ADMIN")
 
                         // 後台訂位管理：給 STAFF、MANAGER、ADMIN
                         .requestMatchers("/api/admin/reservations/**")
@@ -108,8 +113,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/reservation-settings/**")
                         .hasAnyAuthority("ROLE_MANAGER", "ROLE_ADMIN")
 
-                        // 後台菜單管理：STAFF、MANAGER、ADMIN 
+                        // 後台菜單管理：STAFF、MANAGER、ADMIN
                         .requestMatchers("/api/menu-items/**")
+                        .hasAnyAuthority("ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
+
+                        // 後台 Dashboard：營收與訂單統計，只給後台角色
+                        .requestMatchers(HttpMethod.GET, "/api/admin/dashboard/**")
                         .hasAnyAuthority("ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
 
                         // 其他所有後台 API：給 STAFF、MANAGER、ADMIN
