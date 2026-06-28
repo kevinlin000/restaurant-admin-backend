@@ -26,7 +26,7 @@ import CustomerOrder from "@/views/customer/order/order.vue";
 import CustomerStore from "@/views/customer/store/store.vue";
 import CustomerNews from "@/views/customer/news/news.vue";
 import CustomerFaq from "@/views/customer/faq/faq.vue";
-
+import AdminOrderDashboard from "@/views/admin/order/AdminOrderDashboard.vue";
 const ROLE = {
   STAFF: "STAFF",
   MANAGER: "MANAGER",
@@ -162,6 +162,12 @@ const routers = [
         path: "order-manage",
         name: "AdminOrderManage",
         component: AdminOrderManage,
+        meta: { roles: ADMIN_ROLES },
+      },
+      {
+        path: "order-dashboard",
+        name: "AdminOrderDashboard",
+        component: AdminOrderDashboard,
         meta: { roles: ADMIN_ROLES },
       },
       {

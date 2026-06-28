@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 public class PointTransaction {
 
     public enum TransactionType {
-        EARN, USE, EXPIRE, ADJUST
+        EARN, USE, EXPIRE, ADJUST, REFUND
     }
 
     @Id

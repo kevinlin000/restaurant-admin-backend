@@ -27,10 +27,13 @@ import com.restaurant.order.entity.Payment;
 import com.restaurant.order.repository.OrderItemRepository;
 import com.restaurant.order.repository.OrderRepository;
 import com.restaurant.order.repository.PaymentRepository;
+import com.restaurant.reservation.entity.Reservation;
+import com.restaurant.reservation.repository.ReservationRepository;
 import com.restaurant.store.entity.Store;
 import com.restaurant.store.entity.TableInfo;
 import com.restaurant.store.repository.StoreRepository;
 import com.restaurant.store.repository.TableInfoRepository;
+import com.restaurant.member.service.PointService;
 
 @Service
 public class OrderService {
@@ -49,9 +52,13 @@ public class OrderService {
 
         private final TableInfoRepository tableInfoRepository;
 
+        private final ReservationRepository reservationRepository;
+
         private final MenuItemRepository menuItemRepository;
 
         private final StoreMenuRepository storeMenuRepository;
+
+        private final PointService pointService;
 
         OrderService(OrderRepository orderRepository,
                         OrderItemRepository orderItemRepository,
@@ -60,7 +67,9 @@ public class OrderService {
                         StoreRepository storeRepository,
                         TableInfoRepository tableInfoRepository,
                         MenuItemRepository menuItemRepository,
-                        StoreMenuRepository storeMenuRepository) {
+                        StoreMenuRepository storeMenuRepository,
+                        ReservationRepository reservationRepository,
+                        PointService pointService) {
                 this.orderRepository = orderRepository;
                 this.orderItemRepository = orderItemRepository;
                 this.paymentRepository = paymentRepository;
@@ -69,7 +78,8 @@ public class OrderService {
                 this.tableInfoRepository = tableInfoRepository;
                 this.menuItemRepository = menuItemRepository;
                 this.storeMenuRepository = storeMenuRepository;
-
+                this.reservationRepository = reservationRepository;
+                this.pointService = pointService;
         }
 
         @Transactional
@@ -77,8 +87,12 @@ public class OrderService {
                 String orderType = normalizeOrderType(request.getOrderType());
 
                 // 1. 查詢 User
-                User user = userRepository.findById(request.getUserId())
-                                .orElseThrow(() -> new BusinessException("找不到會員"));
+                User user = null;
+
+                if (request.getUserId() != null) {
+                        user = userRepository.findById(request.getUserId())
+                                        .orElseThrow(() -> new BusinessException("找不到會員"));
+                }
 
                 // 2. 查詢 Store
                 Store store = storeRepository.findByStoreIdAndIsDeletedFalse(request.getStoreId())
@@ -92,6 +106,8 @@ public class OrderService {
 
                 // 4. 查詢 Reservation
 
+                Reservation reservation = resolveReservation(request, user, store, orderType);
+
                 // 5. 查詢 MenuItem// 6. 計算 totalAmount
                 List<OrderLine> orderLines = buildOrderLines(request.getStoreId(), request.getItems());
                 BigDecimal totalAmount = orderLines.stream()
@@ -99,14 +115,34 @@ public class OrderService {
                                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                 // 7. 計算 finalAmount
-                BigDecimal pointsDiscount = BigDecimal.valueOf(
-                                request.getPointsUsed() != null ? request.getPointsUsed() : 0);
+                Integer requestedPointsUsed = request.getPointsUsed() != null
+                                ? request.getPointsUsed()
+                                : 0;
 
-                BigDecimal finalAmount = totalAmount.subtract(pointsDiscount);
+                int actualPointsUsed = 0;
+
+                if (user != null && requestedPointsUsed > 0) {
+                        actualPointsUsed = pointService.usePointsForOrder(
+                                        user.getUserId(),
+                                        store.getStoreId(),
+                                        null,
+                                        requestedPointsUsed);
+                }
+
+                BigDecimal depositDiscount = BigDecimal.ZERO;
+
+                // TODO Reservation 完成訂金流程後，改由 Reservation 帶入 depositAmount
+
+                BigDecimal pointsDiscount = BigDecimal.valueOf(actualPointsUsed);
+
+                BigDecimal finalAmount = totalAmount
+                                .subtract(depositDiscount)
+                                .subtract(pointsDiscount);
 
                 if (finalAmount.compareTo(BigDecimal.ZERO) < 0) {
                         finalAmount = BigDecimal.ZERO;
                 }
+
                 // 8. pointsEarned 由會員模組計算，這邊先放 0
 
                 // 9. 建立 Order
@@ -114,13 +150,13 @@ public class OrderService {
                                 .user(user)
                                 .store(store)
                                 .table(table)
-                                .reservationId(request.getReservationId())
+                                .reservation(reservation)
                                 .orderType(orderType)
                                 // 計算假資料
                                 .totalAmount(totalAmount)
                                 .finalAmount(finalAmount)
                                 .pointsEarned(0)
-                                .pointsUsed(request.getPointsUsed() != null ? request.getPointsUsed() : 0)
+                                .pointsUsed(actualPointsUsed)
                                 .invoiceType(request.getInvoiceType())
                                 .carrierNumber(request.getCarrierNumber())
                                 .status("PENDING")
@@ -203,7 +239,6 @@ public class OrderService {
                                 throw new BusinessException("訂單尚未付款，不能設為已完成");
                         }
                 }
-
                 // 狀態流程防呆
                 if (!isValidStatusTransition(currentStatus, newStatus)) {
                         throw new BusinessException("訂單狀態必須依流程更新");
@@ -213,6 +248,16 @@ public class OrderService {
                         handleCancelOrder(order, payment);
                 } else {
                         order.setStatus(newStatus);
+
+                        if ("COMPLETED".equals(newStatus) && order.getUser() != null) {
+                                int earnedPoints = pointService.earnPointsFromOrder(
+                                                order.getUser().getUserId(),
+                                                order.getStore().getStoreId(),
+                                                order.getOrderId(),
+                                                order.getFinalAmount());
+
+                                order.setPointsEarned(earnedPoints);
+                        }
                 }
 
                 Order savedOrder = orderRepository.save(order);
@@ -236,10 +281,12 @@ public class OrderService {
                                 .collect(Collectors.toList());
                 return OrderResponse.builder()
                                 .orderId(order.getOrderId())
-                                .userId(order.getUser().getUserId())
+                                .userId(order.getUser() != null ? order.getUser().getUserId() : null)
                                 .storeId(order.getStore().getStoreId())
                                 .tableId(order.getTable() != null ? order.getTable().getTableId() : null)
-                                .reservationId(order.getReservationId())
+                                .reservationId(order.getReservation() != null
+                                                ? order.getReservation().getReservationId()
+                                                : null)
                                 .orderType(order.getOrderType())
                                 .totalAmount(order.getTotalAmount())
                                 .finalAmount(order.getFinalAmount())
@@ -270,7 +317,7 @@ public class OrderService {
 
                 return OrderSummaryResponse.builder()
                                 .orderId(order.getOrderId())
-                                .userId(order.getUser().getUserId())
+                                .userId(order.getUser() != null ? order.getUser().getUserId() : null)
                                 .storeId(order.getStore().getStoreId())
                                 .orderType(order.getOrderType())
                                 .totalAmount(order.getTotalAmount())
@@ -294,6 +341,34 @@ public class OrderService {
 
                 return tableInfoRepository.findByTableIdAndStoreId(request.getTableId(), request.getStoreId())
                                 .orElseThrow(() -> new BusinessException("桌位不屬於指定門市"));
+        }
+
+        private Reservation resolveReservation(CreateOrderRequest request, User user, Store store, String orderType) {
+                if (request.getReservationId() == null) {
+                        return null;
+                }
+
+                if (!ORDER_TYPE_DINE_IN.equals(orderType)) {
+                        throw new BusinessException("外帶訂單不可綁定訂位");
+                }
+
+                Reservation reservation = reservationRepository.findById(request.getReservationId())
+                                .orElseThrow(() -> new BusinessException("找不到訂位資料"));
+
+                if (!reservation.getStoreId().equals(store.getStoreId())) {
+                        throw new BusinessException("訂位門市與訂單門市不一致");
+                }
+
+                if (reservation.getUserId() != null && user != null &&
+                                !reservation.getUserId().equals(user.getUserId())) {
+                        throw new BusinessException("訂位會員與訂單會員不一致");
+                }
+
+                if ("CANCELLED".equals(reservation.getStatus())) {
+                        throw new BusinessException("已取消的訂位不可建立訂單");
+                }
+
+                return reservation;
         }
 
         private List<OrderLine> buildOrderLines(Long storeId, List<OrderItemRequest> items) {
@@ -365,6 +440,17 @@ public class OrderService {
 
                         payment.setPaymentStatus("REFUNDED");
                         paymentRepository.save(payment);
+                }
+
+                if (order.getUser() != null
+                                && order.getPointsUsed() != null
+                                && order.getPointsUsed() > 0) {
+
+                        pointService.refundPointsForOrder(
+                                        order.getUser().getUserId(),
+                                        order.getStore().getStoreId(),
+                                        order.getOrderId(),
+                                        order.getPointsUsed());
                 }
 
                 order.setStatus("CANCELLED");

@@ -435,10 +435,10 @@ const loadOrders = async () => {
 }
 
 const revenueTitle = computed(() => {
-  if (dateFilter.value === 'YESTERDAY') return '昨日營收'
-  if (dateFilter.value === 'WEEK') return '近 7 天營收'
-  if (dateFilter.value === 'MONTH') return '近 30 天營收'
-  return '今日營收'
+  if (dateFilter.value === 'YESTERDAY') return '昨日營業額'
+  if (dateFilter.value === 'WEEK') return '近 7 天營業額'
+  if (dateFilter.value === 'MONTH') return '近 30 天營業額'
+  return '今日天營業額'
 })
 
 const dateFilteredOrders = computed(() => {
