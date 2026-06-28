@@ -32,5 +32,7 @@ public class OrderSummaryResponse {
 
     private String status;
 
+    private String tableNumber;
+
     private LocalDateTime createdAt;
 }

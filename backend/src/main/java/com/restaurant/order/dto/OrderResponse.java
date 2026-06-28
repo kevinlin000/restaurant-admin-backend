@@ -10,7 +10,7 @@ import lombok.Data;
 @Data
 @Builder
 public class OrderResponse {
-    
+
     private Long orderId;
 
     private Long userId;
@@ -40,8 +40,10 @@ public class OrderResponse {
     private String paymentStatus;
 
     private String invoiceType;
-    
+
     private String carrierNumber;
+    
+    private String tableNumber;
 
     private List<OrderItemResponse> items;
 

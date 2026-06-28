@@ -183,7 +183,7 @@
     </button>
   </div>
 
-  <div v-if="selectedOrder" class="modal-mask" @click.self="selectedOrder = null">
+  <div v-if="selectedOrder" class="modal-mask" @click.self="closeOrderDetail">
     <div class="modal">
       <div class="modal-header">
         <h2>訂單明細 #{{ selectedOrder.orderId }}</h2>
@@ -193,7 +193,7 @@
             🖨️ 列印
           </button>
 
-          <button type="button" class="close-btn" @click="selectedOrder = null">
+          <button type="button" class="close-btn" @click="closeOrderDetail">
             ×
           </button>
         </div>
@@ -213,7 +213,7 @@
 
         <div class="detail-item">
           <span class="detail-label">桌號：</span>
-          <span class="detail-value">{{ selectedOrder.tableId || '-' }}</span>
+          <span class="detail-value">{{ selectedOrder.tableNumber || selectedOrder.tableId || '-' }}</span>
         </div>
 
         <div class="detail-item">
@@ -389,6 +389,13 @@ const printOrder = () => {
   window.print()
 }
 
+const closeOrderDetail = () => {
+  selectedOrder.value = null
+
+  if (route.query.orderId) {
+    window.history.replaceState(null, '', '/admin/order-manage')
+  }
+}
 
 const getPaymentMethodClass = (method) => {
   if (method === 'CASH') return 'method-cash'

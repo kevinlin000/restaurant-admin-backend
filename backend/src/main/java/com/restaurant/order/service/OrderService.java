@@ -108,6 +108,14 @@ public class OrderService {
 
                 Reservation reservation = resolveReservation(request, user, store, orderType);
 
+                if (reservation != null
+                                && reservation.getDepositAmount() != null
+                                && reservation.getDepositAmount().compareTo(BigDecimal.ZERO) > 0
+                                && !"PAID".equals(reservation.getPaymentStatus())) {
+
+                        throw new BusinessException("此訂位尚未完成訂金付款，無法建立訂單");
+                }
+
                 // 5. 查詢 MenuItem// 6. 計算 totalAmount
                 List<OrderLine> orderLines = buildOrderLines(request.getStoreId(), request.getItems());
                 BigDecimal totalAmount = orderLines.stream()
@@ -130,6 +138,12 @@ public class OrderService {
                 }
 
                 BigDecimal depositDiscount = BigDecimal.ZERO;
+
+                if (reservation != null
+                                && "PAID".equals(reservation.getPaymentStatus())
+                                && reservation.getDepositAmount() != null) {
+                        depositDiscount = reservation.getDepositAmount();
+                }
 
                 // TODO Reservation 完成訂金流程後，改由 Reservation 帶入 depositAmount
 
@@ -284,6 +298,7 @@ public class OrderService {
                                 .userId(order.getUser() != null ? order.getUser().getUserId() : null)
                                 .storeId(order.getStore().getStoreId())
                                 .tableId(order.getTable() != null ? order.getTable().getTableId() : null)
+                                .tableNumber(order.getTable() != null ? order.getTable().getTableNumber() : null)
                                 .reservationId(order.getReservation() != null
                                                 ? order.getReservation().getReservationId()
                                                 : null)
@@ -319,6 +334,7 @@ public class OrderService {
                                 .orderId(order.getOrderId())
                                 .userId(order.getUser() != null ? order.getUser().getUserId() : null)
                                 .storeId(order.getStore().getStoreId())
+                                .tableNumber(order.getTable() != null ? order.getTable().getTableNumber() : null)
                                 .orderType(order.getOrderType())
                                 .totalAmount(order.getTotalAmount())
                                 .finalAmount(order.getFinalAmount())

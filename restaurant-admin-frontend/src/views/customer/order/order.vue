@@ -5,6 +5,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import axios from "axios";
 import { useRoute, useRouter } from "vue-router";
 import Swal from "sweetalert2";
+import { getProfile } from "@/api/member";
 //Router
 const router = useRouter();
 const route = useRoute();
@@ -29,19 +30,18 @@ import japaneseSakeImg from "@/assets/images/japanese-sake.jpg";
 
 // =========================
 // Category Data
-const categories = ref([
-    { id: 1, name: "前菜" },
-    { id: 2, name: "刺身" },
-    { id: 3, name: "握壽司" },
-    { id: 4, name: "主餐" },
-    { id: 6, name: "甜點" },
-    { id: 7, name: "飲品" },
-    { id: 8, name: "酒類" },
-]);
+const categories = ref([]);
 
 // 之後改成 API
+// { id: 1, name: "前菜" },
+// { id: 2, name: "刺身" },
+// { id: 3, name: "握壽司" },
+// { id: 4, name: "主餐" },
+// { id: 6, name: "甜點" },
+// { id: 7, name: "飲品" },
+// { id: 8, name: "酒類" },
 // =========================
-const activeCategory = ref(1);
+const activeCategory = ref(null);
 
 // =========================
 // Order Form
@@ -96,6 +96,9 @@ async function loadStoreInfo(storeId) {
         storeInfo.value = null;
     }
 }
+const selectedTableLabel = computed(() => {
+    return firstQueryValue(route.query.tableNumber) || orderForm.value.tableId;
+});
 const step = ref("MENU");
 // MENU = 點餐畫面
 // CHECKOUT = 結帳確認畫面
@@ -118,152 +121,45 @@ const touched = ref({
     phone: false,
 });
 
+const fillMemberContactInfo = async () => {
+    if (!isLogin.value) return;
 
+    const info = userInfo.value || {};
+
+    if (!customerForm.value.customerName) {
+        customerForm.value.customerName = info.name || "";
+    }
+
+    try {
+        const response = await getProfile();
+        const data = response.data?.data ?? response.data;
+
+        if (!customerForm.value.customerName) {
+            customerForm.value.customerName =
+                data.name || data.customerName || data.memberName || "";
+        }
+
+        if (!customerForm.value.phone) {
+            customerForm.value.phone = String(
+                data.phone || data.phoneNumber || data.mobile || ""
+            ).replace(/\D/g, "").slice(0, 10);
+        }
+    } catch (error) {
+        console.warn("會員資料未完整帶入，請手動輸入電話", error.response?.data || error);
+    }
+
+    if (customerForm.value.customerName) {
+        touched.value.customerName = true;
+    }
+
+    if (customerForm.value.phone) {
+        touched.value.phone = true;
+    }
+};
 // =========================
 // Menu Data
-const fallbackMenuItems = [
-    {
-        id: 1,
-        categoryId: 1,
-        itemName: "胡麻豆腐",
-        description: "手工研磨胡麻醬，搭配嫩滑豆腐",
-        price: 80,
-        imageUrl: tofuImg,
-        status: "AVAILABLE",
-        allergenInfo: "含堅果、大豆",
-    },
-    {
-        id: 2,
-        categoryId: 1,
-        itemName: "海鮮沙拉",
-        description: "新鮮時蔬搭配鮮蝦、花枝",
-        price: 120,
-        imageUrl: seafoodSaladImg,
-        status: "AVAILABLE",
-        allergenInfo: "含甲殼類",
-    },
-    {
-        id: 3,
-        categoryId: 2,
-        itemName: "綜合生魚片",
-        description: "每日嚴選新鮮漁獲，主廚搭配",
-        price: 580,
-        imageUrl: sashimiImg,
-        status: "AVAILABLE",
-        allergenInfo: "含生食",
-    },
-    {
-        id: 4,
-        categoryId: 2,
-        itemName: "鮭魚刺身",
-        description: "挪威鮭魚薄切",
-        price: 420,
-        imageUrl: salmonSashimiImg,
-        status: "AVAILABLE",
-        allergenInfo: "含生食",
-    },
-    {
-        id: 5,
-        categoryId: 3,
-        itemName: "握壽司盛合",
-        description: "主廚推薦 8 貫握壽司",
-        price: 680,
-        imageUrl: sushiImg,
-        status: "AVAILABLE",
-        allergenInfo: "含生食",
-    },
-    {
-        id: 6,
-        categoryId: 3,
-        itemName: "炙燒鮭魚壽司",
-        description: "炙燒表面焦香，入口即化",
-        price: 380,
-        imageUrl: aburiSalmonSushiImg,
-        status: "AVAILABLE",
-        allergenInfo: "含生食",
-    },
-    {
-        id: 7,
-        categoryId: 4,
-        itemName: "和牛壽喜燒",
-        description: "澳洲和牛搭配特製壽喜燒醬汁",
-        price: 680,
-        imageUrl: sukiyakiImg,
-        status: "AVAILABLE",
-        allergenInfo: "含大豆",
-    },
-    {
-        id: 8,
-        categoryId: 4,
-        itemName: "天婦羅拼盤",
-        description: "嚴選蝦、蔬菜酥炸",
-        price: 380,
-        imageUrl: tempuraImg,
-        status: "AVAILABLE",
-        allergenInfo: "含麩質、甲殼類",
-    },
-    {
-        id: 9,
-        categoryId: 6,
-        itemName: "抹茶提拉米蘇",
-        description: "宇治抹茶搭配 Mascarpone",
-        price: 180,
-        imageUrl: matchaDessertImg,
-        status: "AVAILABLE",
-        allergenInfo: "含乳製品、蛋",
-    },
-    {
-        id: 10,
-        categoryId: 6,
-        itemName: "焦糖布丁",
-        description: "法式經典焦糖布丁",
-        price: 120,
-        imageUrl: caramelPuddingImg,
-        status: "AVAILABLE",
-        allergenInfo: "含乳製品、蛋",
-    },
-    {
-        id: 11,
-        categoryId: 7,
-        itemName: "可爾必思",
-        description: "日本原裝進口",
-        price: 90,
-        imageUrl: calpisImg,
-        status: "AVAILABLE",
-        allergenInfo: "含乳製品",
-    },
-    {
-        id: 12,
-        categoryId: 7,
-        itemName: "烏龍茶",
-        description: "台灣高山烏龍",
-        price: 80,
-        imageUrl: japaneseTeaImg,
-        status: "AVAILABLE",
-        allergenInfo: "無",
-    },
-    {
-        id: 13,
-        categoryId: 8,
-        itemName: "朝日生啤",
-        description: "日本直送 350ml",
-        price: 150,
-        imageUrl: asahiBeerImg,
-        status: "AVAILABLE",
-        allergenInfo: "無",
-    },
-    {
-        id: 14,
-        categoryId: 8,
-        itemName: "獺祭純米大吟釀",
-        description: "山口縣產，一合",
-        price: 380,
-        imageUrl: japaneseSakeImg,
-        status: "AVAILABLE",
-        allergenInfo: "無",
-    },
-];
-const menuItems = ref([...fallbackMenuItems]);
+
+const menuItems = ref([]);
 // =========================
 // Cart
 // 之後可搬到 Pinia
@@ -444,7 +340,46 @@ const normalizeStoreMenuItem = (item) => ({
 });
 
 const menuLoadError = ref("");
+const shortCategoryNameMap = {
+    精選日式前菜: "前菜",
+    旬味生魚片系列: "刺身",
+    職人握壽司盛合: "握壽司",
+    主廚熱騰騰熟食: "主餐",
+    職人手作甜點: "甜點",
+    特調清爽飲料: "飲品",
+    微醺日式酒水: "酒類",
+    酒水: "酒類",
+};
 
+async function loadMenuCategories() {
+    try {
+        const response = await axios.get("/api/menu-categories");
+        const data = response.data?.data ?? response.data ?? [];
+
+        categories.value = data.map((item) => ({
+            id: item.categoryId ?? item.id,
+            name: shortCategoryNameMap[item.categoryName ?? item.name] ?? item.categoryName ?? item.name,
+        }));
+
+        if (!activeCategory.value && categories.value.length > 0) {
+            activeCategory.value = categories.value[0].id;
+        }
+    } catch (error) {
+        console.error("取得菜單分類失敗", error);
+
+        categories.value = [
+            { id: 1, name: "前菜" },
+            { id: 2, name: "刺身" },
+            { id: 3, name: "握壽司" },
+            { id: 4, name: "主餐" },
+            { id: 6, name: "甜點" },
+            { id: 7, name: "飲品" },
+            { id: 8, name: "酒類" },
+        ];
+
+        activeCategory.value = 1;
+    }
+}
 async function loadStoreMenu(storeId) {
     menuLoadError.value = "";
 
@@ -457,19 +392,29 @@ async function loadStoreMenu(storeId) {
             return;
         }
 
-        menuItems.value = [...fallbackMenuItems];
-        menuLoadError.value = "此門市目前沒有可供應菜單，暫時顯示示範菜單";
+        menuItems.value = [];
+        menuLoadError.value = "此門市目前沒有可供應菜單";
     } catch (error) {
-        menuItems.value = [...fallbackMenuItems];
-        menuLoadError.value = "門市菜單暫時無法載入，暫時顯示示範菜單";
+        menuItems.value = [];
+        menuLoadError.value = "門市菜單暫時無法載入，請稍後再試";
     }
 }
+const isReservationOrder = computed(() => {
+    return !!orderForm.value.reservationId;
+});
 
 const showStorePicker = ref(false);
 const storeOptions = ref([]);
 const selectedPickerStoreId = ref(null);
-const pickupTime = ref("ASAP");
+const pickupTime = ref("");
 
+const isTakeoutFlow = computed(() => {
+    return !orderForm.value.reservationId && !!route.query.storeId && orderForm.value.orderType === "TAKEOUT";
+});
+
+const canSwitchOrderType = computed(() => {
+    return !isReservationOrder.value && !isTakeoutFlow.value;
+});
 const pickupTimeOptions = [];
 
 for (let hour = 11; hour <= 20; hour++) {
@@ -502,6 +447,11 @@ async function loadStoreOptions() {
 async function confirmStorePicker() {
     if (!selectedPickerStoreId.value) {
         showError("請選擇取餐門市");
+        return;
+    }
+
+    if (!pickupTime.value) {
+        showError("請選擇取餐時間");
         return;
     }
 
@@ -802,7 +752,30 @@ async function submitOrder() {
     console.log("送出的訂單資料：", request);
 
     const response = await axios.post("/api/orders", request);
-    const orderId = response.data.orderId;
+    const orderData = response.data?.data ?? response.data;
+    const orderId = orderData.orderId;
+
+    //     let response;
+
+    // try {
+    //     response = await axios.post("/api/orders", request);
+    // } catch (error) {
+    //     console.error("建立訂單失敗：", error.response?.data || error);
+
+    //     showError(
+    //         error.response?.data?.message ||
+    //         "建立訂單失敗，請稍後再試"
+    //     );
+    //     return;
+    // }
+
+    // const orderData = response.data?.data ?? response.data;
+    // const orderId = orderData.orderId;
+
+    // if (!orderId) {
+    //     showError("建立訂單成功但沒有取得訂單編號，請檢查後端回傳格式");
+    //     return;
+    // }
     // if (customerForm.value.paymentMethod === "LINE_PAY") {
     //     pusrouter.h(`/payment/linepay/${orderId}`);
     //     return;
@@ -840,7 +813,7 @@ async function submitOrder() {
             `http://localhost:8080/api/payments/linepay/request/${orderId}`;
         return;
     }
-   
+
     await Swal.fire({
         icon: "success",
         title: "訂單建立成功",
@@ -875,6 +848,8 @@ async function submitOrder() {
         carrierNumber: "",
     };
 
+    
+
     touched.value = {
         customerName: false,
         phone: false,
@@ -888,6 +863,19 @@ async function submitOrder() {
 }
 
 onMounted(async () => {
+    if (route.query.customerName) {
+        customerForm.value.customerName = String(route.query.customerName);
+        touched.value.customerName = true;
+    }
+
+    if (route.query.phone) {
+        customerForm.value.phone = String(route.query.phone).replace(/\D/g, "").slice(0, 10);
+        touched.value.phone = true;
+    }
+
+    await fillMemberContactInfo();
+
+    await loadMenuCategories();
     await loadMemberPoints();
 
     if (!route.query.storeId) {
@@ -913,15 +901,21 @@ onMounted(async () => {
                     <p>選擇餐點加入購物車，確認後送出訂單。</p>
                     <p class="store-context">
                         目前門市：<strong>{{ selectedStoreName }}</strong>
-                        <span v-if="selectedPickupTime">
+                        <span v-if="orderForm.orderType === 'TAKEOUT' && selectedPickupTime">
                             取餐時間：{{ selectedPickupTime === "ASAP" ? "立即取餐" : selectedPickupTime }}
+                        </span>
+
+                        <span v-if="orderForm.orderType === 'DINE_IN' && orderForm.tableId">
+                            桌位：{{ selectedTableLabel }}
                         </span>
                     </p>
                 </div>
 
-                <div class="order-type">
-                    <button :class="{ active: orderForm.orderType === 'DINE_IN' }"
-                        @click="orderForm.orderType = 'DINE_IN'">
+                <div class="order-type" v-if="canSwitchOrderType">
+                    <button :disabled="isReservationOrder" :class="{
+                        active: orderForm.orderType === 'DINE_IN',
+                        disabled: isReservationOrder
+                    }" @click="orderForm.orderType = 'DINE_IN'">
                         內用
                     </button>
 
