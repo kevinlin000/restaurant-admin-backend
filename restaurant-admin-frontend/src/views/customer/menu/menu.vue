@@ -1,8 +1,8 @@
 <script setup>
-import { ref, computed as vueComputed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed as vueComputed } from 'vue'
 import axios from 'axios'
 
-// 🤝 引進 Order 組同學提供的本機圖片
+// 🤝 1. 引進餐點列表本機圖片
 import tofuImg from "@/assets/images/tofu.jpg";
 import seafoodSaladImg from "@/assets/images/seafood-salad.jpg";
 import sashimiImg from "@/assets/images/sashimi.jpg";
@@ -18,340 +18,444 @@ import japaneseTeaImg from "@/assets/images/japanese-tea.jpg";
 import asahiBeerImg from "@/assets/images/asahi-beer.jpg";
 import japaneseSakeImg from "@/assets/images/japanese-sake.jpg";
 
-// 🏪 1. 門市控制中心
-const currentStoreId = ref(null)
-const storeList = ref([])
+// 🌟 EDM 圖片與內容配置 (同學未來只需修改這裡)
+const edmConfig = ref({
+  sashimi: {
+    title: "極上生魚片盛合",
+    desc: "嚴選每日直送頂級鮮味與極上鮭魚肚，主廚以精湛刀工完美留住海洋鮮甜。",
+    price: "NT$ 480",
+    imageUrl: "https://i.ibb.co/sd4zFMct/sashimi.png" 
+  },
+  pork: {
+    title: "生薑燒肉定食",
+    desc: "經典日式老薑風味醬汁，爆炒鮮嫩豬五花。肉質Q彈帶點微甜，是本舖最具人氣的靈魂定食。",
+    price: "NT$ 290",
+    imageUrl: "https://i.ibb.co/SXmQF02Z/Ginger-Braised-Pork-Set-Meal.jpg"
+  }
+});
 
-// 🗂️ 2. 動態分類控制中心 
-const categoryList = ref([])
-const currentCategory = ref(null) 
+// 🎛️ 2. 狀態控制中心
+const showEdmModal = ref(true)      
+const activeCategoryId = ref(null)  
+const currentStoreId = ref(null)    
+const storeList = ref([])          
+const categoryList = ref([])        
+const menuItems = ref([])           
+const heroOpacity = ref(1)          
 
-// 🍱 3. 菜單控制中心
-const menuItems = ref([])
-
-// 🌟 紀錄客人在畫面上點擊了哪一個行銷特色標籤（預設為 null 代表顯示全部）
+// 🌟 3. 紀錄客人在畫面上點擊了哪一個行銷特色標籤
 const selectedFeatureTag = ref(null)
 
-// 🌟 4. 幻燈片滾動漸隱控制
-const heroOpacity = ref(1)
+// 🌟 4. 全端大圖動態管線：採用免 import 的超高畫質網路圖片防線，確保長度永遠固定為 3
+const localFallbackBanners = [
+  { id: 1, url: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=1200&q=80', title: '日式職人．感動嚴選', desc: '源自經典的精緻美味，現點現做，為您奉上最溫慢的道地定食饗宴' },
+  { id: 2, url: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80', title: '極致傳承．究極美味', desc: '嚴選新鮮食材與獨門研磨湯頭，帶給您純粹且多層次的和食體驗' },
+  { id: 3, url: 'https://images.unsplash.com/photo-1611143669185-af224c5e3252?auto=format&fit=crop&w=1200&q=80', title: '旬味珍饌．手作壽司', desc: '每日海洋鮮甜直送，經職人掌心溫潤握製，完美綻放極致鮮味' }
+]
 
-const handleScroll = () => {
+const carouselImages = ref([...localFallbackBanners])
+
+// 🎯 Vue 輪播核心控制器
+const currentSlideIndex = ref(0)
+let heroTimer = null
+
+const startHeroAutoPlay = () => {
+  stopHeroAutoPlay() 
+  heroTimer = setInterval(() => {
+    if (carouselImages.value.length > 0) {
+      currentSlideIndex.value = (currentSlideIndex.value + 1) % carouselImages.value.length
+    }
+  }, 4500) 
+}
+
+const stopHeroAutoPlay = () => {
+  if (heroTimer) { clearInterval(heroTimer); heroTimer = null; }
+}
+
+const handleIndicatorClick = (index) => {
+  currentSlideIndex.value = index
+  startHeroAutoPlay() 
+}
+
+// 🌟 5. 精準 Scrollspy 偵測與大圖透明度線性漸變
+const handleWindowScroll = () => {
   const scrollTop = window.scrollY
-  const maxScroll = 1000 
-  if (scrollTop <= maxScroll) {
-    heroOpacity.value = 1 - (scrollTop / maxScroll)
-  } else {
-    heroOpacity.value = 0
+  const fadeStart = 0
+  const fadeEnd = 350 
+  
+  if (scrollTop <= fadeStart) { heroOpacity.value = 1 } 
+  else if (scrollTop >= fadeEnd) { heroOpacity.value = 0 } 
+  else { heroOpacity.value = 1 - (scrollTop - fadeStart) / (fadeEnd - fadeStart) }
+  
+  if (selectedFeatureTag.value) return; 
+  
+  const scrollPosition = window.scrollY + 280 
+  for (const cat of categoryList.value) {
+    const el = document.getElementById(`category-section-${cat.id}`)
+    if (el) {
+      const top = el.offsetTop
+      const bottom = top + el.offsetHeight
+      if (scrollPosition >= top && scrollPosition < bottom) {
+        activeCategoryId.value = cat.id
+        break
+      }
+    }
   }
 }
 
-// 🎯 智慧型本機圖片自動對應管線
+// 🌟 6. 絲滑平滑滾動至指定分類區 (修正版)
+const scrollToCategory = (categoryId) => {
+  if (selectedFeatureTag.value) { selectedFeatureTag.value = null; }
+  
+  setTimeout(() => {
+    // 這裡原本寫成 `category-section-${cat.id}`，請修正為使用參數 `categoryId`
+    const el = document.getElementById(`category-section-${categoryId}`);
+    
+    if (el) {
+      const offsetTop = el.offsetTop;
+      const targetOffset = offsetTop + 313; // 這裡可以隨意微調數值
+      
+      window.scrollTo({ 
+        top: targetOffset, 
+        behavior: 'smooth' 
+      });
+      
+      activeCategoryId.value = categoryId;
+    }
+  }, 60); 
+}
+
+// 🌟 7. 點擊特色膠囊滑動到動態大標題
+const handleFeatureTagClick = (tag) => {
+  if (selectedFeatureTag.value === tag) {
+    selectedFeatureTag.value = null;
+    return;
+  }
+  
+  selectedFeatureTag.value = tag;
+  activeCategoryId.value = null; 
+
+  setTimeout(() => {
+    const el = document.getElementById('dynamic-feature-title');
+    if (el) {
+      const targetOffset = el.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo({ 
+        top: targetOffset - 160, 
+        behavior: 'smooth' 
+      });
+    }
+  }, 80);
+}
+
+// 🌟 8. 智慧型本機圖片自動對應管線
 const getMenuItemImage = (item) => {
-  if (item.imageUrl && (item.imageUrl.startsWith('http://') || item.imageUrl.startsWith('https://'))) {
-    return item.imageUrl;
-  }
-  const name = item.itemName || '';
-  if (name.includes('胡麻豆腐')) return tofuImg;
-  if (name.includes('海鮮沙拉')) return seafoodSaladImg;
-  if (name.includes('綜合生魚片')) return sashimiImg;
-  if (name.includes('鮭魚刺身')) return salmonSashimiImg;
-  if (name.includes('壽司盛合')) return sushiImg;
-  if (name.includes('炙燒鮭魚')) return aburiSalmonSushiImg;
-  if (name.includes('和牛壽喜燒') || name.includes('壽喜燒')) return sukiyakiImg;
-  if (name.includes('天婦羅')) return tempuraImg;
-  if (name.includes('抹茶')) return matchaDessertImg;
-  if (name.includes('布丁') || name.includes('焦糖')) return caramelPuddingImg;
-  if (name.includes('可爾必思')) return calpisImg;
-  if (name.includes('日式綠茶') || name.includes('茶')) return japaneseTeaImg;
-  if (name.includes('生啤酒') || name.includes('Asahi')) return asahiBeerImg;
-  if (name.includes('清酒') || name.includes('吟釀')) return japaneseSakeImg;
-  return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80';
+  if (item.imageUrl && (item.imageUrl.startsWith('http'))) return item.imageUrl;
+  const name = (item.itemName || '').toLowerCase();
+  
+  if (name.includes('胡麻豆腐') || name.includes('豆腐') || name.includes('胡麻菠菜')) return tofuImg;
+  if (name.includes('海鮮沙拉') || name.includes('沙拉') || name.includes('拌番茄') || name.includes('小黃瓜')) return seafoodSaladImg;
+  if (name.includes('綜合生魚片') || name.includes('刺身盛合') || name.includes('生魚片')) return sashimiImg;
+  if (name.includes('鮭魚刺身') || name.includes('鮭魚肚')) return salmonSashimiImg;
+  if (name.includes('壽司盛合') || name.includes('壽司') || name.includes('加州卷')) return sushiImg;
+  if (name.includes('炙燒鮭魚') || name.includes('厚蛋燒')) return aburiSalmonSushiImg;
+  if (name.includes('壽喜燒') || name.includes('肉') || name.includes('生薑燒肉') || name.includes('雞肉')) return sukiyakiImg;
+  if (name.includes('天婦羅') || name.includes('炸') || name.includes('豬排') || name.includes('可樂餅') || name.includes('炸蝦')) return tempuraImg;
+  if (name.includes('抹茶') || name.includes('蕨餅')) return matchaDessertImg;
+  if (name.includes('布丁') || name.includes('大福') || name.includes('紅豆')) return caramelPuddingImg;
+  if (name.includes('可爾必思') || name.includes('氣氣飲')) return calpisImg;
+  if (name.includes('茶')) return japaneseTeaImg;
+  if (name.includes('生啤酒') || name.includes('啤酒')) return asahiBeerImg;
+  if (name.includes('清酒') || name.includes('梅酒') || name.includes('大吟釀')) return japaneseSakeImg;
+  return 'https://images.unsplash.com/photo-1617196034796-73dfa7b1fd56?auto=format&fit=crop&w=600&q=80';
 }
 
-// 🌟 智慧分類小圖標字典
+// 🌟 9. 智慧分類小圖字典
 const getCategoryIcon = (categoryName) => {
   if (!categoryName) return '🏮';
-  if (categoryName.includes('前菜') || categoryName.includes('沙拉')) return '🥗';
-  if (categoryName.includes('刺身') || categoryName.includes('生魚片')) return '🐟';
-  if (categoryName.includes('壽司') || categoryName.includes('軍艦')) return '🍣';
-  if (categoryName.includes('熟食') || categoryName.includes('熱食')) return '🍳';
-  if (categoryName.includes('炸物') || categoryName.includes('揚物')) return '🍤';
+  if (categoryName.includes('前菜')) return '🥗';
+  if (categoryName.includes('生魚片') || categoryName.includes('刺身')) return '🐟';
+  if (categoryName.includes('壽司')) return '🍣';
+  if (categoryName.includes('熟食') || categoryName.includes('定食')) return '🍳';
+  if (categoryName.includes('炸物')) return '🍤';
   if (categoryName.includes('甜點') || categoryName.includes('甘味')) return '🍰';
-  if (categoryName.includes('飲料') || categoryName.includes('水')) return '🥤';
-  if (categoryName.includes('酒') || categoryName.includes('微醺')) return '🍺';
+  if (categoryName.includes('飲料')) return '🥤';
+  if (categoryName.includes('酒')) return '🍺';
   return '🍱';
 }
 
-// 🌟 幻燈片大圖形象數據
-const carouselImages = ref([
-  { id: 1, url: 'https://images.unsplash.com/photo-1580822184713-fc5400e7fe10?auto=format&fit=crop&w=1200&q=80', title: '日式職人．感動嚴選', desc: '源自日本的美味，現點現做，為您奉上最溫慢的精緻定食' },
-  { id: 3, url: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80', title: '讚岐傳承．彈牙美味', desc: '純手工研磨湯頭與究極麵體，體驗醇厚純粹的日式風味' },
-  { id: 2, url: 'https://images.unsplash.com/photo-1617196034796-73dfa7b1fd56?auto=format&fit=crop&w=1200&q=80', title: '經典和風．極致饗宴', desc: '嚴選頂級食材，搭配主廚特調醬汁，每一口都是道地和風魂' }
-])
+// 🔄 10. API 資料傳輸管線
+const fetchHeroBanners = async () => {
+  try {
+    const response = await axios.get('/api/menu-banners')
+    const backendData = response.data.data || response.data
+    if (Array.isArray(backendData) && backendData.length > 0) {
+      carouselImages.value = backendData.map((b, i) => ({
+        id: b.id || i, url: b.imageUrl || b.url, title: b.title || '敘日嚴選', desc: b.description || b.desc || ''
+      }))
+    }
+  } catch (error) { carouselImages.value = [...localFallbackBanners] }
+}
 
-// 🔄 抓取後端真實門市清單
 const fetchStores = async () => {
   try {
     const response = await axios.get('/api/menu-component/stores')
-    const rawStores = response.data.data || response.data
-    if (Array.isArray(rawStores) && rawStores.length > 0) {
-      storeList.value = rawStores
-      if (!currentStoreId.value) {
-        currentStoreId.value = storeList.value[0].id
-      }
-    }
-  } catch (error) {
-    console.error('⚠️ 撈取門市失敗！', error)
-  }
+    storeList.value = response.data.data || response.data
+    if (storeList.value.length > 0 && !currentStoreId.value) currentStoreId.value = storeList.value[0].id
+  } catch (error) { console.error('門市載入失敗', error) }
 }
 
-// 🗂️ 抓取所有真實分類
 const fetchCategories = async () => {
   try {
     const response = await axios.get('/api/menu-categories')
-    const rawCategories = response.data.data || response.data
-    
-    if (Array.isArray(rawCategories) && rawCategories.length > 0) {
-      categoryList.value = rawCategories.map(cat => ({
-        id: cat.id || cat.categoryId,
-        name: cat.categoryName || cat.name
-      }))
-      
-      if (categoryList.value.length > 0 && !currentCategory.value) {
-        currentCategory.value = categoryList.value[0].id
-      }
-    }
-  } catch (error) {
-    console.error('⚠️ 撈取資料庫動態分類失敗，請確認 Java 後端程式是否啟動！', error)
-  }
+    const raw = response.data.data || response.data
+    categoryList.value = raw.map(cat => ({ id: cat.id || cat.categoryId, name: cat.categoryName || cat.name }))
+    if (categoryList.value.length > 0) activeCategoryId.value = categoryList.value[0].id
+  } catch (error) { console.error('分類載入失敗', error) }
 }
 
-// 🍜 根據選擇的分店 ID，拉取專屬動態菜單
 const fetchMenuData = async (storeId) => {
   if (!storeId) return
   try {
     const response = await axios.get(`/api/menu-items/store/${storeId}`)
-    const rawData = response.data.data || response.data
-    
-    if (Array.isArray(rawData)) {
-      menuItems.value = rawData.map(item => {
-        if (item.categoryId === undefined || item.categoryId === null) {
-          item.categoryId = item.category_id;
-        }
-        return item;
-      })
-    } else {
-      menuItems.value = []
-    }
-  } catch (error) {
-    console.error(`⚠️ 拉取分店菜單失敗！`, error)
-    menuItems.value = [] 
-  }
+    menuItems.value = (response.data.data || response.data).map(item => {
+      if (item.categoryId === undefined) item.categoryId = item.category_id;
+      return item;
+    })
+  } catch (error) { console.error('菜單載入失敗', error); menuItems.value = [] }
 }
 
-const handleStoreChange = () => { fetchMenuData(currentStoreId.value) }
+const cleanTagText = (tag) => { if (!tag) return ''; return String(tag).replace(/[\[\]"']/g, '').trim(); }
 
-watch(currentStoreId, (newStoreId) => { if (newStoreId) { fetchMenuData(newStoreId) } })
-
-
-// 🌟 全域雷達模式 —— 自動分析出這家分店「全部餐點」擁有的所有特色標籤，一併全部秀出！
+// 🌟 11. 特色膠囊智慧清洗：精準對齊官方定義的 10 個黃金特色標籤
 const activeAvailableTags = vueComputed(() => {
+  const allowedTags = ["主廚推薦", "手作工法", "人氣爆棚", "鮮味極致", "經典必點", "職人精神", "嚴選食材", "季節限定", "極致奢華", "限量供應"]
   if (!Array.isArray(menuItems.value)) return []
-  return [...new Set(
-    menuItems.value.flatMap(item => item.featureTags || [])
-  )]
+  const tagCounts = {}
+  
+  menuItems.value.forEach(item => {
+    let tags = item.featureTags || item.feature_tags;
+    if (typeof tags === 'string') {
+      try { tags = JSON.parse(tags); } 
+      catch (e) { tags = tags.replace(/[\[\]"']/g, '').split(',').map(t => t.trim()); }
+    }
+    if (Array.isArray(tags)) {
+      tags.forEach(tag => {
+        const clean = cleanTagText(tag);
+        if (clean && allowedTags.includes(clean)) {
+          tagCounts[clean] = (tagCounts[clean] || 0) + 1;
+        }
+      })
+    }
+  })
+  return allowedTags.filter(tag => tagCounts[tag] > 0 || selectedFeatureTag.value === tag)
 })
 
-// 🎯 智慧篩選導航：點擊標籤時，不僅進行單選切換，若當前大分類沒有此標籤餐點，自動幫客人轉場！
-const toggleFeatureTag = (tag) => {
-  if (selectedFeatureTag.value === tag) {
-    selectedFeatureTag.value = null // 反選取消
-  } else {
-    selectedFeatureTag.value = tag // 啟用篩選
-    
-    // 🌟 檢查目前看的大分類（例如前菜）裡有沒有這類標籤商品
-    const hasTagInCurrentCategory = menuItems.value.some(item => {
-      const itemCatId = item.categoryId !== undefined ? item.categoryId : item.category_id;
-      return Number(itemCatId) === Number(currentCategory.value) && 
-             item.featureTags && item.featureTags.includes(tag)
-    })
-
-    // 🚀 如果當前大分類找不到，自動幫客人切換到「第一個有這張標籤」的分類！
-    if (!hasTagInCurrentCategory) {
-      const targetItem = menuItems.value.find(item => item.featureTags && item.featureTags.includes(tag))
-      if (targetItem) {
-        const targetCatId = targetItem.categoryId !== undefined ? targetItem.categoryId : targetItem.category_id;
-        currentCategory.value = Number(targetCatId)
-      }
-    }
+// 🌟 12. 雙重過濾與總品項計算
+const getFilteredItemsByCategory = (catId) => {
+  let items = menuItems.value.filter(item => Number(item.categoryId || item.category_id) === Number(catId))
+  if (selectedFeatureTag.value) {
+    items = items.filter(item => {
+      let tags = item.featureTags || item.feature_tags;
+      if (typeof tags === 'string') return tags.includes(selectedFeatureTag.value);
+      if (Array.isArray(tags)) return tags.map(t => cleanTagText(t)).includes(selectedFeatureTag.value);
+      return false;
+    });
   }
+  return items
 }
 
-// 🎯 雙重過濾核心
-const filteredMenu = vueComputed(() => {
-  if (!Array.isArray(menuItems.value)) return []
-  
-  // 第一層：先過濾出當前左側選中分類的餐點
-  const categoryFiltered = menuItems.value.filter(item => {
-    const itemCatId = item.categoryId !== undefined ? item.categoryId : item.category_id;
-    return Number(itemCatId) === Number(currentCategory.value)
-  })
-
-  // 第二層：如果上方的全域標籤有點選，進一步留下含有該標籤的品項
-  if (!selectedFeatureTag.value) {
-    return categoryFiltered
-  }
-  return categoryFiltered.filter(item => 
-    item.featureTags && item.featureTags.includes(selectedFeatureTag.value)
-  )
+const totalFilteredItemsCount = vueComputed(() => {
+  if (!selectedFeatureTag.value) return 0;
+  let count = 0;
+  categoryList.value.forEach(cat => { count += getFilteredItemsByCategory(cat.id).length; });
+  return count;
 })
 
 const addToCart = (item) => { alert(`🎉 成功將【${item.itemName}】加入購物車！`) }
 
+watch(currentStoreId, (newStoreId) => { if (newStoreId) fetchMenuData(newStoreId) })
+
 onMounted(async () => {
-  await fetchStores()
-  await fetchCategories()
-  if (currentStoreId.value) { await fetchMenuData(currentStoreId.value) }
-
-  window.addEventListener('scroll', handleScroll)
-
-  setTimeout(() => {
-    const carouselEl = document.getElementById('yayoiHeroCarousel')
-    if (carouselEl && window.bootstrap) {
-      new window.bootstrap.Carousel(carouselEl, { 
-        interval: 3500, 
-        ride: 'carousel', 
-        pause: 'hover',
-        wrap: true 
-      })
-    }
-  }, 600)
+  await fetchHeroBanners(); 
+  await fetchStores(); 
+  await fetchCategories();
+  if (currentStoreId.value) await fetchMenuData(currentStoreId.value)
+  window.addEventListener('scroll', handleWindowScroll)
+  startHeroAutoPlay() 
 })
 
-onUnmounted(() => {
-  window.removeEventListener('scroll', handleScroll)
+onUnmounted(() => { 
+  window.removeEventListener('scroll', handleWindowScroll);
+  stopHeroAutoPlay() 
 })
 </script>
 
 <template>
-  <div class="overflow-visible" style="min-height: 100vh; background-color: #fafafa;">
-    <div style="height: 90px; width: 100%;"></div>
+  <div class="menu-root">
     
-    <div id="yayoiHeroCarousel" class="carousel slide carousel-fade shadow-sm" data-bs-ride="carousel" style="position: fixed; top: 90px; left: 0; width: 100%; height: 420px; z-index: 1; overflow: hidden; will-change: opacity; transition: opacity 0.05s linear;" :style="{ opacity: heroOpacity }">
-      <div class="carousel-indicators" style="z-index: 15;">
-        <button type="button" data-bs-target="#yayoiHeroCarousel" data-bs-slide-to="0" class="active"></button>
-        <button type="button" data-bs-target="#yayoiHeroCarousel" data-bs-slide-to="1"></button>
-        <button type="button" data-bs-target="#yayoiHeroCarousel" data-bs-slide-to="2"></button>
+    <div v-if="showEdmModal" class="edm-overlay">
+      <div class="edm-container shadow-lg">
+        <button class="edm-close-btn" @click="showEdmModal = false">✖</button>
+        <div id="edmCarousel" class="carousel slide h-100" data-bs-ride="carousel">
+          <div class="carousel-inner h-100">
+            <div class="carousel-item active h-100">
+              <div class="row g-0 h-100">
+                <div class="col-md-5 edm-text-section p-5 d-flex flex-column justify-content-center">
+                  <span class="edm-tag">SUMMER SPECIAL</span>
+                  <h2 class="edm-title">{{ edmConfig.sashimi.title }}</h2>
+                  <div class="edm-divider"></div>
+                  <p class="edm-desc">{{ edmConfig.sashimi.desc }}</p>
+                  <div class="edm-price-container">
+                    <span class="edm-price">{{ edmConfig.sashimi.price }}</span>
+                  </div>
+                </div>
+                <div class="col-md-7 h-100">
+                  <img :src="edmConfig.sashimi.imageUrl" class="edm-img" alt="生魚片">
+                </div>
+              </div>
+            </div>
+            <div class="carousel-item h-100">
+              <div class="row g-0 h-100">
+                <div class="col-md-7 h-100">
+                  <img :src="edmConfig.pork.imageUrl" class="edm-img" alt="生薑燒肉">
+                </div>
+                <div class="col-md-5 edm-text-section p-5 d-flex flex-column justify-content-center">
+                  <span class="edm-tag">POPULAR NO.1</span>
+                  <h2 class="edm-title">{{ edmConfig.pork.title }}</h2>
+                  <div class="edm-divider"></div>
+                  <p class="edm-desc">{{ edmConfig.pork.desc }}</p>
+                  <div class="edm-price-container">
+                    <span class="edm-price">{{ edmConfig.pork.price }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button class="carousel-control-prev" type="button" data-bs-target="#edmCarousel" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+          </button>
+          <button class="carousel-control-next" type="button" data-bs-target="#edmCarousel" data-bs-slide="next">
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="mainHeroCarousel" class="custom-vue-hero-container" :style="{ opacity: heroOpacity }">
+      <div class="carousel-indicators custom-hero-indicators">
+        <button 
+          v-for="(slide, index) in carouselImages" 
+          :key="'indicator-' + slide.id"
+          type="button" 
+          :class="{ active: index === currentSlideIndex }"
+          @click="handleIndicatorClick(index)"
+        ></button>
       </div>
       <div class="carousel-inner h-100">
-        <div v-for="(slide, index) in carouselImages" :key="slide.id" :class="['carousel-item h-100', index === 0 ? 'active' : '']">
-          <div class="position-relative h-100 w-100">
-            <img :src="slide.url" class="d-block w-100 h-100" style="object-fit: cover; filter: brightness(0.65);" :alt="slide.title">
-            <div class="carousel-caption text-start" style="left: 8%; bottom: 25%; z-index: 20; max-width: 65%;">
-              <h2 class="fw-bold text-white mb-2" style="font-size: 2.2rem; letter-spacing: 3px; text-shadow: 2px 4px 10px rgba(0,0,0,0.85), 0 0 6px rgba(0,0,0,0.6);">{{ slide.title }}</h2>
-              <p class="fs-5 text-white-50 fw-light mb-0" style="font-size: 1.2rem; letter-spacing: 1.5px; color: rgba(255, 255, 255, 0.75) !important; text-shadow: 1px 2px 8px rgba(0,0,0,0.85);">{{ slide.desc }}</p>
+        <div 
+          v-for="(slide, index) in carouselImages" 
+          :key="slide.id" 
+          :class="['carousel-item h-100 carousel-fade-item', index === currentSlideIndex ? 'active' : '']"
+        >
+          <div class="carousel-fade-wrapper">
+            <div class="hero-overlay"></div>
+            <img :src="slide.url" class="d-block w-100 h-100 object-fit-cover" alt="形象圖">
+            
+            <div class="carousel-caption hero-text-box animate__animated animate__fadeInUp">
+              <h2 class="fw-bold text-white">{{ slide.title }}</h2>
+              <div class="hero-divider"></div>
+              <p class="text-white fw-light">{{ slide.desc }}</p>
             </div>
           </div>
         </div>
       </div>
-    </div>
-    
-    <div class="main-content-wrapper position-relative" style="z-index: 10; background-color: #fafafa; margin-top: 420px; padding-top: 40px; padding-bottom: 100px;">
-      <div class="container px-2">
-        <div class="row g-4">
-          
-          <div class="col-md-3 mb-4">
-            <div class="sticky-top" style="top: 110px; z-index: 90;">
-              <div class="card shadow-sm mb-4 border-0" style="border-radius: 8px;">
-                <div class="card-body p-3 bg-white" style="border-radius: 8px;">
-                  <label class="form-label fw-bold text-secondary small mb-2">📍 請選擇您要查看的門市：</label>
-                  <select v-model="currentStoreId" @change="handleStoreChange" class="form-select border-2 fw-bold select-store-style">
+      </div>
+
+    <div class="main-content-wrapper">
+      <div class="container">
+        <div class="row">
+          <div class="col-md-3">
+            <div class="sticky-top" style="top: 110px; z-index: 20;">
+              
+              <div class="card shadow-sm mb-4 border-0 rounded-3" style="border-radius: 12px !important; overflow: hidden;">
+                <div class="card-body p-3 bg-white">
+                  <label class="form-label fw-bold text-secondary small">📍 當前查看門市：</label>
+                  <select v-model="currentStoreId" class="form-select border-2 fw-bold store-select">
                     <option v-for="store in storeList" :key="store.id" :value="store.id">{{ store.name }}</option>
                   </select>
                 </div>
               </div>
-
-              <div class="list-group shadow-sm border-0 bg-white" style="border-radius: 12px; overflow: hidden;">
+              
+              <div class="list-group shadow-sm border-0 bg-white rounded-3 overflow-hidden">
                 <button 
-                  v-for="cat in categoryList" 
-                  :key="cat.id"
-                  @click="currentCategory = cat.id" 
-                  :class="['list-group-item list-group-item-action py-3 px-4 fw-bold border-0 border-bottom border-light-subtle d-flex align-items-center category-btn', currentCategory === cat.id ? 'yayoi-active' : 'text-secondary bg-white']"
+                  v-for="cat in categoryList" :key="cat.id" @click="scrollToCategory(cat.id)" 
+                  :class="['list-group-item list-group-item-action py-3 px-4 fw-bold border-0 border-bottom d-flex align-items-center sidebar-item', activeCategoryId === cat.id ? 'yayoi-active' : 'text-secondary bg-white']"
                 >
-                  <span class="fs-5 me-3 icon-wrapper">{{ getCategoryIcon(cat.name) }}</span>
-                  <span class="category-text-label">{{ cat.name }}</span>
+                  <span class="fs-5 me-3">{{ getCategoryIcon(cat.name) }}</span>
+                  <span>{{ cat.name }}</span>
                 </button>
               </div>
             </div>
           </div>
 
           <div class="col-md-9">
-            <div v-if="activeAvailableTags.length > 0" class="menu-feature-tags-container mb-4">
-              <div class="d-flex align-items-center flex-wrap gap-2 py-2">
-                <button 
-                  @click="selectedFeatureTag = null"
-                  :class="['btn btn-feature-tag', !selectedFeatureTag ? 'active' : '']"
-                >
-                  全部特色
-                </button>
-
-                <button 
-                  v-for="tag in activeAvailableTags" 
-                  :key="tag"
-                  @click="toggleFeatureTag(tag)"
-                  :class="['btn btn-feature-tag', selectedFeatureTag === tag ? 'active' : '']"
-                >
-                  {{ tag }}
-                </button>
-              </div>
+            <div v-if="activeAvailableTags.length > 0" class="mb-4 d-flex flex-wrap gap-2 align-items-center bg-white p-3 rounded-3 shadow-sm border-0">
+              <span class="fw-bold text-secondary small me-2">🔍 快速過濾：</span>
+              <button @click="selectedFeatureTag = null" :class="['btn tag-pill', !selectedFeatureTag ? 'active' : '']">全部特色</button>
+              <button v-for="tag in activeAvailableTags" :key="tag" @click="handleFeatureTagClick(tag)" :class="['btn tag-pill', selectedFeatureTag === tag ? 'active' : '']">{{ tag }}</button>
             </div>
 
-            <div class="row row-cols-1 row-cols-md-2 g-4">
-              <div class="col" v-for="item in filteredMenu" :key="item.id">
-                <div class="card h-100 border-0 shadow-sm overflow-hidden hover-shadow bg-white transition-all item-card" style="border-radius: 12px;">
-                  <div class="position-relative overflow-hidden" style="height: 240px;">
-                    <img :src="getMenuItemImage(item)" class="card-img-top h-100 w-100 transition-scale" style="object-fit: cover;" :alt="item.itemName">
-                  </div>
-                  <div class="card-body d-flex flex-column p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                      <h5 class="card-title fw-bold mb-0" style="color: #374151;">{{ item.itemName }}</h5>
-                      <span class="fs-4 fw-bold" style="color: #b45309;">
-                        ${{ item.finalPrice || item.price || 0 }}
-                      </span>
-                    </div>
+            <div id="dynamic-feature-title" v-if="selectedFeatureTag" class="alert alert-warning border-0 shadow-sm p-4 rounded-3 mb-4 d-flex justify-content-between align-items-center bg-white border-start border-4 border-warning">
+              <div>
+                <span class="badge bg-warning text-dark px-2 py-1 small mb-1 fw-bold">FEATURE SHOWCASE</span>
+                <h4 class="fw-bold mb-0 text-dark">【{{ selectedFeatureTag }}】</h4>
+              </div>
+              <span class="fs-5 fw-bold text-secondary">共 <span class="text-warning fs-3">{{ totalFilteredItemsCount }}</span> 品</span>
+            </div>
 
-                    <div v-if="item.featureTags && item.featureTags.length > 0" class="flex flex-wrap gap-1.5 mb-2.5">
-                      <span 
-                        v-for="(tag, tagIdx) in item.featureTags" 
-                        :key="tagIdx"
-                        class="inline-flex align-items-center px-2.5 py-0.5 rounded-full small fw-bold tag-badge"
-                      >
-                        {{ tag }}
-                      </span>
+            <div class="menu-sections-container">
+              <template v-for="cat in categoryList" :key="cat.id">
+                <div v-if="getFilteredItemsByCategory(cat.id).length > 0" :id="'category-section-' + cat.id" class="category-section-block mb-5 animate__animated animate__fadeIn">
+                  <h3 v-if="!selectedFeatureTag" class="fw-bold mb-4 border-start border-4 border-warning ps-3 text-dark">{{ cat.name }}</h3>
+                  <div class="row row-cols-1 row-cols-md-2 g-4">
+                    <div class="col" v-for="item in getFilteredItemsByCategory(cat.id)" :key="item.id">
+                      <div class="card h-100 border-0 shadow-sm item-card" :class="{ 'sold-out': item.isSelectable === false || item.is_active === 0 }">
+                        <div class="card-img-wrapper">
+                          <img :src="getMenuItemImage(item)" class="card-img-top" alt="餐點圖片">
+                          <div v-if="item.isSelectable === false || item.is_active === 0" class="sold-out-overlay"><span>已售罄</span></div>
+                        </div>
+                        <div class="card-body p-4 d-flex flex-column">
+                          <div v-if="selectedFeatureTag" class="mb-2"><span class="badge bg-light text-secondary border px-2 py-1 small fw-normal">{{ cat.name }}系列</span></div>
+                          <div class="d-flex justify-content-between mb-2">
+                            <h5 class="fw-bold mb-0 text-dark">{{ item.itemName }}</h5>
+                            <span class="price-text">${{ item.finalPrice || item.price }}</span>
+                          </div>
+                          <p class="text-muted small mb-3 flex-grow-1" style="line-height: 1.6;">{{ item.description }}</p>
+                          <div class="mb-2 d-flex flex-wrap gap-1 align-items-center" style="min-height: 26px;">
+                            <template v-for="tag in (Array.isArray(item.featureTags || item.feature_tags) ? (item.featureTags || item.feature_tags) : cleanTagText(item.featureTags || item.feature_tags).split(','))">
+                              <span v-if="cleanTagText(tag) && ['主廚推薦', '手作工法', '人氣爆棚', '鮮味極致', '經典必點', '職人精神', '嚴選食材', '季節限定', '極致奢華', '限量供應'].includes(cleanTagText(tag))" :key="tag" class="badge-feature">{{ cleanTagText(tag) }}</span>
+                            </template>
+                          </div>
+                          <div v-if="item.allergenInfo || item.allergen_info" class="mb-3 d-flex align-items-center gap-1 mt-2" style="font-size: 11px; font-weight: 400; letter-spacing: 0.1px;">
+                            <span style="color: #78350f; opacity: 0.8;">🔸 本產品含{{ item.allergenInfo || item.allergen_info }}</span>
+                          </div>
+                          <button @click="addToCart(item)" class="btn yayoi-btn-primary w-100 fw-bold py-2 mt-auto" :disabled="item.isSelectable === false || item.is_active === 0">
+                            {{ (item.isSelectable === false || item.is_active === 0) ? '暫不供應' : '加入購物車' }}
+                          </button>
+                        </div>
+                      </div>
                     </div>
-
-                    <p class="card-text small flex-grow-1 mb-3" style="line-height: 1.6; color: #6b7280;">{{ item.description }}</p>
-                    <div v-if="item.allergenInfo" class="alert alert-warning py-1 px-2 mb-3 border-0 rounded-2 d-flex align-items-center bg-opacity-10" style="font-size: 0.75rem; color: #9a3412; background-color: #ffedd5;">
-                      ⚠️ 過敏原提示：{{ item.allergenInfo }}
-                    </div>
-                    <button v-if="item.isSelectable !== false" @click="addToCart(item)" class="btn w-100 fw-bold mt-auto py-2 text-white border-0 shadow-sm yayoi-btn">
-                      <i class="fa-solid fa-cart-plus me-1"></i>加入購物車
-                    </button>
-                    <button v-else class="btn btn-secondary w-100 fw-bold mt-auto py-2 border-0" style="border-radius: 6px; cursor: not-allowed;" disabled>
-                      ❌ 已售罄 / 暫不供應
-                    </button>
                   </div>
                 </div>
-              </div>
+              </template>
             </div>
             
-            <div v-if="filteredMenu.length === 0" class="text-center py-5 text-muted border border-dashed rounded-3 bg-white shadow-sm mt-2">
-              <div class="fs-1 mb-2">👨‍🍳</div>
-              <div class="fw-bold" style="color: #4b5563;">該門市此系列品項正由主廚精製籌備中</div>
-              <div class="small text-muted mt-1">敬請期待或切換其他分店！</div>
+            <div v-if="menuItems.length > 0 && selectedFeatureTag && totalFilteredItemsCount === 0" class="text-center py-5 bg-white rounded shadow-sm border border-dashed mt-4">
+              <div class="fs-2 mb-2">🔍</div>
+              <p class="fw-bold text-secondary mb-1">區域內找不到符合「{{ selectedFeatureTag }}」的菜色</p>
+              <button @click="selectedFeatureTag = null" class="btn btn-sm btn-outline-warning mt-2 fw-bold">重設篩選</button>
             </div>
           </div>
-
         </div>
       </div>
     </div>
@@ -359,104 +463,206 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.transition-all { transition: all 0.3s ease; }
-.transition-scale { transition: transform 0.5s ease; }
-.hover-shadow:hover { transform: translateY(-6px); box-shadow: 0 12px 20px rgba(0,0,0,0.06) !important; }
-.hover-shadow:hover .transition-scale { transform: scale(1.04); }
+/* ================= 原有的 EDM 樣式 (保留) ================= */
+.edm-overlay {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background-color: rgba(0, 0, 0, 0.85); z-index: 99999;
+  display: flex; justify-content: center; align-items: center; backdrop-filter: blur(8px);
+}
+.edm-container { position: relative; width: 85%; height: 75%; max-width: 1100px; background: #f7f5f0; border-radius: 16px; overflow: hidden; }
+.edm-close-btn { position: absolute; top: 15px; right: 15px; z-index: 100; background: rgba(0,0,0,0.5); color: white; border: 1px solid white; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; transition: 0.3s; }
+.edm-close-btn:hover { background: #b22222; transform: rotate(90deg); }
+.edm-tag { font-size: 12px; color: #8b7355; font-weight: bold; letter-spacing: 2px; }
+.edm-title { font-size: 36px !important; font-weight: 800 !important; color: #1f2937 !important; }
+.edm-divider { width: 50px; height: 3px; background: #8b7355; margin: 15px 0; }
+.edm-desc { font-size: 15px; line-height: 1.8; color: #555; }
+.edm-price { font-size: 28px; font-weight: 700; color: #b22222; display: block; }
+.edm-img { width: 100%; height: 100%; object-fit: cover; }
 
-/* ==========================================================================
-   左側分類選單字體與質感優化
-   ========================================================================== */
-.category-btn { 
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft JhengHei", sans-serif;
-  font-size: 15px;
-  font-weight: 650 !important; 
-  color: #374151 !important; 
-  letter-spacing: 0.06em; 
-  line-height: 1.5;
-  will-change: padding, background-color, color;
-  transition: all 0.12s ease-out; 
+/* ================= Hero Section (職人風格優化) ================= */
+.custom-vue-hero-container {
+  position: fixed; top: 90px; left: 0; width: 100%; height: 460px; z-index: 1; 
 }
 
-.category-btn:hover:not(.yayoi-active) { 
-  background-color: #fff7ed !important; 
-  color: #b45309 !important; 
-  font-weight: 700 !important; 
-  padding-left: 1.25rem !important; 
+/* 🌟 漸層遮罩優化：解決圖片過亮、大幅增加文字的可讀性與高級感 */
+.hero-overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.65) 100%);
+  z-index: 2;
 }
 
-.yayoi-active { 
-  transition: none !important; 
-  background-color: #b45309 !important; 
-  background-image: linear-gradient(135deg, #cc7d24 0%, #b45309 100%) !important; 
+/* 修改這個既有的 class，加入 transition */
+.carousel-fade-item {
+  position: absolute !important; 
+  top: 0; left: 0; width: 100%; height: 100%; 
+  opacity: 0 !important; 
+  transition: opacity 1.2s ease-in-out !important; /* 這是淡入淡出的關鍵 */
+  pointer-events: none; /* 讓未選中的圖層不影響點擊 */
+}
+
+/* 當有 active 時，顯示該圖片 */
+.carousel-fade-item.active { 
+  opacity: 1 !important; 
+  z-index: 1 !important; 
+}
+
+/* 🌟 文字佈局優化：調整至中下方 (top: 65%)，改用 translate 精準置中 */
+.carousel-caption { 
+  z-index: 10 !important; 
+  text-align: center !important;
+  left: 50% !important; 
+  top: 65% !important;
+  transform: translate(-50%, -50%) !important;    
+  width: 100%;
+  padding: 0 20px;
+}
+
+/* 🌟 主標題優化：加粗、加大、並拉開字距展現職人內斂感 */
+.carousel-caption h2 { 
+  font-size: 2.6rem !important; 
+  font-weight: 800 !important; 
   color: #ffffff !important; 
-  font-weight: 700 !important; 
-  padding-left: 1.25rem !important;
-  box-shadow: 0 4px 12px rgba(180, 83, 9, 0.35) !important;
+  letter-spacing: 0.18rem !important; 
+  margin-bottom: 18px !important;
+  text-shadow: none !important; /* 捨棄厚重陰影，改靠遮罩襯托 */
 }
 
-/* ==========================================================================
-   🌟 特色標籤列：優雅暖橘棕配色（與右側價格及高亮按鈕呼應）
-   ========================================================================== */
-.menu-feature-tags-container {
-  border-bottom: 1px solid #e5e7eb; 
-  padding-bottom: 12px;
+/* 🌟 置中極細線裝飾點綴 */
+.hero-divider { 
+  width: 50px; 
+  height: 1.5px; 
+  background-color: rgba(255, 255, 255, 0.85); 
+  margin: 0 auto 18px auto; 
 }
 
-/* 基礎膠囊按鈕（未選取狀態） */
-.btn-feature-tag {
-  font-size: 0.88rem;
-  font-weight: 600;
-  padding: 6px 18px;
-  border-radius: 50px; 
-  border: 1px solid #e5e7eb;
+/* 🌟 副標題優化：輕量字體與微調字距，呈現呼吸空氣感 */
+.carousel-caption p { 
+  font-size: 1.15rem !important; 
+  color: #ffffff !important;
+  font-weight: 300 !important;
+  letter-spacing: 0.05rem !important;
+  opacity: 0.95;
+  text-shadow: none !important;
+}
+
+/* 確保漸變層覆蓋整個區塊 */
+.carousel-fade-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* 核心：強行覆蓋 Bootstrap 的 display 設定 */
+#mainHeroCarousel .carousel-fade-item {
+  display: block !important; 
+  opacity: 0;
+  transition: opacity 1.2s ease-in-out !important;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* 核心：啟用淡入效果 */
+#mainHeroCarousel .carousel-fade-item.active {
+  opacity: 1 !important;
+}
+
+/* 優化後的卡片樣式：增加呼吸感與質感 */
+.item-card {
+  border-radius: 16px !important;       /* 加大圓角，讓視覺更柔和 */
   background-color: #ffffff;
-  color: #6b7280;
-  transition: all 0.2s ease-in-out;
+  border: 1px solid rgba(0, 0, 0, 0.05); /* 加入極淡邊框，增加立體層次 */
+  overflow: hidden;                     /* 確保內容不會溢出圓角 */
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); /* 改用更平滑的動畫曲線 */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); /* 靜止時給予極淡的基礎陰影 */
 }
 
-/* 滑鼠游標懸停 */
-.btn-feature-tag:hover {
-  border-color: #fed7aa;
-  color: #c2410c;
-  background-color: #fff7ed;
+/* 滑鼠懸浮時的效果：模擬浮起感 */
+.item-card:hover {
+  transform: translateY(-8px);          /* 調整移動距離，更明顯的懸浮感 */
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important; 
 }
 
-/* 🌟 選取標籤後：呈現溫潤的和風暖焦糖色（告別突兀，極具整體美感） */
-.btn-feature-tag.active {
-  background-color: #fff7ed !important; 
-  color: #c2410c !important; 
-  border-color: #fed7aa !important; 
-  box-shadow: 0 2px 6px rgba(194, 65, 12, 0.08);
+/* --- 新增：高質感分類標題 (呼吸感與層次提升) --- */
+/* 修改為適應文字寬度 */
+/* --- 優化後的分類標題樣式 --- */
+.category-section-block h3 {
+  font-size: 1.75rem !important;
+  color: #2d2a2a !important; 
+  font-weight: 800 !important;
+  
+  /* 改用 block + margin 來撐開空間，不再使用 ::after */
+  display: block !important; 
+  width: fit-content !important; /* 寬度自動貼合文字 */
+  
+  /* 透過 border-bottom 畫線，這最穩定且不會消失 */
+  padding-bottom: 8px !important;
+  margin-bottom: 24px !important;
+  border-bottom: 3px solid #b45309 !important; /* 直接給予顏色與厚度 */
 }
 
-/* ==========================================================================
-   特色標籤微光澤細緻樣式
-   ========================================================================== */
-.tag-badge {
-  background-color: #fdf2e9; 
-  color: #c2410c;            
-  border: 1px solid #fed7aa; 
-  letter-spacing: 0.04em;
-  box-shadow: 0 1px 2px rgba(194, 65, 12, 0.03);
-  transition: all 0.15s ease-in-out;
+/* 滑鼠滑過時延伸到 100% */
+.category-section-block:hover h3::after {
+  transform: scaleX(1); 
 }
 
-.item-card:hover .tag-badge {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(194, 65, 12, 0.08);
-  background-color: #fff7ed;
-  color: #b45309;
+/* 懸浮效果：讓分類標題在視覺上更靈動 */
+.category-section-block:hover h3::after {
+  width: 80px;
 }
 
-/* ==========================================================================
-   其餘既有核心樣式
-   ========================================================================== */
-.category-text-label { color: inherit; }
-.icon-wrapper { display: inline-block; transition: transform 0.2s ease; }
-.category-btn:hover .icon-wrapper { transform: scale(1.15) rotate(5deg); }
-.yayoi-btn { background-color: #ea580c; background-image: linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius: 6px; }
-.yayoi-btn:hover { opacity: 0.9; color: #ffffff; }
-.select-store-style { border-color: #4a3728; cursor: pointer; }
-.select-store-style:focus { border-color: #b45309; box-shadow: 0 0 0 0.25rem rgba(180, 83, 9, 0.25); }
+/* 圖片區塊優化 */
+.card-img-wrapper {
+  height: 220px;
+  overflow: hidden;
+  position: relative;
+}
+
+.card-img-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover !important;
+  transition: transform 0.6s ease;     /* 減慢縮放速度，更有質感 */
+}
+
+/* 當卡片 hover 時，圖片稍微放大，增加視覺互動性 */
+.item-card:hover .card-img-wrapper img {
+  transform: scale(1.05);
+}
+
+/* ================= 其餘元件設定 (全部保留) ================= */
+.custom-hero-indicators {
+  position: absolute !important; z-index: 50 !important; bottom: 85px !important; 
+  left: 0 !important; right: 0 !important; display: flex !important; justify-content: center !important;
+  margin: 0 !important; list-style: none !important; pointer-events: auto !important; 
+}
+.custom-hero-indicators button {
+  pointer-events: auto !important; width: 24px !important; height: 3px !important; 
+  border-radius: 20px !important; margin: 0 4px !important; 
+  background-color: rgba(255, 255, 255, 0.25) !important; border: none !important;
+  border-top: 15px solid transparent !important; border-bottom: 15px solid transparent !important; 
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important; cursor: pointer !important;
+}
+.custom-hero-indicators button.active { background-color: rgba(92, 64, 51, 0.7) !important; width: 36px !important; }
+
+.main-content-wrapper { position: relative; z-index: 10; background-color: #fafafa !important; margin-top: 460px; padding-top: 25px; padding-bottom: 100px; }
+.menu-sections-container { background-color: #fafafa; border-radius: 12px; padding: 20px; }
+.sidebar-item { transition: all 0.2s ease; font-size: 15px; }
+.sidebar-item:hover:not(.yayoi-active) { background-color: #fff7ed !important; color: #b45309 !important; padding-left: 1.5rem !important; }
+.yayoi-active { background-color: #b45309 !important; color: white !important; border-left: 5px solid #ffc107 !important; padding-left: 1.5rem !important; box-shadow: 0 4px 10px rgba(180, 83, 9, 0.3); }
+.store-select:focus { border-color: #b45309; box-shadow: 0 0 0 0.25rem rgba(180, 83, 9, 0.2); }
+.price-text { color: #b45309; font-size: 1.4rem; font-weight: 800; }
+.badge-feature { background: #fdf2e9; color: #ca8a04; border: 1px solid #fef08a; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+.yayoi-btn-primary { background: linear-gradient(135deg, #f97316, #ea580c); color: white; border: none; border-radius: 6px; }
+
+.tag-pill { border: 1px solid #e5e7eb; border-radius: 6px !important; padding: 6px 14px; font-size: 13px; font-weight: 500; color: #5c4033; background-color: #ffffff; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+.tag-pill:hover { border-color: #fdba74; color: #c2410c; background-color: #fff7ed; transform: translateY(-1px); }
+.tag-pill.active { background: linear-gradient(135deg, #fff7ed, #ffedd5) !important; border-color: #b45309 !important; color: #78350f !important; font-weight: 600; box-shadow: 0 4px 12px rgba(180, 83, 9, 0.15) !important; }
+
+.sold-out { opacity: 0.65; }
+.sold-out-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); display: flex; justify-content: center; align-items: center; }
+.sold-out-overlay span { background: rgba(0,0,0,0.8); color: #fff; padding: 5px 15px; border-radius: 20px; font-size: 13px; font-weight: bold; }
+.object-fit-cover { object-fit: cover; }
+.brightness-50 { filter: brightness(0.5); }
+.shadow-text { text-shadow: 2px 2px 8px rgba(0,0,0,0.8); }
 </style>
