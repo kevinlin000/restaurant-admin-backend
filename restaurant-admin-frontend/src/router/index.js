@@ -258,7 +258,10 @@ router.beforeEach((to, from, next) => {
   const allowedRoles = getRouteRoles(to);
 
   if (!token && (requiresAuth || isAdminPage || isProfilePage)) {
-    next("/login");
+    next({
+      path: "/login",
+      query: { redirect: to.fullPath },
+    });
     return;
   }
 
