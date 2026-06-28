@@ -43,10 +43,10 @@ const fetchAllMenuItems = async () => {
     // 🎯 移除硬編碼，使用分店隔離查詢 API
     const response = await axios.get(`/api/menu-items/store/${currentStoreId.value}`)
     
-    // 將後端多表動態計算出來的 finalPrice 對齊前端表單的 price 變數名
+    // 將後端多表動態計算出來的 price 對齊前端表單的 price 變數名
     const formattedData = (response.data.data || response.data).map(item => ({
       ...item,
-      price: item.finalPrice // 讓分店修改時，預設帶出的是該分店的專屬定價
+      price: item.price // 讓分店修改時，預設帶出的是該分店的專屬定價
     }))
     menuItems.value = formattedData
   } catch (error) {
@@ -58,7 +58,7 @@ const fetchAllMenuItems = async () => {
 const selectItem = (item) => {
   formData.value = { 
     ...item,
-    price: item.price || item.finalPrice || item.basePrice,
+    price: item.price ,
     // ⚡ 核心回填：從下方列表選取時，若有標籤陣列，將第一個值抽出來做為單選值回填
     featureTags: (item.featureTags && item.featureTags.length > 0) ? item.featureTags[0] : ''
   }
@@ -105,71 +105,60 @@ onMounted(async () => {
   }
 })
 
+// ✅ 共用函式，放在 handleUpdateMenu 上方
+const submitMenuUpdate = async (overrideData = {}) => {
+  const cleanMenuId = parseInt(menuItemId.value, 10)
+  const cleanStoreId = parseInt(currentStoreId.value, 10)
+  const processedTags = formData.value.featureTags || null
+
+  await axios.put(`/api/menu-items/${cleanMenuId}/store/${cleanStoreId}`, {
+    categoryId: Number(formData.value.categoryId),
+    itemName: formData.value.itemName,
+    price: Number(formData.value.price),
+    description: formData.value.description,
+    imageUrl: formData.value.imageUrl,
+    allergenInfo: formData.value.allergenInfo,
+    featureTags: processedTags,
+    ...overrideData
+  })
+}
+
+// ✅ 簡化後的 handleUpdateMenu
 const handleUpdateMenu = async () => {
   try {
-    // ⚡【全端對齊修改】後端是 String，所以沒選就給 null，有選就直接送字串，不包陣列！
-    const processedTags = formData.value.featureTags ? formData.value.featureTags : null;
-
-    // ⚡【防呆防線】強制將 ID 洗乾淨為純數字
-    const cleanMenuId = parseInt(menuItemId.value, 10);
-    const cleanStoreId = parseInt(currentStoreId.value, 10);
-
-    // 🎯 使用洗乾淨的純數字進行網址拼接
-    await axios.put(`/api/menu-items/${cleanMenuId}/store/${cleanStoreId}`, {
-      categoryId: Number(formData.value.categoryId),
-      itemName: formData.value.itemName,
-      price: Number(formData.value.price), 
-      description: formData.value.description,
-      imageUrl: formData.value.imageUrl,
-      allergenInfo: formData.value.allergenInfo,
-      isActive: formData.value.isActive, 
-      featureTags: processedTags // ⚡ 現在是漂亮的純字串或 null 了！
-    })
-    
-    alert(` 🎉 第 ${cleanStoreId} 號分店餐點數據客製修改成功！`)
-    fetchAllMenuItems() 
+    await submitMenuUpdate({ isActive: formData.value.isActive })
+    alert(`🎉 第 ${parseInt(currentStoreId.value, 10)} 號分店餐點數據客製修改成功！`)
+    fetchAllMenuItems()
   } catch (error) {
     console.error('分店更新餐點失敗：', error)
-    alert(' ❌ 更新失敗，請檢查後端控制台！')
+    alert('❌ 更新失敗，請檢查後端控制台！')
   }
 }
 
 // 🚀 6. 雙向開關邏輯：分店專屬狀態取反切換（上架/下架）
+// ✅ 安全順序
 const handleToggleStatus = async () => {
   if (!formData.value.id) {
     alert('請先在下方列表選擇一個餐點才能進行操作唷！')
     return
   }
+
   const isCurrentlyAvailable = formData.value.isActive === true || formData.value.isActive === 'true'
+  const newStatus = !isCurrentlyAvailable
   const actionText = isCurrentlyAvailable ? '下架移出分店菜單' : '分店重新上架還原'
   const confirmAction = confirm(`確定要將【${formData.value.itemName}】進行${actionText}嗎？`)
   if (!confirmAction) return
-  
+
   try {
-    formData.value.isActive = !isCurrentlyAvailable
-    
-    // ⚡ 同步修改這裡的標籤包裝
-    const processedTags = formData.value.featureTags ? formData.value.featureTags : null;
+    await submitMenuUpdate({ isActive: newStatus })
 
-    const cleanMenuId = parseInt(menuItemId.value, 10);
-    const cleanStoreId = parseInt(currentStoreId.value, 10);
+    formData.value.isActive = newStatus  // ✅ API 成功後才更新前端
+    alert(`🎉 【${formData.value.itemName}】${actionText}成功！`)
+    fetchAllMenuItems()
 
-    await axios.put(`/api/menu-items/${cleanMenuId}/store/${cleanStoreId}`, {
-      categoryId: Number(formData.value.categoryId),
-      itemName: formData.value.itemName,
-      price: Number(formData.value.price),
-      description: formData.value.description,
-      imageUrl: formData.value.imageUrl,
-      allergenInfo: formData.value.allergenInfo,
-      isActive: formData.value.isActive, 
-      featureTags: processedTags 
-    })
-    
-    alert(` 🎉 【${formData.value.itemName}】${actionText}成功！`)
-    fetchAllMenuItems() 
   } catch (error) {
     console.error('狀態切換失敗：', error)
-    alert(' ❌ 操作失敗，請檢查後端控制台！')
+    alert('❌ 操作失敗，請檢查後端控制台！')
   }
 }
 </script>

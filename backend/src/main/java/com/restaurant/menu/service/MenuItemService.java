@@ -266,9 +266,9 @@ public class MenuItemService {
 
             // ==================== 💰 智慧核心：價格動態咬合防線 ====================
             if (currentStoreSetting != null && currentStoreSetting.getPrice() != null) {
-                response.setFinalPrice(currentStoreSetting.getPrice());
+                response.setPrice(currentStoreSetting.getPrice());
             } else {
-                response.setFinalPrice(item.getPrice());
+                response.setPrice(item.getPrice());
             }
             // ====================================================================
 

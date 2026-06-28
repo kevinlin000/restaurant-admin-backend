@@ -428,7 +428,7 @@ onUnmounted(() => {
                           <div v-if="selectedFeatureTag" class="mb-2"><span class="badge bg-light text-secondary border px-2 py-1 small fw-normal">{{ cat.name }}系列</span></div>
                           <div class="d-flex justify-content-between mb-2">
                             <h5 class="fw-bold mb-0 text-dark">{{ item.itemName }}</h5>
-                            <span class="price-text">${{ item.finalPrice || item.price }}</span>
+                            <span class="price-text">${{ item.price }}</span>
                           </div>
                           <p class="text-muted small mb-3 flex-grow-1" style="line-height: 1.6;">{{ item.description }}</p>
                           <div class="mb-2 d-flex flex-wrap gap-1 align-items-center" style="min-height: 26px;">
