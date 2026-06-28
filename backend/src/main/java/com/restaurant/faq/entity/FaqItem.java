@@ -37,13 +37,13 @@ public class FaqItem {
     @Builder.Default
     private FaqStatus status = FaqStatus.DRAFT;
 
-    @Column(name = "question", nullable = false, length = 180)
+    @Column(name = "question", nullable = false, length = 255)
     private String question;
 
     @Column(name = "answer", nullable = false, columnDefinition = "TEXT")
     private String answer;
 
-    @Column(name = "keywords", length = 320)
+    @Column(name = "keywords", columnDefinition = "TEXT")
     private String keywords;
 
     @Column(name = "is_featured", nullable = false)

@@ -6,11 +6,14 @@ import com.restaurant.faq.dto.FaqItemResponse;
 import com.restaurant.faq.dto.FaqSearchResponse;
 import com.restaurant.faq.entity.FaqCategory;
 import com.restaurant.faq.entity.FaqItem;
+import com.restaurant.faq.entity.FaqSearchLog;
 import com.restaurant.faq.entity.FaqStatus;
 import com.restaurant.faq.repository.FaqItemRepository;
+import com.restaurant.faq.repository.FaqSearchLogRepository;
 import com.restaurant.store.service.StoreAdminAccessService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -24,6 +27,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,6 +36,9 @@ class FaqItemServiceImplTest {
 
     @Mock
     private FaqItemRepository faqItemRepository;
+
+    @Mock
+    private FaqSearchLogRepository faqSearchLogRepository;
 
     @Mock
     private StoreAdminAccessService storeAdminAccessService;
@@ -65,6 +72,14 @@ class FaqItemServiceImplTest {
 
         assertThat(result.getResults()).extracting(FaqItemResponse::getFaqId).containsExactly(1L, 2L);
         assertThat(result.getSuggestions()).hasSize(4);
+
+        ArgumentCaptor<FaqSearchLog> logCaptor = ArgumentCaptor.forClass(FaqSearchLog.class);
+        verify(faqSearchLogRepository).save(logCaptor.capture());
+        FaqSearchLog log = logCaptor.getValue();
+        assertThat(log.getQueryText()).isEqualTo("訂金");
+        assertThat(log.getMatched()).isTrue();
+        assertThat(log.getResultCount()).isEqualTo(2);
+        assertThat(log.getTopFaqId()).isEqualTo(1L);
     }
 
     @Test
@@ -85,6 +100,18 @@ class FaqItemServiceImplTest {
     }
 
     @Test
+    void blankSearchReturnsSuggestionsWithoutWritingSearchLog() {
+        when(faqItemRepository.findByIsDeletedFalseAndStatusOrderByIsFeaturedDescSortOrderAscFaqIdDesc(FaqStatus.PUBLISHED))
+                .thenReturn(List.of(faq(1L, "訂位需要訂金嗎？", "部分時段需要支付訂金", FaqCategory.DEPOSIT, FaqStatus.PUBLISHED, true)));
+
+        FaqSearchResponse result = faqItemService.searchPublishedFaqs(" ");
+
+        assertThat(result.getResults()).isEmpty();
+        assertThat(result.getSuggestions()).hasSize(1);
+        verify(faqSearchLogRepository, never()).save(any(FaqSearchLog.class));
+    }
+
+    @Test
     void adminCanCreateFaq() {
         Authentication auth = adminAuth();
         when(faqItemRepository.save(any(FaqItem.class))).thenAnswer(invocation -> {
@@ -99,6 +126,24 @@ class FaqItemServiceImplTest {
         assertThat(result.getFaqId()).isEqualTo(9L);
         assertThat(result.getQuestion()).isEqualTo("訂位需要訂金嗎？");
         assertThat(result.getIsFeatured()).isTrue();
+    }
+
+    @Test
+    void adminCanCreateFaqWithLongKeywordsForSearchCoverage() {
+        Authentication auth = adminAuth();
+        FaqItemRequest request = request();
+        String longKeywords = "訂位,訂金,取消,退款,包廂,大人數,特殊餐期,候位,保留座位,門市,外帶,點餐,付款,發票,過敏,兒童椅,慶生,停車,營業狀態,會員紀錄"
+                .repeat(5);
+        request.setKeywords(longKeywords);
+        when(faqItemRepository.save(any(FaqItem.class))).thenAnswer(invocation -> {
+            FaqItem faq = invocation.getArgument(0);
+            faq.setFaqId(10L);
+            return faq;
+        });
+
+        FaqItemResponse result = faqItemService.createFaq(request, auth);
+
+        assertThat(result.getKeywords()).isEqualTo(longKeywords);
     }
 
     @Test

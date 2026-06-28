@@ -70,7 +70,13 @@ const currentPageTitle = computed(() => {
   if (path.startsWith("/admin/menu")) return "菜單管理";
   if (path.startsWith("/admin/member")) return "員工管理";
   if (path.startsWith("/admin/homepage")) return "首頁管理";
-  if (path.startsWith("/admin/news") || path.startsWith("/admin/faqs")) return "品牌內容";
+  if (
+    path.startsWith("/admin/news") ||
+    path.startsWith("/admin/faqs") ||
+    path.startsWith("/admin/faq-analytics")
+  ) {
+    return "品牌內容";
+  }
   if (path.startsWith("/admin/home")) return "後台管理首頁";
 
   return "後台管理首頁";
@@ -191,6 +197,11 @@ const sidebarGroups = computed(() => [
         path: "/admin/faqs",
         roles: ["ADMIN"],
       },
+      {
+        label: "客服查詢紀錄",
+        path: "/admin/faq-analytics",
+        roles: ["ADMIN"],
+      },
     ],
   },
 ]);
@@ -211,6 +222,7 @@ const openMenu = ref({
   content:
     route.path.startsWith("/admin/news") ||
     route.path.startsWith("/admin/faqs") ||
+    route.path.startsWith("/admin/faq-analytics") ||
     route.path.startsWith("/admin/homepage"),
 });
 

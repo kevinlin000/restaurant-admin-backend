@@ -1,6 +1,9 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
+import { useRoute } from "vue-router";
 import { faqApi } from "@/api/faq";
+
+const route = useRoute();
 
 const faqs = ref([]);
 const selectedId = ref(null);
@@ -88,6 +91,17 @@ const startCreate = () => {
   resetMessages();
 };
 
+const applyDraftQuestionFromRoute = () => {
+  const draftQuestion =
+    typeof route.query.draftQuestion === "string" ? route.query.draftQuestion.trim() : "";
+  if (!draftQuestion) return;
+
+  startCreate();
+  form.question = draftQuestion;
+  form.keywords = draftQuestion;
+  message.value = "已帶入客服未命中問題，請補上回答後儲存。";
+};
+
 const selectFaq = (faq) => {
   selectedId.value = faq.faqId;
   assignForm(faq);
@@ -155,7 +169,10 @@ const deleteFaq = async () => {
   }
 };
 
-onMounted(loadFaqs);
+onMounted(async () => {
+  await loadFaqs();
+  applyDraftQuestionFromRoute();
+});
 </script>
 
 <template>
@@ -279,7 +296,7 @@ onMounted(loadFaqs);
 
         <label class="full-field">
           問題
-          <input v-model="form.question" type="text" maxlength="180" placeholder="例如：取消訂位後訂金可以退嗎？" />
+          <input v-model="form.question" type="text" maxlength="255" placeholder="例如：取消訂位後訂金可以退嗎？" />
         </label>
 
         <label class="full-field">
@@ -289,7 +306,7 @@ onMounted(loadFaqs);
 
         <label class="full-field">
           搜尋關鍵字
-          <input v-model="form.keywords" type="text" maxlength="320" placeholder="訂金,退款,取消,未到,no show" />
+          <input v-model="form.keywords" type="text" maxlength="1000" placeholder="訂金,退款,取消,未到,no show" />
         </label>
 
         <div class="actions">
