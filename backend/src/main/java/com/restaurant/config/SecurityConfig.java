@@ -75,6 +75,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/orders").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/orders/**").permitAll()
                         .requestMatchers("/api/payments/**").permitAll()
+                        .requestMatchers("/api/reservation-payments/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/favicon.ico").permitAll()
 
                         // ===== 個人資料路由（所有已登入角色都可以看 / 修改自己的資料）=====

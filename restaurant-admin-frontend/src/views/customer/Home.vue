@@ -773,6 +773,7 @@ onBeforeUnmount(() => {
   position: relative;
   width: min(1180px, calc(100% - 48px));
   margin: 0 auto;
+  padding-top: 50px;
   color: #fff;
 }
 

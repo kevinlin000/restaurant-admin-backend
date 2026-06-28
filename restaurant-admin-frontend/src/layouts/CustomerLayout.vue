@@ -264,7 +264,7 @@ const logout = async () => {
 }
 
 .landing-navbar .navbar {
-  background: white;
+  background: rgba(255, 255, 255, 0.99);
   border-radius: 10px;
   padding: 10px 20px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
@@ -386,7 +386,6 @@ const logout = async () => {
   flex: 1;
   min-height: calc(100vh - 160px);
   background-attachment: scroll;
-  /* background-color:#f8f3ed; */
   background: url("../assets/images/background.png");
 }
 
@@ -394,7 +393,7 @@ const logout = async () => {
 
 .footer {
   margin-top: auto;
-  background-color: #4c4332b8;
+  background-color: #2a2115e3;
 }
 
 /* mobile */

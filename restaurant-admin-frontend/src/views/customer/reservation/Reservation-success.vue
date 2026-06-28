@@ -19,7 +19,28 @@ const storeName = ref('')
 // 訂位成功顯示名字、分店
 const displayName = computed(() => reservation.value?.customerName || cachedReservation.value.customerName || '訂位顧客')
 const displayStoreName = computed(() => storeName.value || cachedReservation.value.storeName || '未指定分店')
-const pageTitle = computed(() => '訂位成功')
+const depositAmount = computed(() => Number(reservation.value?.depositAmount || cachedReservation.value.depositAmount || 0))
+const hasDeposit = computed(() => depositAmount.value > 0)
+const depositPaid = computed(() => reservation.value?.paymentStatus === 'PAID')
+const reservationCancelled = computed(() => reservation.value?.status === 'CANCELLED')
+const depositPending = computed(() => hasDeposit.value && !depositPaid.value && !reservationCancelled.value)
+// 訂位成功、待付款、取消樣式切換
+const statusIconClass = computed(() => {
+  if (reservationCancelled.value) return 'bx-x'
+  return depositPending.value ? 'bx-credit-card' : 'bx-check-double'
+})
+const statusIconWrapClass = computed(() => {
+  if (reservationCancelled.value) return 'bg-label-danger'
+  return depositPending.value ? 'bg-label-warning' : 'bg-label-success'
+})
+const statusIconColor = computed(() => {
+  if (reservationCancelled.value) return '#dc3545'
+  return depositPending.value ? '#b7791f' : 'green'
+})
+const pageTitle = computed(() => {
+  if (reservationCancelled.value) return '訂位已取消'
+  return depositPending.value ? '訂位待付款' : '訂位成功'
+})
 
 // 讀取訂位頁送出暫存顧客資訊（避免重新整理或後端欄位差）
 const loadCachedReservation = (reservationId) => {
@@ -55,7 +76,8 @@ const loadReservation = async () => {
     const res = route.query.token
       ? await reservationApi.getPublicReservation(route.query.id, route.query.token)
       : await reservationApi.getReservation(route.query.id)
-    reservation.value = res.data
+    const item = res.data
+    reservation.value = item
     loadCachedReservation(res.data?.reservationId)
     await loadStoreName(res.data?.storeId)
   } catch (error) {
@@ -84,6 +106,10 @@ const cancelReservation = async () => {
 
   try {
     await reservationApi.cancelReservation(reservation.value.reservationId)
+    reservation.value = {
+      ...reservation.value,
+      status: 'CANCELLED',
+    }
     await Swal.fire({
       title: '已取消訂位',
       text: '您的訂位已取消。',
@@ -95,7 +121,6 @@ const cancelReservation = async () => {
     errorMessage.value = error.response?.data?.message || '取消訂位失敗，請稍後再試'
     return
   }
-  router.push({ name: 'CustomerReservation' })
 }
 
 // 保留訂位（SweetAlert） 
@@ -132,6 +157,12 @@ const reserveReservation = async () => {
   }
 }
 
+// 待付款訂位可從成功頁繼續導到綠界付款。
+const continuePayment = () => {
+  if (!reservation.value) return
+  window.location.href = reservationApi.depositCheckoutUrl(reservation.value.reservationId)
+}
+
 // 編輯訂位：只有 PENDING 狀態可編輯
 const editReservation = () => {
   if (!reservation.value || reservation.value.status !== 'PENDING') return
@@ -154,8 +185,12 @@ onMounted(loadReservation)
     <!-- 訂位成功 card -->
     <div class="card mb-4 py-4 align-items-center reservation-success-card">
       <div class="avatar me-2">
-        <span class="avatar-initial rounded-circle bg-label-success">
-          <i class="bx bx-check-double bx-sm" style="color: green;"></i>
+        <span class="avatar-initial rounded-circle" :class="statusIconWrapClass">
+          <i
+            class="bx bx-sm"
+            :class="statusIconClass"
+            :style="{ color: statusIconColor }">
+          </i>
         </span>
       </div>
       <h3 class="card-header">{{ pageTitle }}</h3>
@@ -171,30 +206,50 @@ onMounted(loadReservation)
             <div class="col-md-12"><p class="fs-4 mb-0">{{ reservation.reservationDate }}</p></div>
             <div class="col-md-12"><p class="fs-4 mb-0">{{ reservation.partySize }} 位</p></div>
             <div class="col-md-12"><p class="fs-4 mb-0">{{ formatTime(reservation.startTime) }} - {{ formatTime(reservation.endTime) }}</p></div>
+            <div v-if="hasDeposit" class="col-md-12">
+              <p class="mb-0">
+                <span class="badge" :class="depositPaid ? 'bg-label-success' : (reservationCancelled ? 'bg-label-danger' : 'bg-label-warning')">
+                  {{ depositPaid ? '已支付訂金' : (reservationCancelled ? '訂金未付款，訂位已取消' : '請於1 小時內完成付款，逾時會自動取消訂位') }}
+                </span>
+              </p>
+            </div>
           </div>
           <p class="mt-3 mb-0">
-            <span class="badge" :class="reservation.status === 'RESERVED' ? 'bg-label-warning' : 'bg-label-success'">
-              {{ reservation.status === 'RESERVED' ? '已保留' : '待確認' }}
+            <span class="badge" :class="reservationCancelled ? 'bg-label-danger' : (depositPending ? 'bg-label-warning' : (reservation.status === 'RESERVED' ? 'bg-label-warning' : 'bg-label-success'))">
+              {{ reservationCancelled ? '已取消' : (depositPending ? '待付款' : (reservation.status === 'RESERVED' ? '已保留' : '待確認')) }} 
             </span>
           </p>
           <div v-if="successMessage" class="alert alert-success mt-3 mb-0">{{ successMessage }}</div>
           <!-- 編輯、保留、刪除按鈕 -->
           <div class="pt-5 success-card-actions">
             <button
-              v-if="reservation.status === 'PENDING'"
+              v-if="depositPending"
+              type="button"
+              class="btn btn-reservation-light me-sm-3 me-1"
+              @click="continuePayment">
+              繼續付款
+            </button>
+            <button
+              v-if="reservation.status === 'PENDING' && !depositPending"
               type="button"
               class="btn btn-label-primary me-sm-3 me-1"
               @click="editReservation">
               編輯訂位
             </button>
             <button
-              v-if="reservation.status === 'PENDING'"
+              v-if="reservation.status === 'PENDING' && !depositPending"
               type="button"
               class="btn btn-label-warning me-sm-3 me-1"
               @click="reserveReservation">
               保留訂位
             </button>
-            <button type="button" class="btn btn-label-danger me-sm-3 me-1" @click="cancelReservation">取消訂位</button>
+            <button
+              v-if="!reservationCancelled"
+              type="button"
+              class="btn btn-label-danger me-sm-3 me-1"
+              @click="cancelReservation">
+              取消訂位
+            </button>
           </div>
         </template>
       </div>

@@ -12,7 +12,6 @@ import {
   formatTime,
   getCurrentUserInfo,
 } from '@/assets/js/reservationUi'
-import reservationHeroImage from '@/assets/images/reservation.jpg'
 
 const route = useRoute()
 const router = useRouter()
@@ -99,6 +98,8 @@ const fullDateSet = computed(() => {
 const slotsForDate = computed(() => slots.value.filter((slot) => slot.reservationDate === form.reservationDate))
 const availableSlotsForDate = computed(() => slotsForDate.value.filter((slot) => !isSlotFull(slot)))
 const selectedSlot = computed(() => slots.value.find((slot) => String(slot.slotId) === String(form.slotId)))
+const selectedSlotRequiresDeposit = computed(() => Boolean(selectedSlot.value?.requiresDeposit))
+const selectedSlotDepositAmount = computed(() => Number(selectedSlot.value?.depositAmount || 0))
 const selectedSlotIsFull = computed(() => {
   const isOriginalEditingSlot = editingReservationId.value
     && String(form.slotId) === String(editingOriginalSlotId.value)
@@ -157,6 +158,7 @@ const cacheSuccessReservation = (reservationId) => {
     customerName: form.customerName,
     customerPhone: form.customerPhone,
     storeName: getSelectedStoreName(),
+    depositAmount: selectedSlotDepositAmount.value,
   }))
 }
 
@@ -338,6 +340,10 @@ const submitReservation = async () => {
     successReservation.value = res.data
     editingReservationId.value = null
     successMessage.value = isEditing ? '訂位已更新' : ''
+    if (!isEditing && Number(res.data?.depositAmount || 0) > 0 && res.data?.paymentStatus !== 'PAID') {
+      window.location.href = reservationApi.depositCheckoutUrl(res.data.reservationId)
+      return
+    }
     const successQuery = { id: res.data.reservationId }
     if (res.data.accessToken) successQuery.token = res.data.accessToken
     router.push({ name: 'CustomerReservationSuccess', query: successQuery })
@@ -418,7 +424,7 @@ onBeforeUnmount(() => {
 <template>
   <main class="reservation-page">
     <!-- 訂位頁首 -->
-    <section class="reservation-hero" :style="{ backgroundImage: `linear-gradient(90deg, rgba(22, 28, 34, 0.76), rgba(22, 28, 34, 0.2)), url(${reservationHeroImage})` }">
+    <section class="reservation-hero">
       <div class="container reservation-hero-shell">
         <div class="reservation-hero-content">
           <p class="eyebrow">Reservation</p>
@@ -432,7 +438,7 @@ onBeforeUnmount(() => {
     <!-- 分店篩選 -->
     <div v-if="!successReservation" class="card mb-4 store-filter-card reservation-customer-card">
       <div class="card-body">
-        <h4 class="mb-4" style="color:#6f665d;">用餐門市</h4>
+        <h4 class="mb-4" style="color:#6f665d;">門市選擇<span class="text-muted fs-5 fw-normal"> / Store </span></h4>
         <hr class="my-4">
         <div class="row g-3">
           <div class="col-md-5">
@@ -460,7 +466,7 @@ onBeforeUnmount(() => {
     <!-- 訂位表單 -->
     <div v-if="!successReservation" class="card mb-4 reservation-customer-card">
       <section class="reservation-notice-card" aria-label="訂位須知">
-        <h4 class="mb-4" style="color:#6f665d;">訂位資訊</h4>
+        <h4 class="mb-4" style="color:#6f665d;">訂位資訊<span class="text-muted fs-5 fw-normal"> / Reservation Information </span></h4>
         <hr class="my-4">
         <div class="reservation-notice-tab">
           <i class="bx bx-info-circle" aria-hidden="true"></i>
@@ -557,9 +563,15 @@ onBeforeUnmount(() => {
             <select id="reservation-slot" v-model="form.slotId" class="form-select" required>
               <option value="">請選擇</option>
               <option v-for="slot in slotsForDate" :key="slot.slotId" :value="String(slot.slotId)" :disabled="isSlotDisabled(slot)">
-                {{ formatTime(slot.startTime) }} - {{ formatTime(slot.endTime) }}{{ isSlotFull(slot) ? '（已額滿）' : '' }}
+                {{ formatTime(slot.startTime) }} - {{ formatTime(slot.endTime) }}{{ slot.requiresDeposit ? `｜需訂金 $${Number(slot.depositAmount || 0).toLocaleString()}` : '' }}{{ isSlotFull(slot) ? '（已額滿）' : '' }}
               </option>
             </select>
+          </div>
+          <div v-if="selectedSlotRequiresDeposit" class="col-12">
+            <div class="reservation-deposit-notice">
+              <i class="bx bx-credit-card"></i>
+              <span>此時段需先支付訂金 ${{ selectedSlotDepositAmount.toLocaleString() }}</span>
+            </div>
           </div>
           <div class="col-12">
             <label class="form-label" for="reservation-request">特殊需求</label>
@@ -584,15 +596,17 @@ onBeforeUnmount(() => {
 <style scoped>
 .reservation-page {
   min-height: 100vh;
-  /* background: #f7f3ee; */
-  background: url('../../../assets/images/background.png');
+  background-color:#e4e2dd;
+  /* background: url('../../../assets/images/background.png'); */
 }
 
 .reservation-hero {
-  min-height: 430px;
+  min-height: 458px;
   padding: 138px 0 62px;
+  background: url('@/assets/images/reservation.jpg');
   background-position: center;
-  background-size: cover;
+  background-size: 113% auto;
+  background-repeat: no-repeat;
 }
 
 .reservation-hero-shell {
@@ -603,8 +617,8 @@ onBeforeUnmount(() => {
 
 .reservation-hero-content {
   max-width: 750px;
-  padding-left: 50px;
-  padding-bottom: 15px;
+  padding-left: 100px;
+  padding-bottom: 10px;
   color: #ffffff;
 }
 
@@ -626,6 +640,17 @@ onBeforeUnmount(() => {
   letter-spacing: 0;
 }
 
+.reservation-deposit-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-left: 5px solid #c08b55;
+  background: #fbf2e7;
+  color: #755638;
+  font-weight: 700;
+}
+
 .reservation-content {
   position: relative;
   padding-top: 0;
@@ -644,17 +669,18 @@ onBeforeUnmount(() => {
   position: relative;
   z-index: 5;
   box-shadow: 0 0.75rem 1.75rem rgba(52, 64, 81, 0.12);
-  margin-top: -60px;
-  margin-right: auto;
-  margin-left: auto;
+  margin-top: -55px;
+  
 }
 
 .reservation-customer-card {
-  border: 1px solid #e1d9cf;
-  border-radius: 5;
-  border-color: #dbd5cf;
-  background: #fffdf8;
+  max-width: 1000px;
+  border: 1px solid #ddd8d182;
+  border-radius: 1;
+  background: #fdfdfd;
   box-shadow: 0 12px 34px rgba(36, 28, 21, 0.08);
+  margin-right: auto;
+  margin-left: auto;
 }
 
 .reservation-customer-card .card-body {

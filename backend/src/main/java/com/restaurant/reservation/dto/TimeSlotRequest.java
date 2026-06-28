@@ -3,6 +3,7 @@ package com.restaurant.reservation.dto;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
@@ -21,9 +22,15 @@ public class TimeSlotRequest {
     @NotNull(message = "結束時間必填")
     private LocalTime endTime;
 
-    // 是否開放預訂；預設開放。
+    // 是否開放預訂(預設開放)
     private Boolean isOpen = true;
 
-    // 是否由星期規則批次產生；自訂日期或單日修改會是 false。
+    // 是否由星期規則批次產生(自訂日期、單日修改會是 false)
     private Boolean ruleGenerated = false;
+
+    // 是否需要支付訂金
+    private Boolean requiresDeposit = false;
+
+    // 訂金金額（requiresDeposit=false 時後端會統一視為 0）
+    private BigDecimal depositAmount = BigDecimal.ZERO;
 }

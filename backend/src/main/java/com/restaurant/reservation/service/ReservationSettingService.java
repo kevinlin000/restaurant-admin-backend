@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -48,6 +49,7 @@ public class ReservationSettingService {
     @Transactional
     public TimeSlot createTimeSlot(TimeSlotRequest request) {
         validateTimeRange(request.getStartTime(), request.getEndTime());
+        BigDecimal depositAmount = resolveDepositAmount(request.getRequiresDeposit(), request.getDepositAmount());
         validateWithinBusinessHours(
                 request.getStoreId(),
                 request.getReservationDate(),
@@ -71,6 +73,8 @@ public class ReservationSettingService {
                 .endTime(request.getEndTime())
                 .isOpen(request.getIsOpen() == null || request.getIsOpen())
                 .ruleGenerated(Boolean.TRUE.equals(request.getRuleGenerated()))
+                .requiresDeposit(Boolean.TRUE.equals(request.getRequiresDeposit()))
+                .depositAmount(depositAmount)
                 .build());
         rebuildCapacity(slot.getSlotId());
         return slot;
@@ -82,6 +86,7 @@ public class ReservationSettingService {
         TimeSlot slot = timeSlotRepository.findById(slotId)
                 .orElseThrow(() -> new ResourceNotFoundException("訂位時段", slotId));
         validateTimeRange(request.getStartTime(), request.getEndTime());
+        BigDecimal depositAmount = resolveDepositAmount(request.getRequiresDeposit(), request.getDepositAmount());
         validateWithinBusinessHours(
                 request.getStoreId(),
                 request.getReservationDate(),
@@ -107,6 +112,8 @@ public class ReservationSettingService {
         slot.setEndTime(request.getEndTime());
         slot.setIsOpen(request.getIsOpen() == null || request.getIsOpen());
         slot.setRuleGenerated(Boolean.TRUE.equals(request.getRuleGenerated()));
+        slot.setRequiresDeposit(Boolean.TRUE.equals(request.getRequiresDeposit()));
+        slot.setDepositAmount(depositAmount);
 
         TimeSlot saved = timeSlotRepository.save(slot);
         if (storeChanged) {
@@ -169,6 +176,17 @@ public class ReservationSettingService {
         if (startTime == null || endTime == null || !startTime.isBefore(endTime)) {
             throw new BusinessException("結束時間必須晚於開始時間");
         }
+    }
+
+    // 後台時段訂金設定：有勾訂金必須輸入正數，沒勾一律 0
+    private BigDecimal resolveDepositAmount(Boolean requiresDeposit, BigDecimal depositAmount) {
+        if (!Boolean.TRUE.equals(requiresDeposit)) {
+            return BigDecimal.ZERO;
+        }
+        if (depositAmount == null || depositAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("需要支付訂金時，訂金金額必須大於 0");
+        }
+        return depositAmount;
     }
 
     private Integer resolveDayOfWeek(LocalDate reservationDate) {
