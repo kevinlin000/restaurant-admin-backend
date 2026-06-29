@@ -42,9 +42,13 @@ public class OrderResponse {
     private String invoiceType;
 
     private String carrierNumber;
-    
+
     private String tableNumber;
 
+    private BigDecimal depositAmount;
+
+    private String depositStatus;
+    
     private List<OrderItemResponse> items;
 
 }
