@@ -167,6 +167,7 @@ const menuItems = ref([]);
 
 const cartItems = ref([]);
 
+
 const selectedMenuItem = ref(null);
 const selectedQuantity = ref(1);
 const selectedNote = ref("");
@@ -731,15 +732,85 @@ function removeItem(menuItemId) {
     );
 }
 
-function goCheckout() {
+const ORDER_DRAFT_KEY = "orderDraft";
+
+function saveOrderDraft() {
+    const draft = {
+        cartItems: cartItems.value,
+        orderForm: orderForm.value,
+        customerForm: customerForm.value,
+        pickupTime: pickupTime.value,
+        activeCategory: activeCategory.value,
+        savedAt: Date.now(),
+    };
+
+    localStorage.setItem(ORDER_DRAFT_KEY, JSON.stringify(draft));
+}
+
+
+async function goCheckout() {
     if (cartItems.value.length === 0) {
-        showToast("請先加入餐點", "error");
+        showError("請先加入餐點");
         return;
+    }
+
+    if (!isLogin.value) {
+        const result = await Swal.fire({
+            icon: undefined,
+            title: "登入會員享更多優惠",
+            html: `
+        <div class="benefit-list">
+
+    <div class="benefit-item">
+        <span>✔</span>
+        <span>現金付款</span>
+    </div>
+
+    <div class="benefit-item">
+        <span>✔</span>
+        <span>使用會員點數折抵</span>
+    </div>
+
+    
+
+</div>
+    `,
+            showCancelButton: true,
+            showDenyButton: true,
+
+            confirmButtonText: "立即登入",
+            denyButtonText: "訪客結帳",
+            cancelButtonText: "取消",
+
+            confirmButtonColor: "#e7a86d",
+            denyButtonColor: "#35527a",
+            cancelButtonColor: "#b8bec8",
+
+            customClass: {
+                popup: "restaurant-login-popup",
+                title: "restaurant-login-title"
+            }
+        });
+
+        if (result.isConfirmed) {
+            saveOrderDraft();
+
+            router.push({
+                path: "/login",
+                query: {
+                    redirect: route.fullPath,
+                },
+            });
+            return;
+        }
+
+        if (!result.isDenied) {
+            return;
+        }
     }
 
     step.value = "CHECKOUT";
 }
-
 function backToMenu() {
     step.value = "MENU";
 }
@@ -1011,6 +1082,52 @@ async function submitOrder() {
     router.push("/");
 }
 
+function restoreOrderDraft() {
+    const raw = localStorage.getItem(ORDER_DRAFT_KEY);
+    if (!raw) return;
+
+    try {
+        const draft = JSON.parse(raw);
+
+        if (Date.now() - Number(draft.savedAt || 0) > 2 * 60 * 60 * 1000) {
+            localStorage.removeItem(ORDER_DRAFT_KEY);
+            return;
+        }
+
+        if (Array.isArray(draft.cartItems)) {
+            cartItems.value = draft.cartItems;
+        }
+
+        if (draft.orderForm) {
+            orderForm.value = {
+                ...orderForm.value,
+                ...draft.orderForm,
+                userId: userInfo.value?.userId ?? null,
+            };
+        }
+
+        if (draft.customerForm) {
+            customerForm.value = {
+                ...customerForm.value,
+                ...draft.customerForm,
+            };
+        }
+
+        if (draft.pickupTime) {
+            pickupTime.value = draft.pickupTime;
+        }
+
+        if (draft.activeCategory) {
+            activeCategory.value = draft.activeCategory;
+        }
+
+        localStorage.removeItem(ORDER_DRAFT_KEY);
+    } catch (error) {
+        console.error("還原點餐資料失敗", error);
+        localStorage.removeItem(ORDER_DRAFT_KEY);
+    }
+}
+
 onMounted(async () => {
     if (route.query.customerName) {
         customerForm.value.customerName = String(route.query.customerName);
@@ -1036,6 +1153,9 @@ onMounted(async () => {
     await loadStoreInfo(orderForm.value.storeId);
     await loadStoreMenu(orderForm.value.storeId);
     await loadRecommendItems();
+
+    restoreOrderDraft();
+    await fillMemberContactInfo();
 });
 // =========================
 </script>
@@ -1048,7 +1168,7 @@ onMounted(async () => {
             <section class="order-header">
                 <div>
                     <H2></H2>
-                    
+
                 </div>
 
                 <div class="order-type" v-if="canSwitchOrderType">
@@ -1629,7 +1749,7 @@ onMounted(async () => {
                                 <p>
                                     已被點選
                                     <strong>{{ item.totalQuantity || item.quantity || item.count || item.orderCount || 0
-                                        }}</strong>
+                                    }}</strong>
                                     份
                                 </p>
                             </div>
@@ -3240,6 +3360,7 @@ onMounted(async () => {
 .order-top-row .smart-recommend-bar {
     margin: 0;
 }
+
 .order-top-row {
     display: flex;
     align-items: center;
@@ -3260,5 +3381,104 @@ onMounted(async () => {
 
 .order-top-row .smart-recommend-bar {
     margin: 0;
+}
+
+.restaurant-login-popup {
+    border-radius: 24px;
+    padding: 30px;
+}
+
+.restaurant-login-title {
+    color: #243d63;
+    font-size: 36px;
+    font-weight: 800;
+}
+
+
+
+.login-icon {
+    font-size: 58px;
+    margin-bottom: 16px;
+}
+
+.login-benefit p {
+    font-size: 18px;
+    color: #666;
+    margin-bottom: 18px;
+}
+
+
+.login-benefit small {
+    display: block;
+    margin-top: 18px;
+    color: #999;
+    font-size: 15px;
+}
+
+.benefit-list {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 14px;
+    text-align: left;
+    margin: 22px auto;
+}
+
+.benefit-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #43506b;
+}
+
+.benefit-item span:first-child {
+    color: #39b54a;
+    font-size: 22px;
+}
+
+:deep(.restaurant-login-popup .benefit-list) {
+    display: flex;
+    flex-direction: column;
+    width: fit-content;
+    margin: 22px auto;
+    gap: 14px;
+}
+
+:deep(.restaurant-login-popup .benefit-item) {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+:deep(.restaurant-login-popup .benefit-item span:first-child) {
+    color: #37b24d;
+    font-size: 22px;
+}
+</style>
+<style>
+.restaurant-login-popup .benefit-list {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: 22px auto;
+    text-align: left;
+}
+
+.restaurant-login-popup .benefit-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #43506b;
+}
+
+.restaurant-login-popup .benefit-item span:first-child {
+    color: #39b54a;
+    font-size: 22px;
 }
 </style>

@@ -13,11 +13,7 @@
         <div class="form-group">
           <label>密碼</label>
           <div class="password-wrapper">
-            <input
-              v-model="form.password"
-              :type="showPassword ? 'text' : 'password'"
-              placeholder="請輸入密碼"
-            />
+            <input v-model="form.password" :type="showPassword ? 'text' : 'password'" placeholder="請輸入密碼" />
             <span class="eye-icon" @click="showPassword = !showPassword">
               <i :class="showPassword ? 'bi bi-eye' : 'bi bi-eye-slash'"></i>
             </span>
@@ -51,31 +47,15 @@
         <div class="form-group">
           <label>電子信箱 (Email)</label>
           <div class="email-row">
-            <input
-              v-model="forgotForm.email"
-              type="email"
-              placeholder="請輸入電子信箱"
-            />
-            <button
-              type="button"
-              class="verify-btn"
-              @click="sendResetCode"
-              :disabled="
-                isSendingCode || resetCodeCountdown > 0 || !forgotEmailValid
-              "
-            >
+            <input v-model="forgotForm.email" type="email" placeholder="請輸入電子信箱" />
+            <button type="button" class="verify-btn" @click="sendResetCode" :disabled="isSendingCode || resetCodeCountdown > 0 || !forgotEmailValid
+              ">
               <span v-if="isSendingCode">發送中...</span>
-              <span v-else-if="resetCodeCountdown > 0"
-                >重新發送 {{ resetCodeCountdown }}s</span
-              >
+              <span v-else-if="resetCodeCountdown > 0">重新發送 {{ resetCodeCountdown }}s</span>
               <span v-else>發送驗證碼</span>
             </button>
           </div>
-          <p
-            v-if="forgotEmailStatus"
-            class="status-text"
-            :class="forgotEmailStatusClass"
-          >
+          <p v-if="forgotEmailStatus" class="status-text" :class="forgotEmailStatusClass">
             {{ forgotEmailStatus }}
           </p>
         </div>
@@ -83,28 +63,16 @@
         <div class="form-group">
           <label>驗證碼</label>
           <div class="code-row">
-            <input
-              v-model="forgotForm.verifyCode"
-              type="text"
-              maxlength="6"
-              placeholder="請輸入 6 位數驗證碼"
-            />
-            <button
-              type="button"
-              class="verify-btn code-verify-btn"
-              @click="verifyResetCode"
-              :disabled="!canVerifyResetCode"
-            >
+            <input v-model="forgotForm.verifyCode" type="text" maxlength="6" placeholder="請輸入 6 位數驗證碼" />
+            <button type="button" class="verify-btn code-verify-btn" @click="verifyResetCode"
+              :disabled="!canVerifyResetCode">
               <span v-if="isVerifyingResetCode">驗證中...</span>
               <span v-else-if="resetCodeVerified">已驗證</span>
               <span v-else>驗證</span>
             </button>
           </div>
-          <p
-            v-if="forgotForm.verifyCode || resetCodeVerified"
-            class="status-text"
-            :class="resetCodeVerified ? 'status-success' : 'status-muted'"
-          >
+          <p v-if="forgotForm.verifyCode || resetCodeVerified" class="status-text"
+            :class="resetCodeVerified ? 'status-success' : 'status-muted'">
             {{
               resetCodeVerified
                 ? "驗證碼已通過，請設定新密碼"
@@ -116,12 +84,8 @@
         <div class="form-group">
           <label>新密碼</label>
           <div class="password-wrapper">
-            <input
-              v-model="forgotForm.newPassword"
-              :type="showNewPassword ? 'text' : 'password'"
-              placeholder="至少 8 碼，最多 20 碼"
-              :disabled="!resetCodeVerified"
-            />
+            <input v-model="forgotForm.newPassword" :type="showNewPassword ? 'text' : 'password'"
+              placeholder="至少 8 碼，最多 20 碼" :disabled="!resetCodeVerified" />
             <span class="eye-icon" @click="showNewPassword = !showNewPassword">
               <i :class="showNewPassword ? 'bi bi-eye' : 'bi bi-eye-slash'"></i>
             </span>
@@ -139,26 +103,14 @@
         <div class="form-group">
           <label>確認新密碼</label>
           <div class="password-wrapper">
-            <input
-              v-model="forgotForm.confirmPassword"
-              :type="showConfirmPassword ? 'text' : 'password'"
-              placeholder="再次輸入新密碼"
-              :disabled="!resetCodeVerified"
-            />
-            <span
-              class="eye-icon"
-              @click="showConfirmPassword = !showConfirmPassword"
-            >
-              <i
-                :class="showConfirmPassword ? 'bi bi-eye' : 'bi bi-eye-slash'"
-              ></i>
+            <input v-model="forgotForm.confirmPassword" :type="showConfirmPassword ? 'text' : 'password'"
+              placeholder="再次輸入新密碼" :disabled="!resetCodeVerified" />
+            <span class="eye-icon" @click="showConfirmPassword = !showConfirmPassword">
+              <i :class="showConfirmPassword ? 'bi bi-eye' : 'bi bi-eye-slash'"></i>
             </span>
           </div>
-          <p
-            v-if="forgotForm.confirmPassword"
-            class="status-text"
-            :class="passwordConfirmed ? 'status-success' : 'status-error'"
-          >
+          <p v-if="forgotForm.confirmPassword" class="status-text"
+            :class="passwordConfirmed ? 'status-success' : 'status-error'">
             {{
               passwordConfirmed ? "兩次輸入的密碼一致" : "兩次輸入的密碼不一致"
             }}
@@ -167,12 +119,7 @@
 
         <p v-if="forgotErrorMsg" class="error-msg">{{ forgotErrorMsg }}</p>
 
-        <button
-          class="submit-btn"
-          type="button"
-          @click="handleResetPassword"
-          :disabled="!canSubmitResetPassword"
-        >
+        <button class="submit-btn" type="button" @click="handleResetPassword" :disabled="!canSubmitResetPassword">
           {{ isResettingPassword ? "重設中..." : "重設密碼" }}
         </button>
       </template>
@@ -182,7 +129,7 @@
 
 <script setup>
 import { computed, onUnmounted, reactive, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import {
   forgotPassword,
   login,
@@ -192,6 +139,7 @@ import {
 import Swal from "sweetalert2";
 
 const router = useRouter();
+const route = useRoute();
 
 const currentView = ref("login");
 const showPassword = ref(false);
@@ -531,7 +479,13 @@ const handleLogin = async () => {
       confirmButtonColor: "#d9a372",
     });
 
-    router.push(getDefaultPathByRole(data.roleName));
+    const redirect = route.query.redirect;
+
+    if (redirect) {
+      router.push(String(redirect));
+    } else {
+      router.push(getDefaultPathByRole(data.roleName));
+    }
   } catch (err) {
     errorMsg.value = err.response?.data?.message || "登入失敗，請稍後再試";
   } finally {
