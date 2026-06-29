@@ -3,6 +3,7 @@
 // Vue
 import { computed, onMounted, ref, watch } from "vue";
 import axios from "axios";
+import api from "@/api/axios";
 import { useRoute, useRouter } from "vue-router";
 import Swal from "sweetalert2";
 import { getProfile } from "@/api/member";
@@ -171,6 +172,10 @@ const selectedQuantity = ref(1);
 const selectedNote = ref("");
 const showItemModal = ref(false);
 const showCartModal = ref(false);
+const showRecommendModal = ref(false);
+const recommendItems = ref([]);
+const isRecommendLoading = ref(false);
+const recommendErrorMsg = ref("");
 // =========================
 // Computed
 // =========================
@@ -399,6 +404,60 @@ async function loadStoreMenu(storeId) {
         menuLoadError.value = "門市菜單暫時無法載入，請稍後再試";
     }
 }
+async function loadRecommendItems() {
+    isRecommendLoading.value = true;
+    recommendErrorMsg.value = "";
+
+    try {
+        const response = await api.get("/api/menu/recommend");
+        const data = response.data?.data ?? response.data ?? [];
+
+        recommendItems.value = Array.isArray(data) ? data.slice(0, 5) : [];
+    } catch (error) {
+        console.error("取得人氣推薦失敗", error);
+        recommendItems.value = [];
+        recommendErrorMsg.value = "人氣推薦暫時無法載入";
+    } finally {
+        isRecommendLoading.value = false;
+    }
+}
+
+async function openRecommendModal() {
+    showRecommendModal.value = true;
+
+    if (recommendItems.value.length === 0) {
+        await loadRecommendItems();
+    }
+}
+
+const getRankIcon = (index) => {
+    if (index === 0) return "🥇";
+    if (index === 1) return "🥈";
+    if (index === 2) return "🥉";
+    return `TOP ${index + 1}`;
+};
+
+const findMenuByRecommend = (recommend) => {
+    return menuItems.value.find((item) => {
+        return (
+            item.id === recommend.menuItemId ||
+            item.menuItemId === recommend.menuItemId ||
+            item.itemName === recommend.itemName
+        );
+    });
+};
+
+const addRecommendItem = (recommend) => {
+    const menuItem = findMenuByRecommend(recommend);
+
+    if (!menuItem) {
+        showError("此推薦餐點目前不在本門市菜單中");
+        return;
+    }
+
+    addItem(menuItem);
+    showRecommendModal.value = false;
+};
 const isReservationOrder = computed(() => {
     return !!orderForm.value.reservationId;
 });
@@ -443,6 +502,96 @@ async function loadStoreOptions() {
         selectedPickerStoreId.value = storeOptions.value[0].storeId;
     }
 }
+
+const recommendTab = ref("popular");
+
+const recommendCombos = {
+    single: {
+        title: "一人精緻套餐",
+        subtitle: "清爽前菜＋主食＋飲品",
+        people: "適合 1 人",
+        itemNames: ["胡麻豆腐", "炙燒焦糖鮭魚握壽司", "紀州梅子可爾必思"],
+    },
+    double: {
+        title: "雙人分享套餐",
+        subtitle: "生魚片、壽司、炸物一次滿足",
+        people: "適合 2 人",
+        itemNames: ["綜合生魚片", "握壽司盛合", "炸蝦天婦羅盛合", "靜岡御用冰抹茶", "巨峰葡萄氣泡飲"],
+    },
+    family: {
+        title: "四人全家餐",
+        subtitle: "主食、炸物、甜點、飲品都幫你配好",
+        people: "適合 4 人",
+        itemNames: [
+            "握壽司盛合",
+            "和牛壽喜燒",
+            "天婦羅拼盤",
+            "南蠻炸雞塊",
+            "炙燒焦糖布丁",
+            "宇治金時黃金蕨餅",
+            "可爾必思",
+            "烏龍茶"
+        ],
+    },
+};
+
+const findMenuByName = (name) => {
+    return menuItems.value.find((item) => item.itemName === name);
+};
+
+const comboItems = (combo) => {
+    return combo.itemNames
+        .map((name) => findMenuByName(name))
+        .filter(Boolean);
+};
+
+const comboTotal = (combo) => {
+    return comboItems(combo).reduce((sum, item) => sum + Number(item.price || 0), 0);
+};
+
+const addMenuItemToCartDirectly = (menuItem) => {
+    const existItem = cartItems.value.find(
+        (item) => item.menuItemId === menuItem.id
+    );
+
+    if (existItem) {
+        existItem.quantity += 1;
+    } else {
+        cartItems.value.push({
+            menuItemId: menuItem.id,
+            categoryId: menuItem.categoryId,
+            itemName: menuItem.itemName,
+            price: menuItem.price,
+            imageUrl: menuItem.imageUrl,
+            allergenInfo: menuItem.allergenInfo,
+            quantity: 1,
+            note: "",
+        });
+    }
+};
+
+const addComboToCart = async (combo) => {
+    const items = comboItems(combo);
+
+    if (items.length === 0) {
+        showError("此套餐餐點目前不在本門市菜單中");
+        return;
+    }
+
+    items.forEach(addMenuItemToCartDirectly);
+
+    showRecommendModal.value = false;
+
+    await Swal.fire({
+        icon: "success",
+        title: "已加入套餐",
+        text: `${combo.title} 已加入購物車`,
+        confirmButtonText: "查看購物車",
+        confirmButtonColor: "#e8ad78",
+    });
+
+    showCartModal.value = true;
+};
 
 async function confirmStorePicker() {
     if (!selectedPickerStoreId.value) {
@@ -848,7 +997,7 @@ async function submitOrder() {
         carrierNumber: "",
     };
 
-    
+
 
     touched.value = {
         customerName: false,
@@ -886,6 +1035,7 @@ onMounted(async () => {
 
     await loadStoreInfo(orderForm.value.storeId);
     await loadStoreMenu(orderForm.value.storeId);
+    await loadRecommendItems();
 });
 // =========================
 </script>
@@ -897,18 +1047,8 @@ onMounted(async () => {
         <div v-if="step === 'MENU'">
             <section class="order-header">
                 <div>
-                    <h1>點餐</h1>
-                    <p>選擇餐點加入購物車，確認後送出訂單。</p>
-                    <p class="store-context">
-                        目前門市：<strong>{{ selectedStoreName }}</strong>
-                        <span v-if="orderForm.orderType === 'TAKEOUT' && selectedPickupTime">
-                            取餐時間：{{ selectedPickupTime === "ASAP" ? "立即取餐" : selectedPickupTime }}
-                        </span>
-
-                        <span v-if="orderForm.orderType === 'DINE_IN' && orderForm.tableId">
-                            桌位：{{ selectedTableLabel }}
-                        </span>
-                    </p>
+                    <H2></H2>
+                    
                 </div>
 
                 <div class="order-type" v-if="canSwitchOrderType">
@@ -925,6 +1065,45 @@ onMounted(async () => {
                     </button>
                 </div>
             </section>
+
+            <section class="order-top-row">
+                <p class="store-context">
+                    目前門市：<strong>{{ selectedStoreName }}</strong>
+
+                    <span v-if="orderForm.orderType === 'TAKEOUT' && selectedPickupTime">
+                        取餐時間：{{ selectedPickupTime === "ASAP" ? "立即取餐" : selectedPickupTime }}
+                    </span>
+
+                    <span v-if="orderForm.orderType === 'DINE_IN' && orderForm.tableId">
+                        桌位：{{ selectedTableLabel }}
+                    </span>
+                </p>
+
+                <section class="smart-recommend-bar">
+                    <div class="smart-recommend-trigger">
+                        <span class="smart-spark">✨</span>
+                        <span class="smart-title">不知道吃什麼？</span>
+                        <span class="smart-hint">今天幫你搭配好了</span>
+
+                        <div class="smart-dropdown">
+                            <button type="button" @click="recommendTab = 'popular'; openRecommendModal();">
+                                <span>🔥</span> 今日人氣
+                            </button>
+                            <button type="button" @click="recommendTab = 'single'; openRecommendModal();">
+                                <span>👤</span> 一人套餐
+                            </button>
+                            <button type="button" @click="recommendTab = 'double'; openRecommendModal();">
+                                <span>👥</span> 雙人分享
+                            </button>
+                            <button type="button" @click="recommendTab = 'family'; openRecommendModal();">
+                                <span>👨‍👩‍👧‍👦</span> 四人全家餐
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </section>
+
+
             <!-- 2. 分類按鈕：之後可拆 CategoryTabs.vue -->
             <section class="category-tabs">
                 <button v-for="category in categories" :key="category.id"
@@ -1407,6 +1586,87 @@ onMounted(async () => {
                 ">
                     前往結帳
                 </button>
+            </div>
+        </div>
+        <div v-if="showRecommendModal" class="modal-mask">
+            <div class="recommend-modal">
+                <button class="modal-close" @click="showRecommendModal = false">×</button>
+
+                <h2>今天想吃什麼？</h2>
+                <p class="recommend-subtitle">
+                    最人氣套餐，幫你快速完成點餐。
+                </p>
+
+                <div class="recommend-tabs">
+                    <button :class="{ active: recommendTab === 'popular' }" @click="recommendTab = 'popular'">
+                        🔥 人氣
+                    </button>
+                    <button :class="{ active: recommendTab === 'single' }" @click="recommendTab = 'single'">
+                        👤 一人
+                    </button>
+                    <button :class="{ active: recommendTab === 'double' }" @click="recommendTab = 'double'">
+                        👥 雙人
+                    </button>
+                    <button :class="{ active: recommendTab === 'family' }" @click="recommendTab = 'family'">
+                        👨‍👩‍👧‍👦 四人
+                    </button>
+                </div>
+
+                <div v-if="recommendTab === 'popular'">
+                    <div v-if="isRecommendLoading" class="recommend-state">推薦載入中...</div>
+
+                    <div v-else-if="recommendErrorMsg" class="recommend-state error">
+                        {{ recommendErrorMsg }}
+                    </div>
+
+                    <div v-else class="recommend-list">
+                        <div v-for="(item, index) in recommendItems" :key="item.menuItemId || item.itemName"
+                            class="recommend-card">
+                            <div class="rank-badge">{{ getRankIcon(index) }}</div>
+
+                            <div class="recommend-info">
+                                <h3>{{ item.itemName }}</h3>
+                                <p>
+                                    已被點選
+                                    <strong>{{ item.totalQuantity || item.quantity || item.count || item.orderCount || 0
+                                        }}</strong>
+                                    份
+                                </p>
+                            </div>
+
+                            <button type="button" @click="addRecommendItem(item)">
+                                加入
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-else class="combo-panel">
+                    <div class="combo-header">
+                        <span class="combo-people">
+                            {{ recommendCombos[recommendTab].people }}
+                        </span>
+                        <h3>{{ recommendCombos[recommendTab].title }}</h3>
+                        <p>{{ recommendCombos[recommendTab].subtitle }}</p>
+                    </div>
+
+                    <div class="combo-items">
+                        <div v-for="item in comboItems(recommendCombos[recommendTab])" :key="item.id"
+                            class="combo-item">
+                            <span>{{ item.itemName }}</span>
+                            <strong>NT${{ item.price }}</strong>
+                        </div>
+                    </div>
+
+                    <div class="combo-total">
+                        <span>套餐合計</span>
+                        <strong>NT${{ comboTotal(recommendCombos[recommendTab]) }}</strong>
+                    </div>
+
+                    <button class="combo-add-btn" type="button" @click="addComboToCart(recommendCombos[recommendTab])">
+                        一鍵加入套餐
+                    </button>
+                </div>
             </div>
         </div>
         <div v-if="showStorePicker" class="modal-mask">
@@ -2671,5 +2931,334 @@ onMounted(async () => {
 
 .store-picker-modal .modal-add-btn {
     margin-top: 28px;
+}
+
+.recommend-modal {
+    position: relative;
+    width: min(620px, 100%);
+    max-height: 90vh;
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 24px;
+    padding: 34px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+}
+
+.recommend-modal h2 {
+    margin: 0 0 8px;
+    color: #23466b;
+    font-size: 30px;
+}
+
+.recommend-subtitle {
+    margin: 0 0 24px;
+    color: #8a99a8;
+    line-height: 1.7;
+}
+
+.recommend-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.recommend-card {
+    display: grid;
+    grid-template-columns: 64px 1fr auto;
+    gap: 16px;
+    align-items: center;
+    padding: 16px;
+    border: 1px solid #f0e2d5;
+    border-radius: 16px;
+    background: #fffdfb;
+}
+
+.rank-badge {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #fff3e4;
+    color: #8c6335;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 18px;
+}
+
+.recommend-info h3 {
+    margin: 0 0 6px;
+    color: #23466b;
+    font-size: 20px;
+}
+
+.recommend-info p {
+    margin: 0;
+    color: #8a99a8;
+}
+
+.recommend-info strong {
+    color: #d88938;
+}
+
+.recommend-card button {
+    border: none;
+    border-radius: 12px;
+    padding: 10px 18px;
+    background: #e8ad78;
+    color: white;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.recommend-state {
+    padding: 30px;
+    text-align: center;
+    color: #8a99a8;
+    font-weight: 900;
+}
+
+.recommend-state.error {
+    color: #c0392b;
+}
+
+.recommend-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 18px 0 22px;
+}
+
+.recommend-tabs button {
+    border: 1px solid #ead7c5;
+    background: #fffaf5;
+    color: #23466b;
+    border-radius: 999px;
+    padding: 10px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.recommend-tabs button.active {
+    background: #e8ad78;
+    color: white;
+    border-color: #e8ad78;
+}
+
+.combo-panel {
+    border: 1px solid #f0e2d5;
+    border-radius: 20px;
+    padding: 22px;
+    background: #fffdfb;
+}
+
+.combo-header {
+    margin-bottom: 18px;
+}
+
+.combo-people {
+    display: inline-block;
+    margin-bottom: 10px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: #fff3e4;
+    color: #d88938;
+    font-weight: 900;
+}
+
+.combo-header h3 {
+    margin: 0 0 6px;
+    color: #23466b;
+    font-size: 24px;
+}
+
+.combo-header p {
+    margin: 0;
+    color: #8a99a8;
+    font-weight: 700;
+}
+
+.combo-items {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.combo-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-radius: 12px;
+    background: #fff7ef;
+    color: #23466b;
+    font-weight: 800;
+}
+
+.combo-item strong {
+    color: #d88938;
+}
+
+.combo-total {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px dashed #e6c9ad;
+    color: #23466b;
+    font-size: 20px;
+    font-weight: 900;
+}
+
+.combo-total strong {
+    color: #d88938;
+}
+
+.combo-add-btn {
+    width: 100%;
+    margin-top: 18px;
+    border: none;
+    border-radius: 14px;
+    padding: 14px;
+    background: #e8ad78;
+    color: white;
+    font-weight: 900;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.combo-add-btn:hover {
+    background: #d9945f;
+}
+
+.smart-recommend-bar {
+    display: flex;
+    align-items: center;
+    margin: 0;
+}
+
+.smart-recommend-trigger {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 46px;
+    padding: 10px 18px;
+    border-radius: 999px;
+    background: #fffaf5;
+    border: 1px solid #ead7c5;
+    box-shadow: 0 8px 20px rgba(100, 80, 50, 0.08);
+    color: #23466b;
+    font-weight: 900;
+    cursor: pointer;
+    transition: 0.25s ease;
+}
+
+.smart-recommend-trigger:hover {
+    background: #ffffff;
+    border-color: #e8ad78;
+    box-shadow: 0 12px 28px rgba(100, 80, 50, 0.14);
+}
+
+.smart-spark {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #fff3e4;
+    color: #d88938;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.smart-title {
+    font-size: 16px;
+}
+
+.smart-hint {
+    color: #d88938;
+    font-size: 13px;
+}
+
+.smart-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+    z-index: 30;
+    min-width: 220px;
+    padding: 10px;
+    border-radius: 18px;
+    background: #ffffff;
+    border: 1px solid #ead7c5;
+    box-shadow: 0 18px 38px rgba(80, 60, 40, 0.18);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px);
+    transition: 0.2s ease;
+}
+
+.smart-recommend-trigger:hover .smart-dropdown {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.smart-dropdown button {
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 11px 12px;
+    border-radius: 12px;
+    color: #23466b;
+    font-weight: 900;
+    text-align: left;
+    cursor: pointer;
+}
+
+.smart-dropdown button:hover {
+    background: #fff3e4;
+    color: #d88938;
+}
+
+.smart-dropdown button span {
+    display: inline-block;
+    width: 28px;
+}
+
+.order-top-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 12px 0 18px;
+    flex-wrap: wrap;
+}
+
+.order-top-row .store-context {
+    margin: 0;
+}
+
+.order-top-row .smart-recommend-bar {
+    margin: 0;
+}
+.order-top-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 12px 0 18px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+}
+
+.order-top-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 45px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+
+.order-top-row .smart-recommend-bar {
+    margin: 0;
 }
 </style>

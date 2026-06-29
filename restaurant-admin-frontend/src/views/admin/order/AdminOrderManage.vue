@@ -15,17 +15,19 @@
         <h2>{{ activeCount }}</h2>
       </div>
 
+      <div class="summary-card clickable" :class="{ active: quickFilter === 'UNPAID' }"
+        @click="setQuickFilter('UNPAID')">
+        <p class="card-red">待付款</p>
+        <h2>{{ unpaidCount }}</h2>
+      </div>
+      
       <div class="summary-card clickable" :class="{ active: quickFilter === 'COMPLETED' }"
         @click="setQuickFilter('COMPLETED')">
         <p class="card-green">已完成</p>
         <h2>{{ completedCount }}</h2>
       </div>
 
-      <div class="summary-card clickable" :class="{ active: quickFilter === 'UNPAID' }"
-        @click="setQuickFilter('UNPAID')">
-        <p class="card-red">待付款</p>
-        <h2>{{ unpaidCount }}</h2>
-      </div>
+
 
       <div class="summary-card clickable" @click="setQuickFilter('REVENUE')"
         :class="{ active: quickFilter === 'REVENUE' }">
@@ -445,7 +447,7 @@ const revenueTitle = computed(() => {
   if (dateFilter.value === 'YESTERDAY') return '昨日營業額'
   if (dateFilter.value === 'WEEK') return '近 7 天營業額'
   if (dateFilter.value === 'MONTH') return '近 30 天營業額'
-  return '今日天營業額'
+  return '今日營業額'
 })
 
 const dateFilteredOrders = computed(() => {
