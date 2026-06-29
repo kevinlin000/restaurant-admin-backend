@@ -23,6 +23,19 @@ const newItem = ref({
 
 // 🚀 4. 初始化為空籃子，準備裝真實數據
 const menuItems = ref([])
+
+
+const categoryList = ref([])
+
+const fetchCategories = async () => {
+  try {
+    const response = await axios.get('/api/menu-categories')
+    categoryList.value = response.data.data || response.data
+  } catch (error) {
+    console.error('分類載入失敗', error)
+  }
+}
+
 // 🚀 5. 搜尋欄位的響應式變數
 const searchQuery = ref('')
 
@@ -51,6 +64,7 @@ const fetchMenuItems = async () => {
 // 🚀 8. 網頁一打開，立馬派人去撈資料庫
 onMounted(() => {
   fetchMenuItems()
+  fetchCategories()
 })
 
 // 🚀 9. 點擊「編輯此項」跨頁面轉跳方法（對齊 /admin/menu-edit/:id 路由）
@@ -140,13 +154,13 @@ const handleAddItemMenu = async () => {
           <div class="col-md-3">
             <label class="form-label fw-bold small" style="color: #4b5563;">餐點分類</label>
             <select v-model="newItem.categoryId" class="form-select form-control-solid" style="color: #374151; border-color: #cbd5e1; font-weight: 500;">
-              <option :value="1" style="color: #374151;">精選日式前菜</option>
-              <option :value="2" style="color: #374151;">旬味生魚片系列</option>
-              <option :value="3" style="color: #374151;">職人握壽司盛合</option>
-              <option :value="4" style="color: #374151;">主廚熱騰騰熟食</option>
-              <option :value="6" style="color: #374151;">職人手作甜點</option>
-              <option :value="7" style="color: #374151;">特調清爽飲料</option>
-              <option :value="8" style="color: #374151;">微醺日式酒水</option>
+              <option 
+                v-for="cat in categoryList" 
+                :key="cat.categoryId" 
+                :value="cat.categoryId"
+                style="color: #374151;">
+                {{ cat.categoryName }}
+              </option>
             </select>
           </div>
 

@@ -18,6 +18,9 @@ import java.util.ArrayList; //  🎯  順便引入 Java 萬能大籃子 ArrayLis
 import java.util.Arrays;    //  ⚡ 引入陣列工具，方便切碎標籤字串
 import java.util.stream.Collectors; // ⚡ 引入 Stream 轉譯工具
 import java.lang.reflect.Method; // 🎯 引入反射大絕招
+import java.math.BigDecimal;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 💡 【自我檢查防賴心法：避免「Code 是正確的但跑不起來」】
@@ -27,6 +30,24 @@ import java.lang.reflect.Method; // 🎯 引入反射大絕招
  */
 @Service
 public class MenuItemService {
+    // ==================== 🏪 分店定價群組設定 ====================
+    private static final Set<Long> GROUP_A_STORES = Set.of(1L, 2L);     // 信義A11, 南港CITYLINK → +5元
+    private static final Set<Long> GROUP_C_STORES = Set.of(5L, 7L);     // 台南南紡, 花蓮遠百 → -5元
+    // Group B (3,4,6) 為原價，不需要特別定義
+
+    private static final BigDecimal ADJUSTMENT_A = new BigDecimal("5");
+    private static final BigDecimal ADJUSTMENT_C = new BigDecimal("-5");
+
+    private BigDecimal calculateStorePrice(BigDecimal basePrice, Long storeId) {
+        if (GROUP_A_STORES.contains(storeId)) {
+            return basePrice.add(ADJUSTMENT_A);
+        } else if (GROUP_C_STORES.contains(storeId)) {
+            BigDecimal result = basePrice.add(ADJUSTMENT_C);
+            return result.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : result;
+        }
+        return basePrice; // Group B 原價
+    }
+// ============================================================
 
     @Autowired
     private MenuItemRepository menuItemRepository;
@@ -240,6 +261,9 @@ public class MenuItemService {
         // 2. 撈出該分店目前在 store_menu 裡的所有隔離設定
         List<StoreMenu> storeMenuItems = storeMenuRepository.findByStoreId(storeId);
 
+        Map<Long, StoreMenu> storeMenuMap = storeMenuItems.stream()
+        .collect(Collectors.toMap(StoreMenu::getMenuItemId, sm -> sm));
+
         for (MenuItem item : allActiveItems) {
             // 基礎安全防線：總部如果下架了，分店直接不顯示
             if (item.getIsActive() == null || !item.getIsActive()) {
@@ -247,13 +271,7 @@ public class MenuItemService {
             }
 
             // 3. 🔍 去分店對照表裡，尋找有沒有這道菜的專屬隔離售價或上架設定
-            StoreMenu currentStoreSetting = null;
-            for (StoreMenu sm : storeMenuItems) {
-                if (sm.getMenuItemId() != null && sm.getMenuItemId().equals(item.getId())) {
-                    currentStoreSetting = sm;
-                    break;
-                }
-            }
+            StoreMenu currentStoreSetting = storeMenuMap.get(item.getId());
 
             // 4. 開始組裝前台需要的 DTO 包裹
             StoreMenuDisplayResponse response = new StoreMenuDisplayResponse();
@@ -265,10 +283,11 @@ public class MenuItemService {
             response.setAllergenInfo(item.getAllergenInfo());
 
             // ==================== 💰 智慧核心：價格動態咬合防線 ====================
+            // 優先用分店客製價，沒有才套用群組計算
             if (currentStoreSetting != null && currentStoreSetting.getPrice() != null) {
                 response.setPrice(currentStoreSetting.getPrice());
             } else {
-                response.setPrice(item.getPrice());
+                response.setPrice(calculateStorePrice(item.getPrice(), storeId));
             }
             // ====================================================================
 

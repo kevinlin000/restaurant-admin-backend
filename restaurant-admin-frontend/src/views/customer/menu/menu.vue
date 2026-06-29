@@ -24,7 +24,7 @@ const edmConfig = ref({
     title: "極上生魚片盛合",
     desc: "嚴選每日直送頂級鮮味與極上鮭魚肚，主廚以精湛刀工完美留住海洋鮮甜。",
     price: "NT$ 480",
-    imageUrl: "https://i.ibb.co/sd4zFMct/sashimi.png" 
+    imageUrl: "https://i.ibb.co/NdZthW9t/sashimi.png" 
   },
   pork: {
     title: "生薑燒肉定食",
@@ -40,7 +40,17 @@ const activeCategoryId = ref(null)
 const currentStoreId = ref(null)    
 const storeList = ref([])          
 const categoryList = ref([])        
-const menuItems = ref([])           
+const menuItems = ref([]) 
+const selectedItem = ref(null)  // 記錄被點擊的餐點
+
+const openItemModal = (item) => {
+  selectedItem.value = item
+}
+
+const closeItemModal = () => {
+  selectedItem.value = null
+}
+
 const heroOpacity = ref(1)          
 
 // 🌟 3. 紀錄客人在畫面上點擊了哪一個行銷特色標籤
@@ -108,21 +118,21 @@ const scrollToCategory = (categoryId) => {
   if (selectedFeatureTag.value) { selectedFeatureTag.value = null; }
   
   setTimeout(() => {
-    // 這裡原本寫成 `category-section-${cat.id}`，請修正為使用參數 `categoryId`
-    const el = document.getElementById(`category-section-${categoryId}`);
+    const el = document.getElementById(`category-section-${categoryId}`)
     
     if (el) {
-      const offsetTop = el.offsetTop;
-      const targetOffset = offsetTop + 313; // 這裡可以隨意微調數值
+      const rect = el.getBoundingClientRect()
+      const scrollTop = window.scrollY || document.documentElement.scrollTop
+      const targetOffset = scrollTop + rect.top - 160
       
       window.scrollTo({ 
         top: targetOffset, 
         behavior: 'smooth' 
-      });
+      })
       
-      activeCategoryId.value = categoryId;
+      activeCategoryId.value = categoryId
     }
-  }, 60); 
+  }, 60)
 }
 
 // 🌟 7. 點擊特色膠囊滑動到動態大標題
@@ -224,6 +234,23 @@ const fetchMenuData = async (storeId) => {
   } catch (error) { console.error('菜單載入失敗', error); menuItems.value = [] }
 }
 
+// ✅ 統一的 featureTags 解析函式
+const parseFeatureTags = (tags) => {
+  if (!tags) return []
+  if (Array.isArray(tags)) return tags.map(t => cleanTagText(t)).filter(Boolean)
+  if (typeof tags === 'string') {
+    try {
+      const parsed = JSON.parse(tags)
+      return Array.isArray(parsed) 
+        ? parsed.map(t => cleanTagText(t)).filter(Boolean) 
+        : []
+    } catch {
+      return tags.split(',').map(t => cleanTagText(t)).filter(Boolean)
+    }
+  }
+  return []
+}
+
 const cleanTagText = (tag) => { if (!tag) return ''; return String(tag).replace(/[\[\]"']/g, '').trim(); }
 
 // 🌟 11. 特色膠囊智慧清洗：精準對齊官方定義的 10 個黃金特色標籤
@@ -233,20 +260,13 @@ const activeAvailableTags = vueComputed(() => {
   const tagCounts = {}
   
   menuItems.value.forEach(item => {
-    let tags = item.featureTags || item.feature_tags;
-    if (typeof tags === 'string') {
-      try { tags = JSON.parse(tags); } 
-      catch (e) { tags = tags.replace(/[\[\]"']/g, '').split(',').map(t => t.trim()); }
-    }
-    if (Array.isArray(tags)) {
-      tags.forEach(tag => {
-        const clean = cleanTagText(tag);
-        if (clean && allowedTags.includes(clean)) {
-          tagCounts[clean] = (tagCounts[clean] || 0) + 1;
-        }
-      })
+  const tags = parseFeatureTags(item.featureTags)
+  tags.forEach(tag => {
+  if (tag && allowedTags.includes(tag)) {
+    tagCounts[tag] = (tagCounts[tag] || 0) + 1
     }
   })
+})
   return allowedTags.filter(tag => tagCounts[tag] > 0 || selectedFeatureTag.value === tag)
 })
 
@@ -255,10 +275,7 @@ const getFilteredItemsByCategory = (catId) => {
   let items = menuItems.value.filter(item => Number(item.categoryId || item.category_id) === Number(catId))
   if (selectedFeatureTag.value) {
     items = items.filter(item => {
-      let tags = item.featureTags || item.feature_tags;
-      if (typeof tags === 'string') return tags.includes(selectedFeatureTag.value);
-      if (Array.isArray(tags)) return tags.map(t => cleanTagText(t)).includes(selectedFeatureTag.value);
-      return false;
+      return parseFeatureTags(item.featureTags).includes(selectedFeatureTag.value)
     });
   }
   return items
@@ -308,6 +325,13 @@ onUnmounted(() => {
                   <div class="edm-price-container">
                     <span class="edm-price">{{ edmConfig.sashimi.price }}</span>
                   </div>
+                  <div class="d-flex align-items-center mt-auto pt-4">
+                    <img src="@/assets/images/logo.png" alt="敘日 logo" style="width: 70px; height: 70px; object-fit: contain; margin-right: 14px;">
+                    <div>
+                      <div style="font-size: 1.4rem; font-weight: 700; color: #2d2a2a; margin-bottom: 2px;">敘日</div>
+                      <div style="font-size: 0.9rem; font-weight: 500; color: #6b7280; letter-spacing: 0.15rem;">CHEF COUNTER</div>
+                    </div>
+                  </div>
                 </div>
                 <div class="col-md-7 h-100">
                   <img :src="edmConfig.sashimi.imageUrl" class="edm-img" alt="生魚片">
@@ -327,6 +351,13 @@ onUnmounted(() => {
                   <div class="edm-price-container">
                     <span class="edm-price">{{ edmConfig.pork.price }}</span>
                   </div>
+                  <div class="d-flex align-items-center mt-auto pt-4">
+                    <img src="@/assets/images/logo.png" alt="敘日 logo" style="width: 70px; height: 70px; object-fit: contain; margin-right: 14px;">
+                    <div>
+                      <div style="font-size: 1.4rem; font-weight: 700; color: #2d2a2a; margin-bottom: 2px;">敘日</div>
+                      <div style="font-size: 0.9rem; font-weight: 500; color: #6b7280; letter-spacing: 0.15rem;">CHEF COUNTER</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -341,26 +372,43 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <!-- 餐點詳情 Modal -->
+    <div v-if="selectedItem" class="item-modal-overlay" @click.self="closeItemModal">
+      <div class="item-modal-container">
+        <button class="item-modal-close" @click="closeItemModal">✖</button>
+        <div class="item-modal-img-wrapper">
+          <img :src="getMenuItemImage(selectedItem)" alt="餐點圖片">
+        </div>
+        <div class="item-modal-body">
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <h3 class="fw-bold text-dark mb-0">{{ selectedItem.itemName }}</h3>
+            <span class="price-text fs-4">${{ selectedItem.price }}</span>
+          </div>
+          <p class="text-muted mb-3" style="line-height: 1.8;">{{ selectedItem.description }}</p>
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <template v-for="tag in parseFeatureTags(selectedItem.featureTags)">
+              <span v-if="cleanTagText(tag) && ['主廚推薦', '手作工法', '人氣爆棚', '鮮味極致', '經典必點', '職人精神', '嚴選食材', '季節限定', '極致奢華', '限量供應'].includes(cleanTagText(tag))" :key="tag" class="badge-feature">{{ cleanTagText(tag) }}</span>
+            </template>
+          </div>
+          <div v-if="selectedItem.allergenInfo" class="mb-4" style="font-size: 13px; color: #78350f;">
+            🔸 本產品含{{ selectedItem.allergenInfo }}
+          </div>
+          <button @click="addToCart(selectedItem); closeItemModal()" class="btn yayoi-btn-primary w-100 fw-bold py-2" :disabled="selectedItem.isSelectable === false">
+            {{ selectedItem.isSelectable === false ? '暫不供應' : '加入購物車' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div id="mainHeroCarousel" class="custom-vue-hero-container" :style="{ opacity: heroOpacity }">
       <div class="carousel-indicators custom-hero-indicators">
-        <button 
-          v-for="(slide, index) in carouselImages" 
-          :key="'indicator-' + slide.id"
-          type="button" 
-          :class="{ active: index === currentSlideIndex }"
-          @click="handleIndicatorClick(index)"
-        ></button>
+        <button v-for="(slide, index) in carouselImages" :key="'indicator-' + slide.id" type="button" :class="{ active: index === currentSlideIndex }" @click="handleIndicatorClick(index)"></button>
       </div>
       <div class="carousel-inner h-100">
-        <div 
-          v-for="(slide, index) in carouselImages" 
-          :key="slide.id" 
-          :class="['carousel-item h-100 carousel-fade-item', index === currentSlideIndex ? 'active' : '']"
-        >
+        <div v-for="(slide, index) in carouselImages" :key="slide.id" :class="['carousel-item h-100 carousel-fade-item', index === currentSlideIndex ? 'active' : '']">
           <div class="carousel-fade-wrapper">
             <div class="hero-overlay"></div>
             <img :src="slide.url" class="d-block w-100 h-100 object-fit-cover" alt="形象圖">
-            
             <div class="carousel-caption hero-text-box animate__animated animate__fadeInUp">
               <h2 class="fw-bold text-white">{{ slide.title }}</h2>
               <div class="hero-divider"></div>
@@ -369,14 +417,16 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-      </div>
+    </div>
 
     <div class="main-content-wrapper">
       <div class="container">
         <div class="row">
+
+          <!-- 左側導覽 -->
           <div class="col-md-3">
             <div class="sticky-top" style="top: 110px; z-index: 20;">
-              
+
               <div class="card shadow-sm mb-4 border-0 rounded-3" style="border-radius: 12px !important; overflow: hidden;">
                 <div class="card-body p-3 bg-white">
                   <label class="form-label fw-bold text-secondary small">📍 當前查看門市：</label>
@@ -385,19 +435,24 @@ onUnmounted(() => {
                   </select>
                 </div>
               </div>
-              
-              <div class="list-group shadow-sm border-0 bg-white rounded-3 overflow-hidden">
-                <button 
-                  v-for="cat in categoryList" :key="cat.id" @click="scrollToCategory(cat.id)" 
-                  :class="['list-group-item list-group-item-action py-3 px-4 fw-bold border-0 border-bottom d-flex align-items-center sidebar-item', activeCategoryId === cat.id ? 'yayoi-active' : 'text-secondary bg-white']"
-                >
-                  <span class="fs-5 me-3">{{ getCategoryIcon(cat.name) }}</span>
-                  <span>{{ cat.name }}</span>
-                </button>
+
+              <div style="max-height: calc(100vh - 145px); overflow-y: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;">
+                <div class="list-group shadow-sm border-0 bg-white rounded-3 overflow-hidden">
+                  <button
+                    v-for="cat in categoryList" :key="cat.id" @click="scrollToCategory(cat.id)"
+                    :class="['list-group-item list-group-item-action py-3 px-4 fw-bold border-0 border-bottom d-flex align-items-center sidebar-item', activeCategoryId === cat.id ? 'yayoi-active' : 'text-secondary bg-white']"
+                  >
+                    <span class="fs-5 me-3">{{ getCategoryIcon(cat.name) }}</span>
+                    <span>{{ cat.name }}</span>
+                  </button>
+                </div>
               </div>
+
             </div>
           </div>
+          <!-- 左側導覽結束 -->
 
+          <!-- 右側內容 -->
           <div class="col-md-9">
             <div v-if="activeAvailableTags.length > 0" class="mb-4 d-flex flex-wrap gap-2 align-items-center bg-white p-3 rounded-3 shadow-sm border-0">
               <span class="fw-bold text-secondary small me-2">🔍 快速過濾：</span>
@@ -419,7 +474,7 @@ onUnmounted(() => {
                   <h3 v-if="!selectedFeatureTag" class="fw-bold mb-4 border-start border-4 border-warning ps-3 text-dark">{{ cat.name }}</h3>
                   <div class="row row-cols-1 row-cols-md-2 g-4">
                     <div class="col" v-for="item in getFilteredItemsByCategory(cat.id)" :key="item.id">
-                      <div class="card h-100 border-0 shadow-sm item-card" :class="{ 'sold-out': item.isSelectable === false || item.is_active === 0 }">
+                      <div class="card h-100 border-0 shadow-sm item-card" :class="{ 'sold-out': item.isSelectable === false || item.is_active === 0 }" @click="openItemModal(item)" style="cursor: pointer;">
                         <div class="card-img-wrapper">
                           <img :src="getMenuItemImage(item)" class="card-img-top" alt="餐點圖片">
                           <div v-if="item.isSelectable === false || item.is_active === 0" class="sold-out-overlay"><span>已售罄</span></div>
@@ -432,7 +487,7 @@ onUnmounted(() => {
                           </div>
                           <p class="text-muted small mb-3 flex-grow-1" style="line-height: 1.6;">{{ item.description }}</p>
                           <div class="mb-2 d-flex flex-wrap gap-1 align-items-center" style="min-height: 26px;">
-                            <template v-for="tag in (Array.isArray(item.featureTags || item.feature_tags) ? (item.featureTags || item.feature_tags) : cleanTagText(item.featureTags || item.feature_tags).split(','))">
+                            <template v-for="tag in parseFeatureTags(item.featureTags)">
                               <span v-if="cleanTagText(tag) && ['主廚推薦', '手作工法', '人氣爆棚', '鮮味極致', '經典必點', '職人精神', '嚴選食材', '季節限定', '極致奢華', '限量供應'].includes(cleanTagText(tag))" :key="tag" class="badge-feature">{{ cleanTagText(tag) }}</span>
                             </template>
                           </div>
@@ -449,16 +504,19 @@ onUnmounted(() => {
                 </div>
               </template>
             </div>
-            
+
             <div v-if="menuItems.length > 0 && selectedFeatureTag && totalFilteredItemsCount === 0" class="text-center py-5 bg-white rounded shadow-sm border border-dashed mt-4">
               <div class="fs-2 mb-2">🔍</div>
               <p class="fw-bold text-secondary mb-1">區域內找不到符合「{{ selectedFeatureTag }}」的菜色</p>
               <button @click="selectedFeatureTag = null" class="btn btn-sm btn-outline-warning mt-2 fw-bold">重設篩選</button>
             </div>
           </div>
+          <!-- 右側內容結束 -->
+
         </div>
       </div>
     </div>
+
   </div>
 </template>
 
@@ -647,17 +705,148 @@ onUnmounted(() => {
 
 .main-content-wrapper { position: relative; z-index: 10; background-color: #fafafa !important; margin-top: 460px; padding-top: 25px; padding-bottom: 100px; }
 .menu-sections-container { background-color: #fafafa; border-radius: 12px; padding: 20px; }
-.sidebar-item { transition: all 0.2s ease; font-size: 15px; }
-.sidebar-item:hover:not(.yayoi-active) { background-color: #fff7ed !important; color: #b45309 !important; padding-left: 1.5rem !important; }
+.sidebar-item { 
+  transition: all 0.2s ease; 
+  font-size: 15px;
+  letter-spacing: 0.05rem;
+  font-weight: 500;
+  color: #3d2b1f;
+}
+.sidebar-item:hover:not(.yayoi-active) { 
+  background-color: #fff7ed !important; 
+  color: #b45309 !important; 
+  padding-left: 1.5rem !important; 
+}
 .yayoi-active { background-color: #b45309 !important; color: white !important; border-left: 5px solid #ffc107 !important; padding-left: 1.5rem !important; box-shadow: 0 4px 10px rgba(180, 83, 9, 0.3); }
 .store-select:focus { border-color: #b45309; box-shadow: 0 0 0 0.25rem rgba(180, 83, 9, 0.2); }
 .price-text { color: #b45309; font-size: 1.4rem; font-weight: 800; }
 .badge-feature { background: #fdf2e9; color: #ca8a04; border: 1px solid #fef08a; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; }
 .yayoi-btn-primary { background: linear-gradient(135deg, #f97316, #ea580c); color: white; border: none; border-radius: 6px; }
 
-.tag-pill { border: 1px solid #e5e7eb; border-radius: 6px !important; padding: 6px 14px; font-size: 13px; font-weight: 500; color: #5c4033; background-color: #ffffff; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
-.tag-pill:hover { border-color: #fdba74; color: #c2410c; background-color: #fff7ed; transform: translateY(-1px); }
-.tag-pill.active { background: linear-gradient(135deg, #fff7ed, #ffedd5) !important; border-color: #b45309 !important; color: #78350f !important; font-weight: 600; box-shadow: 0 4px 12px rgba(180, 83, 9, 0.15) !important; }
+.tag-pill { 
+  border: 1px solid #e5e7eb; 
+  border-radius: 6px !important; 
+  padding: 6px 14px; 
+  font-size: 13px; 
+  font-weight: 500; 
+  color: #5c4033; 
+  background-color: #ffffff; 
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.tag-pill::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 14px;
+  right: 14px;
+  height: 2px;
+  background: linear-gradient(90deg, #fbbf24, #fed7aa);
+  border-radius: 2px;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0.8;
+}
+
+.tag-pill:hover { 
+  border-color: #fdba74; 
+  color: #c2410c; 
+  background-color: #fff7ed; 
+  transform: translateY(-1px); 
+}
+
+.tag-pill:hover::after {
+  transform: scaleX(1);
+}
+
+.tag-pill.active { 
+  background: linear-gradient(135deg, #fff7ed, #ffedd5) !important; 
+  border-color: #b45309 !important; 
+  color: #78350f !important; 
+  font-weight: 600; 
+  box-shadow: 0 4px 12px rgba(180, 83, 9, 0.15) !important; 
+}
+
+.tag-pill.active::after {
+  transform: scaleX(1);
+}
+
+.list-group::-webkit-scrollbar {
+  display: none;
+}
+
+/*加上資訊卡*/
+.item-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.item-modal-container {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: modalFadeIn 0.25s ease;
+}
+
+.item-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  font-size: 14px;
+  cursor: pointer;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.item-modal-close:hover {
+  background: #fff7ed;
+  color: #b45309;
+}
+
+.item-modal-img-wrapper {
+  width: 100%;
+  height: 260px;
+  overflow: hidden;
+  border-radius: 16px 16px 0 0;
+}
+
+.item-modal-img-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.item-modal-body {
+  padding: 24px;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 .sold-out { opacity: 0.65; }
 .sold-out-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); display: flex; justify-content: center; align-items: center; }
