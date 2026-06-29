@@ -11,6 +11,7 @@ public class PointTransactionResponse {
     private Long txId;
     private Integer pointChange;
     private String transactionType;
+    private Long referenceId;
     private String storeName; // 從 Store join 過來
     private LocalDateTime createdAt;
 }

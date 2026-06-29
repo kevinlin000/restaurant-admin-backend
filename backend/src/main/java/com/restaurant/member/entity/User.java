@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "`user`")
-@SQLDelete(sql = "UPDATE user SET is_deleted = true WHERE user_id = ?")
+@SQLDelete(sql = "UPDATE `user` SET is_deleted = true WHERE user_id = ?")
 @SQLRestriction("is_deleted = false")
 @Getter
 @Setter
