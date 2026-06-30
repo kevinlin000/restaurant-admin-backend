@@ -167,13 +167,18 @@ npm run dev
 ### 分支策略
 
 ```
-main                    ← 穩定版本，不直接 commit
-  └── develop           ← 開發主線，所有功能合併到這裡
-       ├── feature/member       ← 會員模組
-       ├── feature/reservation  ← 訂位模組
-       ├── feature/order        ← 訂餐模組
-       ├── feature/menu         ← 菜單模組
-       └── feature/store        ← 找門市模組
+main                         ← 穩定版本，不直接 commit
+  └── develop                ← 開發主線，由 kevinlin 統一整合與驗證
+       ├── feature/member              ← 會員、登入、點數、會員中心
+       ├── feature/reservation         ← 訂位、時段、訂金、訂位後台
+       ├── feature/order               ← 點餐、付款、訂單管理、智慧推薦
+       ├── feature/menu / feat-menu-final
+       │                               ← 菜單、分店定價、餐點詳情
+       ├── feature/store               ← 門市、桌位、營業狀態、店長權限
+       ├── feature/homepage-management ← 首頁內容管理
+       ├── feature/news                ← 最新消息前後台
+       └── feature/faq-support / feature/faq-analytics
+                                       ← FAQ、客服浮窗、查詢紀錄
 ```
 
 ### 每日工作流程
@@ -183,29 +188,65 @@ main                    ← 穩定版本，不直接 commit
 git checkout develop
 git pull origin develop
 
-# 2. 切換到自己的分支，合併 develop 的最新內容
-git checkout feature/store
+# 2. 切換到自己的功能分支，合併 develop 的最新內容
+git checkout feature/your-module
 git merge develop
 
 # 3. 寫 code、commit
 git add .
-git commit -m "feat(store): 新增門市列表 API"
+git commit -m "feat(module): 新增功能說明"
 
 # 4. 推上去
-git push origin feature/store
+git push origin feature/your-module
 
-# 5. 功能完成後，在 GitHub 上發 Pull Request 合併到 develop
+# 5. 功能完成後，通知組長協助整合到 develop
 ```
+
+### 整合與衝突處理
+
+develop 由 kevinlin 統一整合各功能分支。合併時會先確認遠端分支更新狀態，再依模組相依性分批合併，避免後進分支覆蓋已完成的跨模組邏輯。
+
+基本整合檢查：
+
+```bash
+git fetch origin
+git checkout develop
+git merge origin/feature/member
+git merge origin/feature/reservation
+git merge origin/feature/order
+git merge origin/feat-menu-final
+git merge origin/feature/store
+git merge origin/feature/homepage-management
+git merge origin/feature/news
+git merge origin/feature/faq-support
+git merge origin/feature/faq-analytics
+
+cd backend
+mvn test
+
+cd ../restaurant-admin-frontend
+npm run build
+
+cd ..
+git diff --check
+```
+
+若發生衝突，優先保留已上線或已驗證的跨模組流程，例如：
+
+- 登入與 JWT 權限不得被舊版覆蓋。
+- 後台路由需保留 member、reservation、order、menu、store、homepage、news、FAQ 等入口。
+- 店長門市權限、訂單付款、點數、訂位訂金等跨模組邏輯需一起檢查。
+- SQL migration 不直接刪除，若有重複或順序問題，需補新的修正 migration。
 
 ### Commit 訊息規範
 
 ```
-feat(模組):    新功能        例: feat(store): 新增門市 CRUD API
-fix(模組):     修 Bug        例: fix(member): 修正登入驗證邏輯
-docs(模組):    文件更新      例: docs(database): 更新 ER Model
-style(模組):   格式調整      例: style(store): 統一程式碼縮排
-refactor(模組): 重構         例: refactor(order): 抽取共用方法
-test(模組):    測試          例: test(store): 新增門市 Service 測試
+feat(module):     新功能        例: feat(store): 新增門市狀態 API
+fix(module):      修 Bug        例: fix(member): 修正登入驗證邏輯
+docs(module):     文件更新      例: docs(readme): 更新模組分工
+style(module):    格式調整      例: style(news): 調整後台排版
+refactor(module): 重構          例: refactor(order): 抽取共用付款邏輯
+test(module):     測試          例: test(store): 新增門市權限測試
 ```
 
 ## API 規範
@@ -245,8 +286,9 @@ test(模組):    測試          例: test(store): 新增門市 Service 測試
 
 ## 團隊公約
 
-1. **不要直接 push 到 main 或 develop**，一律用 Pull Request。
-2. **每次 commit 前先 pull**，避免衝突。
-3. **不要 commit 敏感資訊**（密碼、API Key），用 `.env` 或 `application-dev.properties`（已在 .gitignore）。
-4. **每個 PR 至少要有 1 個人 review**。
-5. **每天結束前至少 push 一次**，避免程式碼只在自己電腦。
+1. **不要直接 push 到 main**，穩定版本只從 develop 整理上去。
+2. **develop 由 kevinlin 統一整合**，合併後需通過 `mvn test`、`npm run build` 與 `git diff --check`。
+3. **每次開始開發前先同步 develop**，避免分支長期落後造成大量衝突。
+4. **跨模組欄位或 SQL 變更要先告知**，例如 storeId、point_level、訂金欄位、付款狀態、FAQ 欄位長度。
+5. **不要 commit 敏感資訊**（密碼、API Key），用 `.env` 或 `application-dev.properties`（已在 .gitignore）。
+6. **每天結束前至少 push 一次**，避免程式碼只在自己電腦。
