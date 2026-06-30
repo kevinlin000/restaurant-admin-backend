@@ -25,6 +25,18 @@ const formData = ref({
 
 // 下方列表數據與搜尋字串
 const menuItems = ref([])
+
+const categoryList = ref([])
+
+const fetchCategories = async () => {
+  try {
+    const response = await axios.get('/api/menu-categories')
+    categoryList.value = response.data.data || response.data
+  } catch (error) {
+    console.error('分類載入失敗', error)
+  }
+}
+
 const searchQuery = ref('')
 
 // 🔍 即時打字動態過濾演算法
@@ -43,10 +55,10 @@ const fetchAllMenuItems = async () => {
     // 🎯 移除硬編碼，使用分店隔離查詢 API
     const response = await axios.get(`/api/menu-items/store/${currentStoreId.value}`)
     
-    // 將後端多表動態計算出來的 finalPrice 對齊前端表單的 price 變數名
+    // 將後端多表動態計算出來的 price 對齊前端表單的 price 變數名
     const formattedData = (response.data.data || response.data).map(item => ({
       ...item,
-      price: item.finalPrice // 讓分店修改時，預設帶出的是該分店的專屬定價
+      price: item.price // 讓分店修改時，預設帶出的是該分店的專屬定價
     }))
     menuItems.value = formattedData
   } catch (error) {
@@ -58,7 +70,7 @@ const fetchAllMenuItems = async () => {
 const selectItem = (item) => {
   formData.value = { 
     ...item,
-    price: item.price || item.finalPrice || item.basePrice,
+    price: item.price ,
     // ⚡ 核心回填：從下方列表選取時，若有標籤陣列，將第一個值抽出來做為單選值回填
     featureTags: (item.featureTags && item.featureTags.length > 0) ? item.featureTags[0] : ''
   }
@@ -81,6 +93,7 @@ const selectItem = (item) => {
 onMounted(async () => {
   menuItemId.value = route.params.id
   fetchAllMenuItems()    //任務a:搬分店大清單
+  fetchCategories()
   if (menuItemId.value) {  //任務b:去搬這「單一品項」的舊資料
     try {
       // 🎯 移除硬編碼，回歸相對路徑
@@ -105,71 +118,60 @@ onMounted(async () => {
   }
 })
 
+// ✅ 共用函式，放在 handleUpdateMenu 上方
+const submitMenuUpdate = async (overrideData = {}) => {
+  const cleanMenuId = parseInt(menuItemId.value, 10)
+  const cleanStoreId = parseInt(currentStoreId.value, 10)
+  const processedTags = formData.value.featureTags || null
+
+  await axios.put(`/api/menu-items/${cleanMenuId}/store/${cleanStoreId}`, {
+    categoryId: Number(formData.value.categoryId),
+    itemName: formData.value.itemName,
+    price: Number(formData.value.price),
+    description: formData.value.description,
+    imageUrl: formData.value.imageUrl,
+    allergenInfo: formData.value.allergenInfo,
+    featureTags: processedTags,
+    ...overrideData
+  })
+}
+
+// ✅ 簡化後的 handleUpdateMenu
 const handleUpdateMenu = async () => {
   try {
-    // ⚡【全端對齊修改】後端是 String，所以沒選就給 null，有選就直接送字串，不包陣列！
-    const processedTags = formData.value.featureTags ? formData.value.featureTags : null;
-
-    // ⚡【防呆防線】強制將 ID 洗乾淨為純數字
-    const cleanMenuId = parseInt(menuItemId.value, 10);
-    const cleanStoreId = parseInt(currentStoreId.value, 10);
-
-    // 🎯 使用洗乾淨的純數字進行網址拼接
-    await axios.put(`/api/menu-items/${cleanMenuId}/store/${cleanStoreId}`, {
-      categoryId: Number(formData.value.categoryId),
-      itemName: formData.value.itemName,
-      price: Number(formData.value.price), 
-      description: formData.value.description,
-      imageUrl: formData.value.imageUrl,
-      allergenInfo: formData.value.allergenInfo,
-      isActive: formData.value.isActive, 
-      featureTags: processedTags // ⚡ 現在是漂亮的純字串或 null 了！
-    })
-    
-    alert(` 🎉 第 ${cleanStoreId} 號分店餐點數據客製修改成功！`)
-    fetchAllMenuItems() 
+    await submitMenuUpdate({ isActive: formData.value.isActive })
+    alert(`🎉 第 ${parseInt(currentStoreId.value, 10)} 號分店餐點數據客製修改成功！`)
+    fetchAllMenuItems()
   } catch (error) {
     console.error('分店更新餐點失敗：', error)
-    alert(' ❌ 更新失敗，請檢查後端控制台！')
+    alert('❌ 更新失敗，請檢查後端控制台！')
   }
 }
 
 // 🚀 6. 雙向開關邏輯：分店專屬狀態取反切換（上架/下架）
+// ✅ 安全順序
 const handleToggleStatus = async () => {
   if (!formData.value.id) {
     alert('請先在下方列表選擇一個餐點才能進行操作唷！')
     return
   }
+
   const isCurrentlyAvailable = formData.value.isActive === true || formData.value.isActive === 'true'
+  const newStatus = !isCurrentlyAvailable
   const actionText = isCurrentlyAvailable ? '下架移出分店菜單' : '分店重新上架還原'
   const confirmAction = confirm(`確定要將【${formData.value.itemName}】進行${actionText}嗎？`)
   if (!confirmAction) return
-  
+
   try {
-    formData.value.isActive = !isCurrentlyAvailable
-    
-    // ⚡ 同步修改這裡的標籤包裝
-    const processedTags = formData.value.featureTags ? formData.value.featureTags : null;
+    await submitMenuUpdate({ isActive: newStatus })
 
-    const cleanMenuId = parseInt(menuItemId.value, 10);
-    const cleanStoreId = parseInt(currentStoreId.value, 10);
+    formData.value.isActive = newStatus  // ✅ API 成功後才更新前端
+    alert(`🎉 【${formData.value.itemName}】${actionText}成功！`)
+    fetchAllMenuItems()
 
-    await axios.put(`/api/menu-items/${cleanMenuId}/store/${cleanStoreId}`, {
-      categoryId: Number(formData.value.categoryId),
-      itemName: formData.value.itemName,
-      price: Number(formData.value.price),
-      description: formData.value.description,
-      imageUrl: formData.value.imageUrl,
-      allergenInfo: formData.value.allergenInfo,
-      isActive: formData.value.isActive, 
-      featureTags: processedTags 
-    })
-    
-    alert(` 🎉 【${formData.value.itemName}】${actionText}成功！`)
-    fetchAllMenuItems() 
   } catch (error) {
     console.error('狀態切換失敗：', error)
-    alert(' ❌ 操作失敗，請檢查後端控制台！')
+    alert('❌ 操作失敗，請檢查後端控制台！')
   }
 }
 </script>
@@ -201,14 +203,13 @@ const handleToggleStatus = async () => {
           <div class="col-md-3">
             <label class="form-label fw-bold small" style="color: #4b5563;">修改分類</label>
             <select v-model="formData.categoryId" class="form-select form-control-solid bg-white" style="color: #374151; border-color: #fed7aa; font-weight: 500;">
-              <option :value="1" style="color: #374151;">精選日式前菜</option>
-              <option :value="2" style="color: #374151;">旬味生魚片系列</option>
-              <option :value="3" style="color: #374151;">職人握壽司盛合</option>
-              <option :value="4" style="color: #374151;">主廚熱騰騰熟食</option>
-              <option :value="5" style="color: #374151;">日式極緻炸揚物</option>
-              <option :value="6" style="color: #374151;">職人手作甜點</option>
-              <option :value="7" style="color: #374151;">特調清爽飲料</option>
-              <option :value="8" style="color: #374151;">微醺日式酒水</option>
+              <option 
+                v-for="cat in categoryList" 
+                :key="cat.categoryId" 
+                :value="cat.categoryId"
+                style="color: #374151;">
+                {{ cat.categoryName }}
+              </option>
             </select>
           </div>
 

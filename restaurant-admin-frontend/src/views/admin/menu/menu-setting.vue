@@ -1,11 +1,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import axios from '@/api/http' // 確保引入組長整合好、內建自動帶 Token 的 http.js
+import axios from '@/api/axios'
 
 const isStoreOpen = ref(true)
 const autoHideOutOfStock = ref(false)
 const userRole = ref('') 
-const currentStoreId = ref(1) // 預設為 A11 店的 ID
+const currentStoreId = ref(Number(localStorage.getItem('storeId')) || 1)
 const isLoading = ref(false)
 
 onMounted(async () => {
