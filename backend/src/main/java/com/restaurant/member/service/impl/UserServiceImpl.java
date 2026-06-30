@@ -193,6 +193,7 @@ public class UserServiceImpl implements UserService {
                 .email(user.getEmail())
                 .phone(user.getPhone())
                 .pointBalance(profile.getPointBalance())
+                .pointLevel(profile.getPointLevel())
                 .memberLevel(profile.getMemberLevel())
                 .birthday(user.getBirthday())
                 .createdAt(user.getCreatedAt())

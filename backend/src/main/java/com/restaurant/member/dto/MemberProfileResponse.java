@@ -20,6 +20,7 @@ public class MemberProfileResponse {
     private String email;
     private String phone;
     private Integer pointBalance;
+    private Integer pointLevel;
     private MemberLevel memberLevel;
     private LocalDate birthday;
     private LocalDateTime createdAt;

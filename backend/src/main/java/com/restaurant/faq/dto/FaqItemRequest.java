@@ -17,14 +17,14 @@ public class FaqItemRequest {
     private FaqStatus status;
 
     @NotBlank(message = "問題不可空白")
-    @Size(max = 180, message = "問題不可超過 180 字")
+    @Size(max = 255, message = "問題不可超過 255 字")
     private String question;
 
     @NotBlank(message = "回答不可空白")
     @Size(max = 1200, message = "回答不可超過 1200 字")
     private String answer;
 
-    @Size(max = 320, message = "關鍵字不可超過 320 字")
+    @Size(max = 1000, message = "關鍵字不可超過 1000 字")
     private String keywords;
 
     private Boolean isFeatured;

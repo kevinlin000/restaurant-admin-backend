@@ -12,7 +12,7 @@ import lombok.Data;
 @Data
 public class CreateOrderRequest {
 
-    @NotNull(message = "會員 ID 不可為空")
+    // 非會員可為 null
     private Long userId;
 
     @NotNull(message = "門市 ID 不可為空")
@@ -22,18 +22,15 @@ public class CreateOrderRequest {
 
     private Long reservationId;
 
-    @Pattern(regexp = "DINE_IN|TAKEOUT|TAKE_OUT", message = "訂單類型只支援 DINE_IN 或 TAKEOUT")
+    @Pattern(
+        regexp = "DINE_IN|TAKEOUT|TAKE_OUT",
+        message = "訂單類型只支援 DINE_IN 或 TAKEOUT"
+    )
     private String orderType;
-
-    // private BigDecimal totalAmount;
-
-    // private BigDecimal finalAmount;
 
     @Min(value = 0, message = "折抵點數不可小於 0")
     private Integer pointsUsed;
 
-    // private Integer pointsEarned;
-    
     private String invoiceType;
 
     private String carrierNumber;
@@ -43,5 +40,4 @@ public class CreateOrderRequest {
     @Valid
     @NotEmpty(message = "訂單至少需要一個餐點")
     private List<OrderItemRequest> items;
-   
 }

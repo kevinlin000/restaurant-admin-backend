@@ -17,6 +17,7 @@ import AdminMenuSetting from "@/views/admin/menu/menu-setting.vue";
 import AdminStore from "@/views/admin/store/store.vue";
 import AdminNews from "@/views/admin/news/news.vue";
 import AdminFaq from "@/views/admin/faq/faq.vue";
+import AdminFaqAnalytics from "@/views/admin/faq/FaqAnalytics.vue";
 import AdminHomepage from "@/views/admin/homepage/HomepageAdmin.vue";
 import AdminMember from "@/views/admin/member/member.vue";
 import AdminOrderManage from "@/views/admin/order/AdminOrderManage.vue";
@@ -25,7 +26,7 @@ import CustomerOrder from "@/views/customer/order/order.vue";
 import CustomerStore from "@/views/customer/store/store.vue";
 import CustomerNews from "@/views/customer/news/news.vue";
 import CustomerFaq from "@/views/customer/faq/faq.vue";
-
+import AdminOrderDashboard from "@/views/admin/order/AdminOrderDashboard.vue";
 const ROLE = {
   STAFF: "STAFF",
   MANAGER: "MANAGER",
@@ -68,6 +69,16 @@ const routers = [
         path: "order",
         name: "CustomerOrder",
         component: CustomerOrder,
+      },
+      {
+        path: "payment-success",
+        name: "PaymentSuccess",
+        component: () => import("@/views/customer/order/PaymentSuccessView.vue"),
+      },
+      {
+        path: "guest-order-detail",
+        name: "GuestOrderDetail",
+        component: () => import("@/views/customer/order/GuestOrderDetail.vue"),
       },
       {
         path: "store",
@@ -164,6 +175,12 @@ const routers = [
         meta: { roles: ADMIN_ROLES },
       },
       {
+        path: "order-dashboard",
+        name: "AdminOrderDashboard",
+        component: AdminOrderDashboard,
+        meta: { roles: ADMIN_ROLES },
+      },
+      {
         path: "member",
         name: "AdminMember",
         component: AdminMember,
@@ -185,6 +202,12 @@ const routers = [
         path: "faqs",
         name: "AdminFaq",
         component: AdminFaq,
+        meta: { roles: ADMIN_ONLY },
+      },
+      {
+        path: "faq-analytics",
+        name: "AdminFaqAnalytics",
+        component: AdminFaqAnalytics,
         meta: { roles: ADMIN_ONLY },
       },
       {
@@ -245,7 +268,10 @@ router.beforeEach((to, from, next) => {
   const allowedRoles = getRouteRoles(to);
 
   if (!token && (requiresAuth || isAdminPage || isProfilePage)) {
-    next("/login");
+    next({
+      path: "/login",
+      query: { redirect: to.fullPath },
+    });
     return;
   }
 

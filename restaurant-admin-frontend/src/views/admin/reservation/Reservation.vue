@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { reservationAdminApi } from '@/api/reservation'
 import {
   canUseAllManagedStores,
@@ -12,6 +13,7 @@ import {
   resolveManagedStoreSelection,
 } from '@/assets/js/reservationUi'
 
+const router = useRouter()
 const stores = ref([])
 const tables = ref([])
 const allReservations = ref([])
@@ -125,21 +127,21 @@ const groupedReservations = computed(() => {
     dateGroups.set(date, new Map())
   })
 
-  ;(overview.value.reservations || [])
-    .filter(isVisibleOverviewReservation)
-    .filter((item) => {
-      const matchName = !filters.name || item.customerName?.includes(filters.name)
-      const matchPhone = !filters.phone || normalizePhone(item.customerPhone).includes(normalizePhone(filters.phone))
-      return matchName && matchPhone
-    })
-    .forEach((item) => {
-      const timeLabel = `${formatTime(item.startTime)} - ${formatTime(item.endTime)}`
-      if (!dateGroups.has(item.reservationDate)) dateGroups.set(item.reservationDate, new Map())
+    ; (overview.value.reservations || [])
+      .filter(isVisibleOverviewReservation)
+      .filter((item) => {
+        const matchName = !filters.name || item.customerName?.includes(filters.name)
+        const matchPhone = !filters.phone || normalizePhone(item.customerPhone).includes(normalizePhone(filters.phone))
+        return matchName && matchPhone
+      })
+      .forEach((item) => {
+        const timeLabel = `${formatTime(item.startTime)} - ${formatTime(item.endTime)}`
+        if (!dateGroups.has(item.reservationDate)) dateGroups.set(item.reservationDate, new Map())
 
-      const timeGroups = dateGroups.get(item.reservationDate)
-      if (!timeGroups.has(timeLabel)) timeGroups.set(timeLabel, [])
-      timeGroups.get(timeLabel).push(item)
-    })
+        const timeGroups = dateGroups.get(item.reservationDate)
+        if (!timeGroups.has(timeLabel)) timeGroups.set(timeLabel, [])
+        timeGroups.get(timeLabel).push(item)
+      })
   return [...dateGroups.entries()].map(([date, timeGroups]) => {
     const slots = [...timeGroups.entries()]
       .map(([timeLabel, items]) => ({
@@ -272,12 +274,37 @@ const reserveReservation = async (item) => {
 // 勾選實際入座
 const checkIn = async (item) => {
   if (item.status === 'CHECKED_IN') return
-  if (!window.confirm(`確認 ${item.customerName} 已實際入座？確認後不能再更改桌位、編輯或刪除。`)) {
+
+  if (!item.tableIds?.length) {
+    errorMessage.value = '請先分配桌位，才能開始點餐'
+    return
+  }
+
+  if (Number(item.depositAmount || 0) > 0 && item.paymentStatus !== 'PAID') {
+    errorMessage.value = '此訂位尚未完成訂金付款，不能開始點餐'
+    return
+  }
+
+  if (!window.confirm(`確認 ${item.customerName} 已實際入座，並開始點餐？`)) {
     await loadDashboard()
     return
   }
+
   await reservationAdminApi.checkIn(item.reservationId)
-  await loadDashboard()
+
+  router.push({
+    name: 'CustomerOrder',
+    query: {
+      storeId: item.storeId,
+      storeName: currentStoreLabel.value,
+      tableId: item.tableIds[0],
+      tableNumber: item.tableNumbers?.[0] || '',
+      reservationId: item.reservationId,
+      orderType: 'DINE_IN',
+      customerName: item.customerName || '',
+      phone: item.customerPhone || '',
+    },
+  })
 }
 
 // 訂位名單：沒有桌位 -> 顯示未分配
@@ -361,12 +388,12 @@ onMounted(loadStores)
       <div class="row">
         <!-- 全部訂位數統計 card -->
         <div class="col-sm-6 col-lg-4 mb-4">
-          <RouterLink
-            class="card dashboard-card h-100 text-reset text-decoration-none"
+          <RouterLink class="card dashboard-card h-100 text-reset text-decoration-none"
             :to="{ name: 'AdminReservationList', query: { storeId: selectedStoreId } }">
             <div class="card-body">
               <div class="d-flex align-items-center mb-2 pb-1">
-                <div class="avatar me-2"><span class="avatar-initial rounded bg-label-primary"><i class="bx bx-calendar bx-sm"></i></span></div>
+                <div class="avatar me-2"><span class="avatar-initial rounded bg-label-primary"><i
+                      class="bx bx-calendar bx-sm"></i></span></div>
                 <h3 class="ms-1 mb-0">{{ allStats.totalCount }}</h3>
               </div>
               <p class="mb-0">訂位總數</p>
@@ -374,12 +401,12 @@ onMounted(loadStores)
           </RouterLink>
         </div>
         <div class="col-sm-6 col-lg-4 mb-4">
-          <RouterLink
-            class="card dashboard-card h-100 text-reset text-decoration-none"
+          <RouterLink class="card dashboard-card h-100 text-reset text-decoration-none"
             :to="{ name: 'AdminReservationList', query: { storeId: selectedStoreId, status: 'RESERVED' } }">
             <div class="card-body">
               <div class="d-flex align-items-center mb-2 pb-1">
-                <div class="avatar me-2"><span class="avatar-initial rounded bg-label-warning"><i class="bx bx-check-double"></i></span></div>
+                <div class="avatar me-2"><span class="avatar-initial rounded bg-label-warning"><i
+                      class="bx bx-check-double"></i></span></div>
                 <h3 class="ms-1 mb-0">{{ allStats.reservedCount }}</h3>
               </div>
               <p class="mb-0">所有已確定保留訂位</p>
@@ -387,12 +414,12 @@ onMounted(loadStores)
           </RouterLink>
         </div>
         <div class="col-sm-6 col-lg-4 mb-4">
-          <RouterLink
-            class="card dashboard-card h-100 text-reset text-decoration-none"
+          <RouterLink class="card dashboard-card h-100 text-reset text-decoration-none"
             :to="{ name: 'AdminReservationTable', query: { storeId: selectedStoreId } }">
             <div class="card-body">
               <div class="d-flex align-items-center mb-2 pb-1">
-                <div class="avatar me-2"><span class="avatar-initial rounded bg-label-danger"><i class="bx bx-error"></i></span></div>
+                <div class="avatar me-2"><span class="avatar-initial rounded bg-label-danger"><i
+                      class="bx bx-error"></i></span></div>
                 <h3 class="ms-1 mb-0">{{ allStats.unassignedCount }}</h3>
               </div>
               <p class="mb-0">所有未配桌</p>
@@ -474,11 +501,13 @@ onMounted(loadStores)
               {{ option.label }}
             </option>
           </select>
-          <input v-model.trim="filters.name" type="text" class="form-control ms-auto search-control" placeholder="搜尋姓名" />
+          <input v-model.trim="filters.name" type="text" class="form-control ms-auto search-control"
+            placeholder="搜尋姓名" />
           <input v-model.trim="filters.phone" type="text" class="form-control search-control" placeholder="搜尋手機" />
         </div>
         <div class="three-day-reservation-list">
-          <div v-if="!loading && groupedReservations.length === 0" class="text-center text-muted py-4">{{ selectedRangeLabel }}沒有訂位資料</div>
+          <div v-if="!loading && groupedReservations.length === 0" class="text-center text-muted py-4">{{
+            selectedRangeLabel }}沒有訂位資料</div>
           <div v-for="group in groupedReservations" :key="group.date" class="time-slot-row">
             <div class="time-slot-date">
               <div class="fw-semibold">{{ group.date }}</div>
@@ -489,7 +518,8 @@ onMounted(loadStores)
               <div v-if="group.slots.length === 0" class="text-muted small empty-date-message">這一天沒有訂位</div>
               <div v-for="slot in group.slots" :key="slot.label" class="time-slot-item">
                 <div class="time-slot-item-summary">
-                  <button type="button" class="btn btn-sm btn-label-secondary slot-toggle" @click="toggleTimeGroup(slot.label)">
+                  <button type="button" class="btn btn-sm btn-label-secondary slot-toggle"
+                    @click="toggleTimeGroup(slot.label)">
                     <i :class="openTimeGroups[slot.label] ? 'bx bx-chevron-down' : 'bx bx-chevron-right'"></i>
                   </button>
                   <div class="time-slot-item-main">
@@ -500,14 +530,12 @@ onMounted(loadStores)
                   </div>
                 </div>
                 <div v-if="openTimeGroups[slot.label]" class="three-day-reservation-items">
-                  <div v-for="item in slot.items" :key="item.reservationId" class="three-day-reservation-row" :class="{ 'is-locked': !canEdit(item) }">
+                  <div v-for="item in slot.items" :key="item.reservationId" class="three-day-reservation-row"
+                    :class="{ 'is-locked': !canEdit(item) }">
                     <div class="three-day-guest">
-                      <input
-                        type="checkbox"
-                        class="form-check-input"
-                        :checked="item.status === 'CHECKED_IN'"
+                      <input type="checkbox" class="form-check-input" :checked="item.status === 'CHECKED_IN'"
                         :disabled="item.status === 'CHECKED_IN' || item.status === 'CANCELLED' || item.status === 'NO_SHOW' || item.status === 'PENDING'"
-                        @change="checkIn(item)"/>
+                        @change="checkIn(item)" />
                       <div>
                         <div class="fw-semibold">{{ item.customerName }}</div>
                         <div class="text-muted small">{{ item.customerPhone }}</div>
@@ -515,28 +543,35 @@ onMounted(loadStores)
                     </div>
                     <div>{{ item.partySize }} 位</div>
                     <div>
-                      <span class="badge me-1" :class="statusClass[item.status]">{{ statusText[item.status] || item.status }}</span>
+                      <span class="badge me-1" :class="statusClass[item.status]">{{ statusText[item.status] ||
+                        item.status }}</span>
                     </div>
                     <div class="three-day-table-control">
-                      <span v-if="!canEdit(item) || !canAssignTable(item) || !canSelectTable(item)">{{ tableText(item) }}</span>
+                      <span v-if="!canEdit(item) || !canAssignTable(item) || !canSelectTable(item)">{{ tableText(item)
+                        }}</span>
                       <select v-else v-model="selectedTables[item.reservationId]" class="form-select">
                         <option value="">{{ tableText(item) }}</option>
-                        <option v-for="table in tablesForReservation(item)" :key="table.tableId" :value="String(table.tableId)">
+                        <option v-for="table in tablesForReservation(item)" :key="table.tableId"
+                          :value="String(table.tableId)">
                           {{ table.tableNumber }}（{{ table.tableSize }}人桌）
                         </option>
                       </select>
                     </div>
                     <div class="three-day-actions">
-                      <button v-if="item.status === 'PENDING'" type="button" class="btn btn-sm btn-label-warning" @click="reserveReservation(item)">
+                      <button v-if="item.status === 'PENDING'" type="button" class="btn btn-sm btn-label-warning"
+                        @click="reserveReservation(item)">
                         保留
                       </button>
-                      <button v-if="canEdit(item) && canAssignTable(item) && canSelectTable(item)" type="button" class="btn btn-sm btn-dark" @click="assignTable(item.reservationId)">
+                      <button v-if="canEdit(item) && canAssignTable(item) && canSelectTable(item)" type="button"
+                        class="btn btn-sm btn-dark" @click="assignTable(item.reservationId)">
                         分配
                       </button>
-                      <button v-if="canEdit(item) && item.status === 'ASSIGNED' && canSelectTable(item)" type="button" class="btn btn-sm btn-label-secondary" @click="cancelReassign(item.reservationId)">
+                      <button v-if="canEdit(item) && item.status === 'ASSIGNED' && canSelectTable(item)" type="button"
+                        class="btn btn-sm btn-label-secondary" @click="cancelReassign(item.reservationId)">
                         取消
                       </button>
-                      <button v-if="canEdit(item) && item.status === 'ASSIGNED' && !canSelectTable(item)" type="button" class="btn btn-sm btn btn-outline-dark" @click="startReassign(item)">
+                      <button v-if="canEdit(item) && item.status === 'ASSIGNED' && !canSelectTable(item)" type="button"
+                        class="btn btn-sm btn btn-outline-dark" @click="startReassign(item)">
                         重新配桌
                       </button>
                     </div>
@@ -698,6 +733,7 @@ onMounted(loadStores)
 }
 
 @media (max-width: 992px) {
+
   .time-slot-row,
   .three-day-reservation-row {
     grid-template-columns: 1fr;

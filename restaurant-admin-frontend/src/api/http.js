@@ -11,7 +11,7 @@ import router from "@/router";
  */
 const http = axios.create({
   baseURL: "/api",
-  timeout: 10000,
+  timeout: 30000,
 });
 
 // 請求攔截器：自動帶 JWT

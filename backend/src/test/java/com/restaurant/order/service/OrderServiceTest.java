@@ -3,6 +3,7 @@ package com.restaurant.order.service;
 import com.restaurant.common.BusinessException;
 import com.restaurant.member.entity.User;
 import com.restaurant.member.repository.UserRepository;
+import com.restaurant.member.service.PointService;
 import com.restaurant.menu.entity.MenuItem;
 import com.restaurant.menu.entity.StoreMenu;
 import com.restaurant.menu.repository.MenuItemRepository;
@@ -65,6 +66,9 @@ class OrderServiceTest {
     @Mock
     private StoreMenuRepository storeMenuRepository;
 
+    @Mock
+    private PointService pointService;
+
     @InjectMocks
     private OrderService orderService;
 
@@ -78,6 +82,7 @@ class OrderServiceTest {
         when(storeMenuRepository.findByStoreIdAndMenuItemIdAndIsAvailableTrue(2L, 11L))
                 .thenReturn(Optional.of(storeMenu(new BigDecimal("90.00"))));
         when(menuItemRepository.findById(11L)).thenReturn(Optional.of(menuItem(new BigDecimal("100.00"))));
+        when(pointService.usePointsForOrder(1L, 2L, null, 10)).thenReturn(10);
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order order = invocation.getArgument(0);
             order.setOrderId(100L);
@@ -96,8 +101,10 @@ class OrderServiceTest {
         assertThat(response.getTableId()).isEqualTo(9L);
         assertThat(savedOrder.getTotalAmount()).isEqualByComparingTo("180.00");
         assertThat(savedOrder.getFinalAmount()).isEqualByComparingTo("170.00");
+        assertThat(savedOrder.getPointsUsed()).isEqualTo(10);
         assertThat(savedOrder.getTable().getTableId()).isEqualTo(9L);
         verify(tableInfoRepository).findByTableIdAndStoreId(9L, 2L);
+        verify(pointService).usePointsForOrder(1L, 2L, null, 10);
     }
 
     @Test
@@ -139,6 +146,7 @@ class OrderServiceTest {
         when(storeMenuRepository.findByStoreIdAndMenuItemIdAndIsAvailableTrue(2L, 11L))
                 .thenReturn(Optional.of(storeMenu(null)));
         when(menuItemRepository.findById(11L)).thenReturn(Optional.of(menuItem(new BigDecimal("100.00"))));
+        when(pointService.usePointsForOrder(1L, 2L, null, 10)).thenReturn(10);
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order order = invocation.getArgument(0);
             order.setOrderId(101L);
@@ -155,7 +163,9 @@ class OrderServiceTest {
         assertThat(response.getTableId()).isNull();
         assertThat(orderCaptor.getValue().getOrderType()).isEqualTo("TAKEOUT");
         assertThat(orderCaptor.getValue().getTable()).isNull();
+        assertThat(orderCaptor.getValue().getPointsUsed()).isEqualTo(10);
         verifyNoInteractions(tableInfoRepository);
+        verify(pointService).usePointsForOrder(1L, 2L, null, 10);
     }
 
     private static CreateOrderRequest orderRequest(String orderType, Long tableId) {

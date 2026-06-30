@@ -18,11 +18,24 @@ const newItem = ref({
   categoryId: 1,
   status: 'AVAILABLE',
   allergenInfo: '',
-  featureTags: null
+  featureTags: '' // 👈 前端下拉選單先用空字串綁定單選值
 })
 
 // 🚀 4. 初始化為空籃子，準備裝真實數據
 const menuItems = ref([])
+
+
+const categoryList = ref([])
+
+const fetchCategories = async () => {
+  try {
+    const response = await axios.get('/api/menu-categories')
+    categoryList.value = response.data.data || response.data
+  } catch (error) {
+    console.error('分類載入失敗', error)
+  }
+}
+
 // 🚀 5. 搜尋欄位的響應式變數
 const searchQuery = ref('')
 
@@ -51,6 +64,7 @@ const fetchMenuItems = async () => {
 // 🚀 8. 網頁一打開，立馬派人去撈資料庫
 onMounted(() => {
   fetchMenuItems()
+  fetchCategories()
 })
 
 // 🚀 9. 點擊「編輯此項」跨頁面轉跳方法（對齊 /admin/menu-edit/:id 路由）
@@ -70,6 +84,10 @@ const handleAddItemMenu = async () => {
     return
   }
   try {
+    // ⚡【全端資料清洗管線】對齊 SQL JSON 陣列格式！
+    // 如果店長有選標籤，就用陣列包裹打包（例如: ["主廚推薦"]）；若無則傳送 null
+    const processedTags = newItem.value.featureTags ? [newItem.value.featureTags] : null;
+
     // 🎯 完美咬合後端最新 POST /api/menu-items/store/{storeId} 隔離管線，精準寫入 store_menu！
     const response = await axios.post(`/api/menu-items/store/${currentStoreId.value}`, {
       categoryId: Number(newItem.value.categoryId),
@@ -80,15 +98,15 @@ const handleAddItemMenu = async () => {
       allergenInfo: newItem.value.allergenInfo || "無特殊過敏原提示。",
       isActive: true,
       
-      // ⚡ 關鍵加入這一行！將前端選好的標籤打包送往後端
-      featureTags: newItem.value.featureTags 
+      // ⚡ 完美對齊！將清洗好、符合 Java 陣列或 String[] 規格的標籤送往後端
+      featureTags: processedTags 
     })
     
     if (response.data.success) {
       alert(` 🎉 成功新增一筆定食餐點，並寫入第 ${currentStoreId.value} 號分店資料庫！`)
       fetchMenuItems() // 重新刷新列表
       
-      // 腦收集籃擦乾淨：記得把 featureTags 也重設為 null
+      // 腦收集籃擦乾淨：記得把所有欄位重設，包含標籤重置為空字串
       newItem.value = { 
         itemName: '', 
         price: '', 
@@ -97,7 +115,7 @@ const handleAddItemMenu = async () => {
         categoryId: 1, 
         status: 'AVAILABLE', 
         allergenInfo: '',
-        featureTags: null // 👈 清空重置
+        featureTags: '' // 👈 清空重置
       } 
     } else {
       alert('上架失敗：' + response.data.message)
@@ -136,13 +154,13 @@ const handleAddItemMenu = async () => {
           <div class="col-md-3">
             <label class="form-label fw-bold small" style="color: #4b5563;">餐點分類</label>
             <select v-model="newItem.categoryId" class="form-select form-control-solid" style="color: #374151; border-color: #cbd5e1; font-weight: 500;">
-              <option :value="1" style="color: #374151;">精選日式前菜</option>
-              <option :value="2" style="color: #374151;">旬味生魚片系列</option>
-              <option :value="3" style="color: #374151;">職人握壽司盛合</option>
-              <option :value="4" style="color: #374151;">主廚熱騰騰熟食</option>
-              <option :value="6" style="color: #374151;">職人手作甜點</option>
-              <option :value="7" style="color: #374151;">特調清爽飲料</option>
-              <option :value="8" style="color: #374151;">微醺日式酒水</option>
+              <option 
+                v-for="cat in categoryList" 
+                :key="cat.categoryId" 
+                :value="cat.categoryId"
+                style="color: #374151;">
+                {{ cat.categoryName }}
+              </option>
             </select>
           </div>
 
@@ -173,26 +191,27 @@ const handleAddItemMenu = async () => {
             </div>
           </div>
 
-          <div class="mb-3">
-            <label class="form-label fw-bold text-secondary">✨ 特色行銷標籤：</label>
-            <select v-model="newItem.featureTags" class="form-select border-2">
-              <option :value="null">-- 不設定標籤（留白） --</option>
-              <option value="👑 店長推薦">👑 店長推薦 </option>
-              <option value="🔥 人氣熱銷">🔥 人氣熱銷 </option>
-              <option value="🍣 主廚推薦">🍣 主廚推薦 </option>
-              <option value="🔥 入口即化">🔥 入口即化 </option>
-              <option value="🥩 頂級和牛">🥩 頂級和牛 </option>
-              <option value="🍵 濃郁系">🍵 濃郁系 </option>
-              <option value="🥢 手工研磨">🥢 手工研磨 </option>
-              <option value="🧊 夏季限定">🧊 夏季限定 </option>
-              <option value="🍶 頂級清酒">🍶 頂級清酒 </option>
+          <div class="col-md-3">
+            <label class="form-label fw-bold small" style="color: #4b5563;">✨ 特色行銷標籤</label>
+            <select v-model="newItem.featureTags" class="form-select form-control-solid" style="color: #374151; border-color: #cbd5e1; font-weight: 500; border-radius: 6px;">
+              <option value="">-- 不設定標籤（留白） --</option>
+              <option value="主廚推薦">👑 主廚推薦</option>
+              <option value="手作工法">👨‍🍳 手作工法</option>
+              <option value="人氣爆棚">🔥 人氣爆棚</option>
+              <option value="鮮味極致">🐟 鮮味極致</option>
+              <option value="經典必點">✨ 經典必點</option>
+              <option value="職人精神">🎯 職人精神</option>
+              <option value="嚴選食材">🌿 嚴選食材</option>
+              <option value="季節限定">🌸 季節限定</option>
+              <option value="極致奢華">💎 極致奢華 (限量)</option>
+              <option value="限量供應">⏳ 限量供應 (限量)</option>
             </select>
-            <div class="form-text small text-muted">選擇一個最能吸引顧客下單的特色標籤，前台將會優雅顯示。</div>
           </div>
 
-          <div class="col-md-3">
+          <div class="col-md-12">
             <label class="form-label fw-bold small" style="color: #4b5563;">圖片網址</label>
             <input v-model="newItem.imageUrl" type="text" class="form-control form-control-solid" placeholder="圖片 URL..." style="color: #374151; border-color: #cbd5e1;">
+            <div class="form-text small text-muted">選擇一個最能吸引顧客下單的特色標籤，前台將會配合視差滾動華麗登場。</div>
           </div>
         </div>
 

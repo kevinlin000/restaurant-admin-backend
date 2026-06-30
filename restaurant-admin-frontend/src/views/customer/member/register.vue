@@ -5,7 +5,7 @@
       <aside class="member-sidebar">
         <div class="sidebar-heading">
           <span class="sidebar-kicker">JOIN US</span>
-          <h2 class="member-name">會員註冊</h2>
+          <h2 class="member-name">旭日會員註冊</h2>
         </div>
 
         <div class="sidebar-divider"></div>
@@ -14,23 +14,48 @@
           <p class="note-title">成為會員即可享有</p>
 
           <ul class="benefit-list">
-            <li>
-              <span class="benefit-icon">
-                <i class="bi bi-stars"></i>
-              </span>
-              <div>
-                <strong>累積敘日點數</strong>
-                <small>消費累積點數即可升級會員等級，享有會員優惠。</small>
+            <li class="benefit-item">
+              <div class="benefit-copy">
+                <span class="benefit-icon">
+                  <i class="bi bi-stars"></i>
+                </span>
+                <div class="benefit-text">
+                  <strong>會員點數</strong>
+                  <small>累積會員點數，達門檻即可升級會員等級。</small>
+                </div>
+              </div>
+              <div class="benefit-thumb thumb-pudding" aria-hidden="true">
+                <img :src="puddingImg" alt="" />
               </div>
             </li>
 
-            <li>
-              <span class="benefit-icon">
-                <i class="bi bi-gift"></i>
-              </span>
-              <div>
-                <strong>生日專屬優惠</strong>
-                <small>生日月份享會員專屬優惠</small>
+            <li class="benefit-item">
+              <div class="benefit-copy">
+                <span class="benefit-icon">
+                  <i class="bi bi-wallet2"></i>
+                </span>
+                <div class="benefit-text">
+                  <strong>折抵點數</strong>
+                  <small>點餐消費可累積點數，結帳時可折抵金額。</small>
+                </div>
+              </div>
+              <div class="benefit-thumb thumb-sushi" aria-hidden="true">
+                <img :src="sushiImg" alt="" />
+              </div>
+            </li>
+
+            <li class="benefit-item">
+              <div class="benefit-copy">
+                <span class="benefit-icon">
+                  <i class="bi bi-gift"></i>
+                </span>
+                <div class="benefit-text">
+                  <strong>生日專屬優惠</strong>
+                  <small>生日月份消費，可享會員專屬生日禮遇。</small>
+                </div>
+              </div>
+              <div class="benefit-thumb thumb-dessert" aria-hidden="true">
+                <img :src="dessertImg" alt="" />
               </div>
             </li>
           </ul>
@@ -38,9 +63,30 @@
       </aside>
 
       <!-- 右側主內容 -->
-      <section class="content-card">
+      <section v-if="registrationComplete" class="content-card success-card">
+        <div class="success-icon">
+          <i class="bi bi-check2-circle"></i>
+        </div>
+        <h1>註冊成功！</h1>
+        <p class="success-message">
+          歡迎加入敘日會員，{{ registeredName }}。<br />
+          現在開始訂位、點餐，並累積會員點數。
+        </p>
+
+
+        <div class="success-actions">
+          <button class="submit-btn" type="button" @click="goToProfile">
+            個人資料
+          </button>
+          <button class="secondary-btn" type="button" @click="goToMenu">
+            瀏覽菜單
+          </button>
+        </div>
+      </section>
+
+      <section v-else class="content-card">
         <div class="card-header">
-          <h1>會員基本資料</h1>
+          <h1>旭日會員基本資料</h1>
         </div>
 
         <div class="form-table">
@@ -224,7 +270,7 @@
             :disabled="!isFormValid || isLoading"
             @click="handleRegister"
           >
-            {{ isLoading ? "註冊中..." : "下一步" }}
+            {{ isLoading ? "註冊中..." : "成為旭日會員" }}
           </button>
         </div>
       </section>
@@ -237,12 +283,17 @@ import { ref, reactive, computed, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { register, sendEmailCode, verifyEmailCode } from "@/api/member";
 import Swal from "sweetalert2";
+import puddingImg from "@/assets/images/caramel-pudding.jpg";
+import sushiImg from "@/assets/images/aburi-salmon-sushi.jpg";
+import dessertImg from "@/assets/images/matcha-dessert.jpg";
 
 const router = useRouter();
 const showPassword = ref(false);
 const showConfirmPassword = ref(false);
 const errorMsg = ref("");
 const isLoading = ref(false);
+const registrationComplete = ref(false);
+const registeredName = ref("新會員");
 const verificationSent = ref(false);
 const emailVerified = ref(false);
 const isSendingCode = ref(false);
@@ -403,6 +454,15 @@ const startCountdown = () => {
     }
   }, 1000);
 };
+
+const goToProfile = () => {
+  router.push("/profile");
+};
+
+const goToMenu = () => {
+  router.push("/menu");
+};
+
 onUnmounted(() => {
   if (countdownTimer) {
     clearInterval(countdownTimer);
@@ -446,15 +506,8 @@ const handleRegister = async () => {
 
     window.dispatchEvent(new Event("login-state-changed"));
 
-    await Swal.fire({
-      icon: "success",
-      title: "註冊成功",
-      text: `歡迎加入敘日會員，${data.name}`,
-      timer: 1500,
-      showConfirmButton: false,
-    });
-
-    router.push("/profile");
+    registeredName.value = data.name || form.name || "新會員";
+    registrationComplete.value = true;
   } catch (err) {
     errorMsg.value = err.response?.data?.message || "註冊失敗，請稍後再試";
   } finally {
@@ -465,21 +518,55 @@ const handleRegister = async () => {
 
 <style scoped>
 .register-page {
-  padding: 120px 7vw 70px;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   min-height: 100vh;
-  background: #f8f3ed;
+  padding: 120px 7vw 70px;
+  background:
+    linear-gradient(115deg, rgba(9, 7, 5, 0.82) 0%, rgba(39, 26, 16, 0.5) 52%, rgba(9, 7, 5, 0.78) 100%),
+    url("@/assets/images/caramel-pudding.jpg") center / cover no-repeat;
+}
+
+.register-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 20% 18%, rgba(227, 172, 127, 0.26), transparent 32%),
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: auto, 110px 110px, 110px 110px;
+}
+
+.register-page::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.38));
 }
 
 .member-layout {
+  position: relative;
+  z-index: 1;
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr);
-  gap: 34px;
-  max-width: 1180px;
+  grid-template-columns: minmax(340px, 4fr) minmax(0, 6fr);
+  gap: 28px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
 .member-sidebar {
-  color: #566a7f;
+  align-self: start;
+  padding: 30px 28px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 24px;
+  color: rgba(255, 255, 255, 0.86);
+  background: rgba(0, 0, 0, 0.34);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(8px);
 }
 
 .sidebar-heading {
@@ -489,36 +576,36 @@ const handleRegister = async () => {
 .sidebar-kicker {
   display: inline-block;
   margin-bottom: 10px;
-  color: #d99b68;
+  color: #e3ac7f;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.12em;
 }
 
 .member-name {
-  font-size: 30px;
-  font-weight: 700;
-  color: #2f3f4f;
+  font-size: 34px;
+  font-weight: 900;
+  color: #fff;
   margin: 0 0 12px;
   line-height: 1.25;
 }
 
 .sidebar-divider {
   height: 1px;
-  background: #e7ddd3;
+  background: rgba(255, 255, 255, 0.22);
   margin: 28px 0;
 }
 
 .benefit-panel {
-  padding: 18px;
-  border: 1px solid #eadfd5;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.65);
-  box-shadow: 0 8px 24px rgba(66, 49, 34, 0.04);
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
 .note-title {
-  color: #566a7f;
+  color: #fff;
   font-weight: 700;
   margin: 0 0 14px;
 }
@@ -530,19 +617,35 @@ const handleRegister = async () => {
 }
 
 .benefit-list li {
-  display: flex;
-  gap: 12px;
-  padding: 14px 0;
-  border-top: 1px solid #efe4da;
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
 }
 
 .benefit-list li:first-child {
   border-top: none;
+}
+
+.benefit-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 0;
+}
+
+.benefit-item:first-child {
   padding-top: 0;
 }
 
-.benefit-list li:last-child {
+.benefit-item:last-child {
   padding-bottom: 0;
+}
+
+.benefit-copy {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .benefit-icon {
@@ -558,26 +661,91 @@ const handleRegister = async () => {
   font-size: 18px;
 }
 
+.benefit-text {
+  min-width: 0;
+}
+
 .benefit-list strong {
   display: block;
-  color: #2f3f4f;
+  color: #fff;
   font-size: 15px;
   margin-bottom: 4px;
 }
 
 .benefit-list small {
   display: block;
-  color: #7d8b99;
-  font-size: 13px;
-  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.benefit-thumb {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.benefit-thumb img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.thumb-pudding {
+  animation: benefitFloatA 4.2s ease-in-out infinite;
+}
+
+.thumb-sushi {
+  animation: benefitFloatB 4.8s ease-in-out infinite;
+}
+
+.thumb-dessert {
+  animation: benefitFloatC 5.1s ease-in-out infinite;
+}
+
+@keyframes benefitFloatA {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-4deg) scale(1);
+  }
+  50% {
+    transform: translateY(-5px) rotate(0deg) scale(1.03);
+  }
+}
+
+@keyframes benefitFloatB {
+  0%,
+  100% {
+    transform: translateY(0) rotate(4deg) scale(1);
+  }
+  50% {
+    transform: translateY(5px) rotate(1deg) scale(1.03);
+  }
+}
+
+@keyframes benefitFloatC {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg) scale(1);
+  }
+  50% {
+    transform: translateY(-4px) rotate(2deg) scale(1.03);
+  }
 }
 
 .content-card {
-  background: #fff;
-  border: 1px solid #eadfd5;
-  border-radius: 14px;
-  padding: 36px 48px 38px;
-  box-shadow: 0 10px 30px rgba(66, 49, 34, 0.06);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.46);
+  border-radius: 24px;
+  padding: 32px 36px 34px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(10px);
 }
 
 .card-header {
@@ -591,6 +759,67 @@ const handleRegister = async () => {
   color: #2f3f4f;
   font-size: 28px;
   margin: 0;
+}
+
+.success-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 540px;
+  text-align: center;
+}
+
+.success-icon {
+  display: grid;
+  place-items: center;
+  width: 86px;
+  height: 86px;
+  margin-bottom: 18px;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(135deg, #e3ac7f, #d8925c);
+  box-shadow: 0 18px 38px rgba(227, 172, 127, 0.32);
+  font-size: 44px;
+}
+
+.success-card h1 {
+  margin: 10px 0 14px;
+  color: #566a7f;
+  font-size: 34px;
+  font-weight: 900;
+}
+
+.success-message {
+  margin: 0;
+  color: #7d8b9a;
+  line-height: 1.9;
+  font-weight: 700;
+}
+
+.success-actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+}
+
+.success-actions .submit-btn,
+.success-actions .secondary-btn {
+  width: 150px;
+  min-width: 150px;
+}
+
+.secondary-btn {
+  min-width: 150px;
+  border: 1px solid #e5c4aa;
+  border-radius: 14px;
+  padding: 14px 24px;
+  background: #fff;
+  color: #c47d4e;
+  font-weight: 900;
+  cursor: pointer;
 }
 
 .form-table {
@@ -734,7 +963,7 @@ const handleRegister = async () => {
 .submit-btn {
   height: 48px;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   color: #fff;
   font-weight: 700;
   cursor: pointer;
@@ -761,6 +990,7 @@ const handleRegister = async () => {
 @media (max-width: 900px) {
   .register-page {
     padding: 105px 22px 50px;
+    background-position: 56% center;
   }
 
   .member-layout {
@@ -769,6 +999,18 @@ const handleRegister = async () => {
 
   .content-card {
     padding: 28px 24px;
+  }
+
+
+  .benefit-item {
+    gap: 10px;
+  }
+
+  .benefit-thumb {
+    width: 46px;
+    height: 46px;
+    flex-basis: 46px;
+    border-radius: 14px;
   }
 
   .form-row {
@@ -783,6 +1025,10 @@ const handleRegister = async () => {
   .email-inline,
   .verify-code-box,
   .action-row {
+    grid-template-columns: 1fr;
+  }
+
+  .success-benefits {
     grid-template-columns: 1fr;
   }
 }

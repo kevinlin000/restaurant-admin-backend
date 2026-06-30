@@ -3,6 +3,8 @@ package com.restaurant.faq.controller;
 import com.restaurant.common.ApiResponse;
 import com.restaurant.faq.dto.FaqItemRequest;
 import com.restaurant.faq.dto.FaqItemResponse;
+import com.restaurant.faq.dto.FaqSearchAnalyticsResponse;
+import com.restaurant.faq.service.FaqSearchAnalyticsService;
 import com.restaurant.faq.service.FaqItemService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,11 +23,18 @@ import java.util.List;
 public class FaqAdminController {
 
     private final FaqItemService faqItemService;
+    private final FaqSearchAnalyticsService faqSearchAnalyticsService;
 
     @GetMapping
     @Operation(summary = "取得後台 FAQ 清單")
     public ApiResponse<List<FaqItemResponse>> getAdminFaqs(Authentication authentication) {
         return ApiResponse.success(faqItemService.getAdminFaqs(authentication));
+    }
+
+    @GetMapping("/search-logs")
+    @Operation(summary = "取得客服 FAQ 搜尋分析")
+    public ApiResponse<FaqSearchAnalyticsResponse> getSearchAnalytics(Authentication authentication) {
+        return ApiResponse.success(faqSearchAnalyticsService.getAnalytics(authentication));
     }
 
     @GetMapping("/{faqId}")

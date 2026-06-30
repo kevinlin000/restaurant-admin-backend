@@ -7,8 +7,10 @@ import com.restaurant.faq.dto.FaqItemResponse;
 import com.restaurant.faq.dto.FaqSearchResponse;
 import com.restaurant.faq.entity.FaqCategory;
 import com.restaurant.faq.entity.FaqItem;
+import com.restaurant.faq.entity.FaqSearchLog;
 import com.restaurant.faq.entity.FaqStatus;
 import com.restaurant.faq.repository.FaqItemRepository;
+import com.restaurant.faq.repository.FaqSearchLogRepository;
 import com.restaurant.faq.service.FaqItemService;
 import com.restaurant.store.service.StoreAdminAccessService;
 import lombok.RequiredArgsConstructor;
@@ -26,8 +28,10 @@ public class FaqItemServiceImpl implements FaqItemService {
 
     private static final int SEARCH_RESULT_LIMIT = 5;
     private static final int SEARCH_SUGGESTION_LIMIT = 4;
+    private static final int SEARCH_LOG_TEXT_LIMIT = 255;
 
     private final FaqItemRepository faqItemRepository;
+    private final FaqSearchLogRepository faqSearchLogRepository;
     private final StoreAdminAccessService storeAdminAccessService;
 
     @Override
@@ -42,7 +46,7 @@ public class FaqItemServiceImpl implements FaqItemService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public FaqSearchResponse searchPublishedFaqs(String query) {
         String normalizedQuery = cleanNullable(query);
         List<FaqItem> publishedFaqs =
@@ -72,11 +76,29 @@ public class FaqItemServiceImpl implements FaqItemService {
                 .map(scoredFaq -> toResponse(scoredFaq.faq()))
                 .toList();
 
+        recordSearch(normalizedQuery, results);
+
         return FaqSearchResponse.builder()
                 .query(normalizedQuery)
                 .results(results)
                 .suggestions(suggestions)
                 .build();
+    }
+
+    private void recordSearch(String query, List<FaqItemResponse> results) {
+        if (query == null) {
+            return;
+        }
+
+        FaqItemResponse topResult = results.isEmpty() ? null : results.get(0);
+        faqSearchLogRepository.save(FaqSearchLog.builder()
+                .queryText(limitText(query, SEARCH_LOG_TEXT_LIMIT))
+                .normalizedQuery(limitText(query.toLowerCase(Locale.ROOT), SEARCH_LOG_TEXT_LIMIT))
+                .matched(!results.isEmpty())
+                .resultCount(results.size())
+                .topFaqId(topResult == null ? null : topResult.getFaqId())
+                .topQuestion(topResult == null ? null : limitText(topResult.getQuestion(), SEARCH_LOG_TEXT_LIMIT))
+                .build());
     }
 
     @Override
@@ -227,6 +249,13 @@ public class FaqItemServiceImpl implements FaqItemService {
 
     private String lower(String value) {
         return value == null ? "" : value.toLowerCase(Locale.ROOT);
+    }
+
+    private String limitText(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
     }
 
     private record ScoredFaq(FaqItem faq, int score) {
