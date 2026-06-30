@@ -108,6 +108,14 @@ public class OrderService {
 
                 Reservation reservation = resolveReservation(request, user, store, orderType);
 
+                if (reservation != null
+                                && reservation.getDepositAmount() != null
+                                && reservation.getDepositAmount().compareTo(BigDecimal.ZERO) > 0
+                                && !"PAID".equals(reservation.getPaymentStatus())) {
+
+                        throw new BusinessException("此訂位尚未完成訂金付款，無法建立訂單");
+                }
+
                 // 5. 查詢 MenuItem// 6. 計算 totalAmount
                 List<OrderLine> orderLines = buildOrderLines(request.getStoreId(), request.getItems());
                 BigDecimal totalAmount = orderLines.stream()
@@ -131,6 +139,12 @@ public class OrderService {
 
                 BigDecimal depositDiscount = BigDecimal.ZERO;
 
+                if (reservation != null
+                                && "PAID".equals(reservation.getPaymentStatus())
+                                && reservation.getDepositAmount() != null) {
+                        depositDiscount = reservation.getDepositAmount();
+                }
+
                 // TODO Reservation 完成訂金流程後，改由 Reservation 帶入 depositAmount
 
                 BigDecimal pointsDiscount = BigDecimal.valueOf(actualPointsUsed);
@@ -151,6 +165,7 @@ public class OrderService {
                                 .store(store)
                                 .table(table)
                                 .reservation(reservation)
+
                                 .orderType(orderType)
                                 // 計算假資料
                                 .totalAmount(totalAmount)
@@ -265,6 +280,55 @@ public class OrderService {
                 return convertToResponse(savedOrder);
         }
 
+        @Transactional
+        public OrderResponse markPaymentPaidForAdmin(Long orderId, String paymentMethod) {
+                if (paymentMethod == null || paymentMethod.isBlank()) {
+                        throw new BusinessException("付款方式不可為空");
+                }
+
+                String method = paymentMethod.trim().toUpperCase();
+
+                if (!method.equals("CASH")
+                                && !method.equals("CREDIT_CARD")
+                                && !method.equals("LINE_PAY")) {
+                        throw new BusinessException("不支援的付款方式");
+                }
+
+                Order order = orderRepository.findById(orderId)
+                                .orElseThrow(() -> new BusinessException("找不到訂單"));
+
+                if ("CANCELLED".equals(order.getStatus())) {
+                        throw new BusinessException("已取消的訂單不可完成付款");
+                }
+
+                Payment payment = paymentRepository.findByOrder(order);
+
+                if (payment == null) {
+                        throw new BusinessException("找不到付款資料");
+                }
+
+                payment.setPaymentMethod(method);
+                payment.setPaymentStatus("PAID");
+                payment.setPaidAt(LocalDateTime.now());
+                paymentRepository.save(payment);
+
+                order.setStatus("COMPLETED");
+
+                if (order.getUser() != null && (order.getPointsEarned() == null || order.getPointsEarned() == 0)) {
+                        int earnedPoints = pointService.earnPointsFromOrder(
+                                        order.getUser().getUserId(),
+                                        order.getStore().getStoreId(),
+                                        order.getOrderId(),
+                                        order.getFinalAmount());
+
+                        order.setPointsEarned(earnedPoints);
+                }
+
+                Order savedOrder = orderRepository.save(order);
+
+                return convertToResponse(savedOrder);
+        }
+
         private OrderResponse convertToResponse(Order order) {
 
                 Payment payment = paymentRepository.findByOrder(order);
@@ -284,8 +348,15 @@ public class OrderService {
                                 .userId(order.getUser() != null ? order.getUser().getUserId() : null)
                                 .storeId(order.getStore().getStoreId())
                                 .tableId(order.getTable() != null ? order.getTable().getTableId() : null)
+                                .tableNumber(order.getTable() != null ? order.getTable().getTableNumber() : null)
                                 .reservationId(order.getReservation() != null
                                                 ? order.getReservation().getReservationId()
+                                                : null)
+                                .depositAmount(order.getReservation() != null
+                                                ? order.getReservation().getDepositAmount()
+                                                : BigDecimal.ZERO)
+                                .depositStatus(order.getReservation() != null
+                                                ? order.getReservation().getPaymentStatus()
                                                 : null)
                                 .orderType(order.getOrderType())
                                 .totalAmount(order.getTotalAmount())
@@ -319,9 +390,16 @@ public class OrderService {
                                 .orderId(order.getOrderId())
                                 .userId(order.getUser() != null ? order.getUser().getUserId() : null)
                                 .storeId(order.getStore().getStoreId())
+                                .tableNumber(order.getTable() != null ? order.getTable().getTableNumber() : null)
                                 .orderType(order.getOrderType())
                                 .totalAmount(order.getTotalAmount())
                                 .finalAmount(order.getFinalAmount())
+                                .depositAmount(order.getReservation() != null
+                                                ? order.getReservation().getDepositAmount()
+                                                : BigDecimal.ZERO)
+                                .depositStatus(order.getReservation() != null
+                                                ? order.getReservation().getPaymentStatus()
+                                                : null)
                                 .paymentMethod(payment != null ? payment.getPaymentMethod() : null)
                                 .paymentStatus(payment != null ? payment.getPaymentStatus() : null)
                                 .invoiceType(order.getInvoiceType())

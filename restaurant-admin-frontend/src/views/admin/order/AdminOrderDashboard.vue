@@ -74,6 +74,42 @@ const getPercent = (count, total) => {
   return Math.round((Number(count || 0) / total) * 100);
 };
 
+const pieStyle = (list) => {
+  const total = list.reduce((sum, item) => sum + Number(item.count || 0), 0);
+
+  if (!total) {
+    return {
+      background: "#fff1e5",
+    };
+  }
+
+  let start = 0;
+
+const colors = ["#e3ac7f", "#5b7fa6", "#7fb685", "#d97b7b", "#9b8acb", "#f2c45f", "#7f8fa0"];
+  const parts = list.map((item, index) => {
+    const percent = (Number(item.count || 0) / total) * 100;
+    const end = start + percent;
+    const part = `${colors[index % colors.length]} ${start}% ${end}%`;
+    start = end;
+    return part;
+  });
+
+  return {
+    background: `conic-gradient(${parts.join(", ")})`,
+  };
+};
+
+const chartColor = (index) => {
+  return [
+    "#e3ac7f", // 橘
+    "#5b7fa6", // 藍
+    "#7fb685", // 綠
+    "#d97b7b", // 紅
+    "#9b8acb", // 紫
+    "#f2c45f", // 黃
+    "#7f8fa0", // 灰
+  ][index % 7];
+};
 const loadDashboard = async () => {
   loading.value = true;
   errorMessage.value = "";
@@ -87,7 +123,7 @@ const loadDashboard = async () => {
         getPaymentMethodRatio(),
         getOrderStatusRatio(),
       ]);
-   
+
     summary.value = summaryRes || {
       todayRevenue: 0,
       monthRevenue: 0,
@@ -179,14 +215,19 @@ onMounted(() => {
             <span>本月訂單付款方式</span>
           </div>
 
-          <div v-if="paymentMethodRatio.length" class="ratio-list">
-            <div v-for="item in paymentMethodRatio" :key="item.paymentMethod" class="ratio-item">
-              <div class="ratio-name">{{ paymentText(item.paymentMethod) }}</div>
-              <div class="ratio-track">
-                <div class="ratio-fill" :style="{ width: `${getPercent(item.count, paymentTotal)}%` }"></div>
+          <div v-if="paymentMethodRatio.length" class="pie-chart-block">
+            <div class="donut-chart" :style="pieStyle(paymentMethodRatio)">
+              <div class="donut-center">
+                <strong>{{ paymentTotal }}</strong>
+                <span>筆訂單</span>
               </div>
-              <div class="ratio-count">
-                {{ item.count }} 筆 / {{ getPercent(item.count, paymentTotal) }}%
+            </div>
+
+            <div class="pie-legend">
+              <div v-for="(item, index) in paymentMethodRatio" :key="item.paymentMethod" class="pie-legend-item">
+                <span class="legend-dot" :style="{ background: chartColor(index) }"></span>
+                <span>{{ paymentText(item.paymentMethod) }}</span>
+                <strong>{{ item.count }} 筆 / {{ getPercent(item.count, paymentTotal) }}%</strong>
               </div>
             </div>
           </div>
@@ -200,14 +241,19 @@ onMounted(() => {
             <span>本月訂單狀態分布</span>
           </div>
 
-          <div v-if="orderStatusRatio.length" class="ratio-list">
-            <div v-for="item in orderStatusRatio" :key="item.status" class="ratio-item">
-              <div class="ratio-name">{{ statusText(item.status) }}</div>
-              <div class="ratio-track">
-                <div class="ratio-fill" :style="{ width: `${getPercent(item.count, statusTotal)}%` }"></div>
+          <div v-if="orderStatusRatio.length" class="pie-chart-block">
+            <div class="donut-chart" :style="pieStyle(orderStatusRatio)">
+              <div class="donut-center">
+                <strong>{{ statusTotal }}</strong>
+                <span>筆訂單</span>
               </div>
-              <div class="ratio-count">
-                {{ item.count }} 筆 / {{ getPercent(item.count, statusTotal) }}%
+            </div>
+
+            <div class="pie-legend">
+              <div v-for="(item, index) in orderStatusRatio" :key="item.status" class="pie-legend-item">
+                <span class="legend-dot" :style="{ background: chartColor(index) }"></span>
+                <span>{{ statusText(item.status) }}</span>
+                <strong>{{ item.count }} 筆 / {{ getPercent(item.count, statusTotal) }}%</strong>
               </div>
             </div>
           </div>
@@ -357,17 +403,17 @@ onMounted(() => {
 
 .bar-track {
   flex: 1;
-  width: 42px;
+  width: 64px;
   display: flex;
   align-items: flex-end;
-  border-radius: 999px;
+  border-radius: 10px;
   background: #fff1e5;
   overflow: hidden;
 }
 
 .bar-fill {
   width: 100%;
-  border-radius: 999px 999px 0 0;
+  border-radius: 10px 10px 0 0;
   background: linear-gradient(180deg, #e3ac7f, #d88b4c);
 }
 
@@ -508,5 +554,69 @@ onMounted(() => {
   .top-count {
     text-align: left;
   }
+}
+.pie-chart-block {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  align-items: center;
+  gap: 26px;
+  min-height: 220px;
+}
+
+.donut-chart {
+  width: 170px;
+  height: 170px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 1px rgba(227, 172, 127, 0.18);
+}
+
+.donut-center {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.donut-center strong {
+  color: #2f4b6c;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.donut-center span {
+  color: #8a99a8;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.pie-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pie-legend-item {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  color: #566a7f;
+  font-weight: 800;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.pie-legend-item strong {
+  color: #2f4b6c;
 }
 </style>

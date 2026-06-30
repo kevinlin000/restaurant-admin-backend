@@ -71,6 +71,16 @@ const routers = [
         component: CustomerOrder,
       },
       {
+        path: "payment-success",
+        name: "PaymentSuccess",
+        component: () => import("@/views/customer/order/PaymentSuccessView.vue"),
+      },
+      {
+        path: "guest-order-detail",
+        name: "GuestOrderDetail",
+        component: () => import("@/views/customer/order/GuestOrderDetail.vue"),
+      },
+      {
         path: "store",
         name: "CustomerStore",
         component: CustomerStore,

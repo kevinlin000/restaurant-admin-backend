@@ -58,6 +58,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/stores/nearby").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/menu-categories/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/menu-items/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/menu/recommend").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/menu-component/stores/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/news/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/faqs/**").permitAll()

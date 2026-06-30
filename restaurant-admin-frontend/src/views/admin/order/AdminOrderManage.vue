@@ -15,17 +15,19 @@
         <h2>{{ activeCount }}</h2>
       </div>
 
+      <div class="summary-card clickable" :class="{ active: quickFilter === 'UNPAID' }"
+        @click="setQuickFilter('UNPAID')">
+        <p class="card-red">待付款</p>
+        <h2>{{ unpaidCount }}</h2>
+      </div>
+
       <div class="summary-card clickable" :class="{ active: quickFilter === 'COMPLETED' }"
         @click="setQuickFilter('COMPLETED')">
         <p class="card-green">已完成</p>
         <h2>{{ completedCount }}</h2>
       </div>
 
-      <div class="summary-card clickable" :class="{ active: quickFilter === 'UNPAID' }"
-        @click="setQuickFilter('UNPAID')">
-        <p class="card-red">待付款</p>
-        <h2>{{ unpaidCount }}</h2>
-      </div>
+
 
       <div class="summary-card clickable" @click="setQuickFilter('REVENUE')"
         :class="{ active: quickFilter === 'REVENUE' }">
@@ -183,7 +185,7 @@
     </button>
   </div>
 
-  <div v-if="selectedOrder" class="modal-mask" @click.self="selectedOrder = null">
+  <div v-if="selectedOrder" class="modal-mask" @click.self="closeOrderDetail">
     <div class="modal">
       <div class="modal-header">
         <h2>訂單明細 #{{ selectedOrder.orderId }}</h2>
@@ -193,7 +195,7 @@
             🖨️ 列印
           </button>
 
-          <button type="button" class="close-btn" @click="selectedOrder = null">
+          <button type="button" class="close-btn" @click="closeOrderDetail">
             ×
           </button>
         </div>
@@ -213,7 +215,7 @@
 
         <div class="detail-item">
           <span class="detail-label">桌號：</span>
-          <span class="detail-value">{{ selectedOrder.tableId || '-' }}</span>
+          <span class="detail-value">{{ selectedOrder.tableNumber || selectedOrder.tableId || '-' }}</span>
         </div>
 
         <div class="detail-item">
@@ -235,6 +237,23 @@
           <span class="payment-badge" :class="getPaymentStatusClass(selectedOrder.paymentStatus)">
             {{ formatPaymentStatus(selectedOrder.paymentStatus) }}
           </span>
+        </div>
+
+        <div v-if="selectedOrder.paymentStatus === 'UNPAID'
+          && selectedOrder.status !== 'CANCELLED'" class="detail-item payment-edit-row">
+          <span class="detail-label">收款方式：</span>
+
+          <div class="payment-edit-box">
+            <select v-model="selectedPaymentMethod" class="payment-method-select">
+              <option value="CASH">現金</option>
+              <option value="CREDIT_CARD">信用卡</option>
+              <option value="LINE_PAY">LINE Pay</option>
+            </select>
+
+            <button type="button" class="paid-btn" @click="completePayment(selectedOrder)">
+              完成付款
+            </button>
+          </div>
         </div>
 
         <div class="detail-item">
@@ -295,8 +314,17 @@
 
       <div class="total-box">
         <p>原始金額：${{ selectedOrder.totalAmount }}</p>
+
+        <p v-if="Number(selectedOrder.depositAmount || 0) > 0" class="deposit-line">
+          已付訂金：-${{ selectedOrder.depositAmount }}
+          <span class="deposit-status">
+            {{ selectedOrder.depositStatus === 'PAID' ? '已付款' : '未付款' }}
+          </span>
+        </p>
+
         <p>點數折抵：${{ selectedOrder.pointsUsed || 0 }}</p>
-        <h2>實付金額：${{ selectedOrder.finalAmount }}</h2>
+
+        <h2>應收金額：${{ selectedOrder.finalAmount }}</h2>
       </div>
     </div>
   </div>
@@ -311,7 +339,8 @@ import Swal from 'sweetalert2'
 import {
   getAdminOrders,
   getAdminOrderById,
-  updateAdminOrderStatus
+  updateAdminOrderStatus,
+  markAdminOrderPaymentPaid
 } from '@/api/orderAdminApi'
 
 
@@ -330,6 +359,7 @@ const dateFilter = ref('')
 const orderTypeFilter = ref('')
 const startDate = ref('')
 const endDate = ref('')
+const selectedPaymentMethod = ref('CASH')
 const lastOrderCount = ref(0)
 
 
@@ -389,6 +419,13 @@ const printOrder = () => {
   window.print()
 }
 
+const closeOrderDetail = () => {
+  selectedOrder.value = null
+
+  if (route.query.orderId) {
+    window.history.replaceState(null, '', '/admin/order-manage')
+  }
+}
 
 const getPaymentMethodClass = (method) => {
   if (method === 'CASH') return 'method-cash'
@@ -438,7 +475,7 @@ const revenueTitle = computed(() => {
   if (dateFilter.value === 'YESTERDAY') return '昨日營業額'
   if (dateFilter.value === 'WEEK') return '近 7 天營業額'
   if (dateFilter.value === 'MONTH') return '近 30 天營業額'
-  return '今日天營業額'
+  return '今日營業額'
 })
 
 const dateFilteredOrders = computed(() => {
@@ -837,7 +874,60 @@ const activeCount = computed(() => {
 const completedCount = computed(() => {
   return dateFilteredOrders.value.filter(order => order.status === 'COMPLETED').length
 })
+const completePayment = async (order) => {
+  const result = await Swal.fire({
+    icon: 'question',
+    title: '確認完成付款？',
+    html: `
+      <div style="line-height:1.8">
+        訂單 #${order.orderId}<br>
+        應付金額：$${order.finalAmount}<br>
+        付款方式：${formatPaymentMethod(selectedPaymentMethod.value)}
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: '確認付款',
+    cancelButtonText: '取消',
+    confirmButtonColor: '#e4a775',
+    allowOutsideClick: false,
+    allowEscapeKey: false
+  })
 
+  if (!result.isConfirmed) return
+
+  try {
+    await markAdminOrderPaymentPaid(
+      order.orderId,
+      selectedPaymentMethod.value
+    )
+
+    await Swal.fire({
+      icon: 'success',
+      title: '付款完成',
+      text: '訂單已更新為已付款與已完成',
+      confirmButtonColor: '#e4a775',
+      allowOutsideClick: false
+    })
+
+    // 成功後才關閉明細
+    selectedOrder.value = null
+
+    await loadOrders()
+
+  } catch (error) {
+
+    Swal.fire({
+      icon: 'warning',
+      title: '完成付款失敗',
+      text:
+        error.response?.data?.message ||
+        error.response?.data ||
+        '請稍後再試'
+    })
+
+    // 保持明細開著，不需要重新點一次
+  }
+}
 const changeStatus = async (orderId, status) => {
   try {
     if (status === 'CANCELLED') {
@@ -890,6 +980,7 @@ const openDetail = async (order) => {
   try {
     const res = await getAdminOrderById(order.orderId)
     selectedOrder.value = res.data
+    selectedPaymentMethod.value = selectedOrder.value.paymentMethod || 'CASH'
   } catch (error) {
     console.error(error)
 
@@ -913,6 +1004,7 @@ const formatOrderType = (type) => {
 const formatPaymentMethod = (method) => {
   if (method === 'CASH') return '現金'
   if (method === 'CREDIT_CARD') return '信用卡'
+  if (method === 'LINE_PAY') return 'LINE Pay'
   return method || '未設定'
 }
 
@@ -1380,7 +1472,7 @@ button:hover {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 2147483647;
+  z-index: 2000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1397,7 +1489,7 @@ button:hover {
   max-width: 95vw;
   max-height: 90vh;
   overflow-y: auto;
-  z-index: 2147483647;
+  z-index: 2001;
   opacity: 1 !important;
   visibility: visible !important;
 }
@@ -1473,5 +1565,48 @@ button:hover {
   .detail-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.payment-edit-row {
+  align-items: center;
+}
+
+.payment-edit-box {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.payment-method-select {
+  min-width: 130px;
+}
+
+.paid-btn {
+  background: #2f9e44;
+}
+
+.paid-btn:hover {
+  background: #27863a;
+}
+
+.deposit-line {
+  color: #2f9e44;
+  font-weight: 700;
+}
+
+.deposit-status {
+  margin-left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f6ffed;
+  border: 1px solid #95de64;
+  color: #237804;
+  font-size: 12px;
+}
+</style>
+
+<style>
+.swal2-container {
+  z-index: 9999 !important;
 }
 </style>
