@@ -541,6 +541,40 @@ const handleLogin = async () => {
 </script>
 
 <style scoped>
+.login-container {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 180px 16px 70px;
+  background:
+    linear-gradient(115deg, rgba(11, 8, 6, 0.78) 0%, rgba(32, 22, 15, 0.5) 48%, rgba(8, 6, 5, 0.82) 100%),
+    url("@/assets/images/caramel-pudding.jpg") center / cover no-repeat;
+}
+
+.login-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 24% 20%, rgba(227, 172, 127, 0.24), transparent 30%),
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: auto, 110px 110px, 110px 110px;
+}
+
+.login-container::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.58));
+}
+
 .title {
   text-align: center;
   color: #55606e;
@@ -548,23 +582,28 @@ const handleLogin = async () => {
   font-weight: 700;
 }
 
-.login-container {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 180px 16px 60px;
-  min-height: 100vh;
-}
-
 .login-box {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 500px;
   padding: 50px;
-  border: none;
-  border-radius: 16px;
-  position: relative;
-  background: white;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.46);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.login-box::before {
+  content: "敘日會員登入";
+  display: block;
+  margin-bottom: 8px;
+  color: #d99b68;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-align: center;
 }
 
 .form-group {
@@ -580,12 +619,13 @@ label {
 
 input {
   width: 100%;
-  padding: 10px;
+  padding: 11px 12px;
   margin-top: 5px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
+  border: 1px solid #dfcdbd;
+  border-radius: 10px;
   box-sizing: border-box;
   color: #333;
+  background: rgba(255, 255, 255, 0.92);
 }
 
 input:focus {
@@ -734,8 +774,9 @@ input:disabled {
   color: white;
   border: none;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: 12px;
   margin-top: 10px;
+  box-shadow: 0 12px 26px rgba(227, 172, 127, 0.28);
   font-weight: 700;
 }
 
@@ -762,7 +803,8 @@ input:disabled {
 
 @media (max-width: 576px) {
   .login-container {
-    padding: 140px 16px 40px;
+    padding: 130px 16px 40px;
+    background-position: 58% center;
   }
 
   .login-box {

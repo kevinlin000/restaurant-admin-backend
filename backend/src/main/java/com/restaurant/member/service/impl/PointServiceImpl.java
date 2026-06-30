@@ -43,13 +43,16 @@ public class PointServiceImpl implements PointService {
     @Transactional(readOnly = true)
     public PointBalanceResponse getPointBalance(Long userId) {
         MemberProfile profile = getMemberProfile(userId);
-        int points = safePoints(profile.getPointBalance());
+        int discountPoints = safePoints(profile.getPointBalance());
+        int levelPoints = safePoints(profile.getPointLevel());
+        MemberLevel currentLevel = calculateMemberLevel(levelPoints);
 
         return PointBalanceResponse.builder()
-                .pointBalance(points)
-                .memberLevel(profile.getMemberLevel())
-                .nextLevel(getNextLevel(points))
-                .pointsToNextLevel(getPointsToNextLevel(points))
+                .pointBalance(discountPoints)
+                .pointLevel(levelPoints)
+                .memberLevel(currentLevel)
+                .nextLevel(getNextLevel(levelPoints))
+                .pointsToNextLevel(getPointsToNextLevel(levelPoints))
                 .earnRuleText("每消費 $100 即可累積 1 點")
                 .build();
     }
@@ -89,8 +92,12 @@ public class PointServiceImpl implements PointService {
             return 0;
         }
 
-        profile.setPointBalance(safePoints(profile.getPointBalance()) + pointsEarned);
-        profile.setMemberLevel(calculateMemberLevel(profile.getPointBalance()));
+        int updatedDiscountPoints = safePoints(profile.getPointBalance()) + pointsEarned;
+        int updatedLevelPoints = safePoints(profile.getPointLevel()) + pointsEarned;
+
+        profile.setPointBalance(updatedDiscountPoints);
+        profile.setPointLevel(updatedLevelPoints);
+        profile.setMemberLevel(calculateMemberLevel(updatedLevelPoints));
         memberProfileRepository.save(profile);
 
         pointTransactionRepository.save(PointTransaction.builder()
@@ -117,7 +124,7 @@ public class PointServiceImpl implements PointService {
         int currentPoints = safePoints(profile.getPointBalance());
 
         if (currentPoints < pointsToUse) {
-            throw new BusinessException("會員點數不足");
+            throw new BusinessException("折抵點數不足");
         }
 
         if (orderId != null && pointTransactionRepository
@@ -126,7 +133,8 @@ public class PointServiceImpl implements PointService {
         }
 
         profile.setPointBalance(currentPoints - pointsToUse);
-        profile.setMemberLevel(calculateMemberLevel(profile.getPointBalance()));
+        // 折抵只扣 point_balance，不動 point_level；會員等級仍以 point_level 判斷。
+        profile.setMemberLevel(calculateMemberLevel(safePoints(profile.getPointLevel())));
         memberProfileRepository.save(profile);
 
         pointTransactionRepository.save(PointTransaction.builder()
@@ -157,7 +165,8 @@ public class PointServiceImpl implements PointService {
         }
 
         profile.setPointBalance(safePoints(profile.getPointBalance()) + pointsToRefund);
-        profile.setMemberLevel(calculateMemberLevel(profile.getPointBalance()));
+        // 取消訂單只退回可用折抵點數，不增加會員升級點數。
+        profile.setMemberLevel(calculateMemberLevel(safePoints(profile.getPointLevel())));
         memberProfileRepository.save(profile);
 
         pointTransactionRepository.save(PointTransaction.builder()
@@ -175,7 +184,7 @@ public class PointServiceImpl implements PointService {
     @Transactional
     public void updateMemberLevel(Long userId) {
         MemberProfile profile = getMemberProfile(userId);
-        profile.setMemberLevel(calculateMemberLevel(safePoints(profile.getPointBalance())));
+        profile.setMemberLevel(calculateMemberLevel(safePoints(profile.getPointLevel())));
         memberProfileRepository.save(profile);
     }
 
@@ -250,6 +259,7 @@ public class PointServiceImpl implements PointService {
                 .txId(tx.getTxId())
                 .pointChange(tx.getPointChange())
                 .transactionType(tx.getTransactionType().name())
+                .referenceId(tx.getReferenceId())
                 .storeName(tx.getStore() != null ? tx.getStore().getStoreName() : null)
                 .createdAt(tx.getCreatedAt())
                 .build();
