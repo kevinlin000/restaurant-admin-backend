@@ -129,7 +129,7 @@
 
 <script setup>
 import { computed, onUnmounted, reactive, ref, watch } from "vue";
-import { useRouter, useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import {
   forgotPassword,
   login,
@@ -452,6 +452,22 @@ const getDefaultPathByRole = (roleName) => {
   return "/home";
 };
 
+const getRedirectPath = (roleName) => {
+  const redirect = route.query.redirect;
+
+  if (
+    typeof redirect === "string" &&
+    redirect.startsWith("/") &&
+    !redirect.startsWith("//") &&
+    redirect !== "/login" &&
+    redirect !== "/register"
+  ) {
+    return redirect;
+  }
+
+  return getDefaultPathByRole(roleName);
+};
+
 const handleLogin = async () => {
   errorMsg.value = "";
   isLoading.value = true;
@@ -477,15 +493,11 @@ const handleLogin = async () => {
       title: "登入成功",
       text: `歡迎回來，${data.name}`,
       confirmButtonColor: "#d9a372",
+      showConfirmButton: false,
+      timer: 900,
     });
 
-    const redirect = route.query.redirect;
-
-    if (redirect) {
-      router.push(String(redirect));
-    } else {
-      router.push(getDefaultPathByRole(data.roleName));
-    }
+    router.push(getRedirectPath(data.roleName));
   } catch (err) {
     errorMsg.value = err.response?.data?.message || "登入失敗，請稍後再試";
   } finally {
