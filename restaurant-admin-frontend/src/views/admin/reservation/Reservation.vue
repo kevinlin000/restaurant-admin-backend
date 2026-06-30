@@ -39,7 +39,7 @@ const rangeOptions = [
   { label: '近一週', value: 7 },
   { label: '近一個月', value: 30 },
 ]
-const selectedRangeDays = ref(30)
+const selectedRangeDays = ref(7)
 
 const selectedDate = ref(formatDateInput(new Date()))
 const canSelectAllStores = computed(() => canUseAllManagedStores())
@@ -329,6 +329,8 @@ const toggleTimeGroup = (timeLabel) => {
 
 // 切換分店 or 日期時 -> 重新載入整個總覽
 watch([selectedStoreId, selectedDate, selectedRangeDays], loadDashboard)
+
+// 初始
 onMounted(loadStores)
 </script>
 

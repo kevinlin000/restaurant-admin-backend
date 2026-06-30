@@ -41,5 +41,8 @@ linepay.api-base-url=https://sandbox-api-pay.line.me
 linepay.confirm-url=http://localhost:5173/payment/linepay/confirm
 linepay.cancel-url=http://localhost:5173/order
 
+# 前台網址：訂位成功信會使用這個網址產生「訂位成功頁」連結
+app.frontend-base-url=http://localhost:5173
+
 # Server
 server.port=8080

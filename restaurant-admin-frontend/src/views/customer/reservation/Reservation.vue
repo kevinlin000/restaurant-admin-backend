@@ -596,7 +596,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .reservation-page {
   min-height: 100vh;
-  background-color:#e4e2dd;
+  background-color:#23221e;
   /* background: url('../../../assets/images/background.png'); */
 }
 
