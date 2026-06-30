@@ -6,7 +6,7 @@
 「敘日」—— 不只是旭日的延伸，更是重逢的起點。
 「敘」是敘舊，是放下手機後的深度對談；「日」是時光，是歲月淬鍊出的滋味。
 我們參考「敘日」對食材與職人精神的堅持，但在系統設計上，我們更想強調「餐桌上的連結」。
-專案目的是開發一套完整的餐廳管理系統，涵蓋會員、訂位、訂餐、菜單、門市五大核心模組。
+專案目的是開發一套完整的餐廳管理系統，涵蓋會員、訂位、訂餐、菜單、門市、首頁內容管理、最新消息與 FAQ 客服知識庫等核心模組。
 
 ## 技術棧
 
@@ -26,7 +26,36 @@
 | 訂位功能 | (填入姓名) | `feature/reservation` | 時段預約、人數控管、庫存邏輯 |
 | 訂餐功能 | (填入姓名) | `feature/order` | 線上點餐、訂單管理 |
 | 價目/菜單 | (填入姓名) | `feature/menu` | 分類展示、價格設定 |
-| 找門市 | (填入姓名) | `feature/store` | 據點資訊、分店配置、桌位管理 |
+| 門市管理 | (組長) | `feature/store` | 據點資訊、分店配置、桌位管理、店長門市權限 |
+| 品牌內容 | (組長) | `feature/homepage-management`, `feature/news`, `feature/faq-support` | 首頁管理、最新消息、FAQ 與客服查詢紀錄 |
+
+## 組長負責模組亮點
+
+### 首頁與品牌內容管理
+
+- 前台首頁呈現品牌主視覺、品牌故事、精選分店、最新消息與 FAQ 入口。
+- 後台「首頁管理」可維護 Hero 輪播、首頁文案、精選門市與精選消息。
+- 首頁內容由資料庫驅動，避免每次活動或門市主推調整都需要改前端程式碼。
+
+### 門市管理
+
+- 前台分店資訊支援多門市展示，包含城市區域、地址、交通、停車、營業狀態與特色標籤。
+- 後台分店管理支援門市資料維護、營業時間、公休日、桌位、圖片與特色標籤。
+- 權限區分 ADMIN 與 MANAGER：ADMIN 可管理全部門市，MANAGER 僅能管理自己所屬門市。
+- 提供門市營業狀態 API，供菜單與點餐模組判斷門市是否開放服務。
+
+### 最新消息
+
+- 前台最新消息支援品牌公告、活動消息與門市異動資訊。
+- 後台可新增、編輯、發布、下架與排序消息。
+- 支援全品牌公告與門市公告，讓總部與分店營運資訊可以集中維護。
+
+### FAQ 與客服查詢紀錄
+
+- 前台 FAQ 提供訂位、訂金、點餐、外帶、門市、會員與服務規則查詢。
+- 全站右下角提供 FAQ 客服浮窗，讓顧客可直接搜尋常見問題。
+- 後台 FAQ 管理可維護問題、答案、分類、關鍵字、狀態與排序。
+- 後台客服查詢紀錄會記錄熱門查詢與未命中問題，協助營運端補強 FAQ 內容。
 
 ## 專案結構
 
@@ -51,7 +80,7 @@ restaurant-project/
 │       ├── application-dev.properties   # 開發環境設定
 │       └── application-prod.properties  # 正式環境設定
 │
-├── frontend/                         # Vue 3 前端
+├── restaurant-admin-frontend/         # Vue 3 前端
 │   ├── src/
 │   │   ├── api/                      # Axios API 封裝
 │   │   ├── assets/                   # 靜態資源（圖片、CSS）
@@ -63,7 +92,10 @@ restaurant-project/
 │   │       ├── reservation/
 │   │       ├── order/
 │   │       ├── menu/
-│   │       └── store/
+│   │       ├── store/
+│   │       ├── news/
+│   │       ├── faq/
+│   │       └── admin/
 │   └── package.json
 │
 ├── sql/                              # SQL 腳本
@@ -117,7 +149,7 @@ cp src/main/resources/application-dev.properties.example src/main/resources/appl
 ### 4. 前端啟動
 
 ```bash
-cd frontend
+cd restaurant-admin-frontend
 npm install
 npm run dev
 ```
@@ -198,7 +230,10 @@ test(模組):    測試          例: test(store): 新增門市 Service 測試
 | 訂位 | `/api/reservations` |
 | 訂餐 | `/api/orders` |
 | 菜單 | `/api/menu-items`, `/api/menu-categories` |
-| 門市 | `/api/stores`, `/api/tables` |
+| 門市 | `/api/stores`, `/api/admin/stores` |
+| 首頁 | `/api/homepage`, `/api/admin/homepage` |
+| 最新消息 | `/api/news`, `/api/admin/news` |
+| FAQ | `/api/faqs`, `/api/admin/faqs` |
 
 ## 團隊公約
 
