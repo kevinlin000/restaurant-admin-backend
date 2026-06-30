@@ -71,6 +71,7 @@ public class MenuItemService {
     }
 
     //  🚀  絕招一：學會接收 MenuCreateDTO 包裹，並存入資料庫
+    @CacheEvict(value = "store_menus", allEntries = true)
     public MenuItem createMenuItem(MenuCreateDTO dto) {
         MenuItem menuItem = new MenuItem();
         menuItem.setCategoryId(dto.getCategoryId());
@@ -85,6 +86,7 @@ public class MenuItemService {
     }
 
     //  🚀  絕招二：學會接收 MenuEditDTO 包裹，並更新資料庫
+    @CacheEvict(value = "store_menus", allEntries = true)
     public MenuItem updateMenuItem(Long id, MenuEditDTO dto) {
         MenuItem existingItem = menuItemRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("找不到該品項，無法修改！"));
@@ -99,12 +101,23 @@ public class MenuItemService {
         return menuItemRepository.save(existingItem);
     }
 
-    // 軟刪除（下架）
+    // 總部/各店長軟刪除（下架）
     public MenuItem deleteMenuItem(Long id) {
         MenuItem existingItem = menuItemRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("找不到該品項，無法下架！"));
         existingItem.setIsActive(false); //  🎯  完美對齊最新的布林值下架！
         return menuItemRepository.save(existingItem);
+    }
+
+    // 總部永久刪除 (下架)
+    @Transactional
+    @CacheEvict(value = "store_menus", allEntries = true)
+    public void permanentlyDeleteMenuItem(Long id) {
+        // 先刪除所有分店與此餐點的關聯資料
+        storeMenuRepository.deleteByMenuItemId(id);
+        
+        // 再刪除總部主表的這筆餐點
+        menuItemRepository.deleteById(id);
     }
 
 
@@ -265,10 +278,6 @@ public class MenuItemService {
         .collect(Collectors.toMap(StoreMenu::getMenuItemId, sm -> sm));
 
         for (MenuItem item : allActiveItems) {
-            // 基礎安全防線：總部如果下架了，分店直接不顯示
-            if (item.getIsActive() == null || !item.getIsActive()) {
-                continue;
-            }
 
             // 3. 🔍 去分店對照表裡，尋找有沒有這道菜的專屬隔離售價或上架設定
             StoreMenu currentStoreSetting = storeMenuMap.get(item.getId());
@@ -289,15 +298,17 @@ public class MenuItemService {
             } else {
                 response.setPrice(calculateStorePrice(item.getPrice(), storeId));
             }
-            // ====================================================================
-
-            // ==================== 🛒 上架狀態動態咬合防線 ====================
-            if (currentStoreSetting != null && currentStoreSetting.getIsAvailable() != null && !currentStoreSetting.getIsAvailable()) {
-                continue; 
-            }
             
-            response.setIsSelectable(true);
-            // ====================================================================
+
+           // ==================== 🛒 上架狀態動態咬合防線 ====================
+            boolean isItemActive = item.getIsActive() != null && item.getIsActive();
+            boolean isStoreAvailable = currentStoreSetting == null 
+                || currentStoreSetting.getIsAvailable() == null 
+                || currentStoreSetting.getIsAvailable();
+
+            response.setIsSelectable(isItemActive && isStoreAvailable);
+            
+
 
             // ==================== 🌟【特色標籤落地優雅化解析】====================
             if (item.getFeatureTags() != null && !item.getFeatureTags().isBlank()) {

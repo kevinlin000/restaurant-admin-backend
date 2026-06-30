@@ -38,10 +38,16 @@ public class MenuItemController {
 
     // 🚀 讓前端一秒調用該店專屬的菜單 displayList！
     @GetMapping("/store/{storeId}")
-    public ApiResponse<List<StoreMenuDisplayResponse>> getStoreMenu(@PathVariable Long storeId) {
-        List<StoreMenuDisplayResponse> menuList = menuItemService.getStoreMenu(storeId);
+    public ApiResponse<List<StoreMenuDisplayResponse>> getStoreMenu(@PathVariable String storeId) {
+    if ("ALL".equalsIgnoreCase(storeId)) {
+        // 🌐 ADMIN 選「全台」時，後台列表用總部基準價顯示，預設用 store_id = 1 撈取顯示用列表
+        List<StoreMenuDisplayResponse> menuList = menuItemService.getStoreMenu(1L);
         return ApiResponse.success(menuList);
     }
+    Long parsedStoreId = Long.parseLong(storeId);
+    List<StoreMenuDisplayResponse> menuList = menuItemService.getStoreMenu(parsedStoreId);
+    return ApiResponse.success(menuList);
+}
 
 
     // ==================== 【店長多租戶隔離寫入管線】 ====================
@@ -50,14 +56,21 @@ public class MenuItemController {
      * 🎯 【新增菜單隔離版】
      * 接收前端送過來的新餐點，並自動與當前店長 storeId 綁定，寫入 store_menu 關聯表
      */
+    // ✅ 改成 String 接收，可判斷 "ALL"
     @PostMapping("/store/{storeId}")
     public ApiResponse<MenuItem> createStoreMenuItem(
-            @PathVariable Long storeId, 
-            @RequestBody MenuCreateDTO dto) {
-        
-        // 💡 核心邏輯：將 storeId 傳入 Service 層
-        // Service 內部會先檢查或建立 menu_item，然後強制插一筆資料到 store_menu 中，確實做到分店隔離！
-        MenuItem item = menuItemService.createStoreMenuItem(storeId, dto);
+        @PathVariable String storeId, 
+        @RequestBody MenuCreateDTO dto) {
+    
+    if ("ALL".equalsIgnoreCase(storeId)) {
+        // 🌐 ADMIN 全台統一定價：只建立總部 menu_item，不寫入 store_menu
+        MenuItem item = menuItemService.createMenuItem(dto);
+        return ApiResponse.success(item);
+    }
+
+    // 🏪 特定分店：原本的分店隔離邏輯
+    Long parsedStoreId = Long.parseLong(storeId);
+        MenuItem item = menuItemService.createStoreMenuItem(parsedStoreId, dto);
         return ApiResponse.success(item);
     }
 
@@ -65,16 +78,24 @@ public class MenuItemController {
      * 🎯 【修改菜單隔離版】
      * 當店長修改菜單時，絕對不碰觸總部總表，只更新該 storeId 在 store_menu 裡的 price 與 is_available
      */
+    // ✅ 改成 String 接收，可判斷 "ALL"
     @PutMapping("/{id}/store/{storeId}")
     public ApiResponse<MenuItem> updateStoreMenuItem(
-            @PathVariable Long id, 
-            @PathVariable Long storeId, 
-            @RequestBody MenuEditDTO dto) {
-        
-        // 💡 核心邏輯：Service 層會利用 (menuItemId, storeId) 去 lock 並更新 store_menu 資料表
-        MenuItem item = menuItemService.updateStoreMenuItem(id, storeId, dto);
+        @PathVariable Long id,
+        @PathVariable String storeId, 
+        @RequestBody MenuEditDTO dto) {
+    
+    if ("ALL".equalsIgnoreCase(storeId)) {
+        // 🌐 ADMIN 全台統一定價：只修改總部 menu_item 的 base_price
+        MenuItem item = menuItemService.updateMenuItem(id, dto);
         return ApiResponse.success(item);
     }
+
+    // 🏪 特定分店：原本的分店隔離邏輯
+    Long parsedStoreId = Long.parseLong(storeId);
+        MenuItem item = menuItemService.updateStoreMenuItem(id, parsedStoreId, dto);
+        return ApiResponse.success(item);
+}
 
 
     // ==================== 【下架管線】 ====================
@@ -85,5 +106,15 @@ public class MenuItemController {
     public ApiResponse<MenuItem> deleteMenuItem(@PathVariable Long id) {
         MenuItem item = menuItemService.deleteMenuItem(id);
         return ApiResponse.success(item);
+    }
+
+    /*
+     * 🎯 【ADMIN 專用：永久刪除】
+     * 真正從資料庫移除這筆餐點與所有分店的關聯，無法復原！
+     */
+    @DeleteMapping("/{id}/permanent")
+    public ApiResponse<String> permanentlyDeleteMenuItem(@PathVariable Long id) {
+        menuItemService.permanentlyDeleteMenuItem(id);
+        return ApiResponse.success("已永久刪除");
     }
 }
