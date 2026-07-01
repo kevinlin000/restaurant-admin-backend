@@ -17,6 +17,8 @@ public class StoreMenuDisplayResponse {
     
     // 💥 精髓：經過後端判斷後的「該店最終售價」
     private BigDecimal finalPrice;
+
+    private BigDecimal basePrice;
     
     private String imageUrl;    // 圖片 URL
     private String allergenInfo;// 過敏原
@@ -26,4 +28,5 @@ public class StoreMenuDisplayResponse {
     
     // 🎯 曾總監實時售罄控制信號：true 代表可以點餐，false 代表按鈕變灰
     private Boolean isSelectable = true;
+    
 }

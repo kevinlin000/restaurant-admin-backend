@@ -54,7 +54,7 @@ const handleStoreStatusChange = async () => {
           <div class="col-md-6 mb-3">
             <div class="d-flex align-items-start gap-2">
               <span class="badge" style="background-color: #b45309; color: #fff;">總部</span>
-              <p class="small mb-0" style="color: #5c4033;">可選擇「全台統一定價」調整總部基準價，各分店將依群組規則自動套用加減價；亦可針對單一分店設定客製化價格。</p>
+              <p class="small mb-0" style="color: #5c4033;">可選擇「全台統一定價」調整總部基準價，各分店將依區域規則自動套用加減價。</p>
             </div>
           </div>
           <div class="col-md-6 mb-3">
@@ -74,22 +74,23 @@ const handleStoreStatusChange = async () => {
         
         <!-- 🏪 店長專屬：單店營業開關 -->
         <div v-if="!isAdmin" class="mb-4 pb-3 border-bottom border-light-subtle">
-          <label class="form-label fw-bold text-dark fs-6">🏪 單店線上點餐營業開關 (快捷操作)</label>
-          <div class="form-check form-switch mt-1">
-            <input 
-              v-model="isStoreOpen" 
-              @change="handleStoreStatusChange"
-              :disabled="isLoading"
-              class="form-check-input" 
-              type="checkbox" 
-              id="switchOpen" 
-              style="cursor: pointer;"
-            >
-            <label class="form-check-label text-secondary fw-semibold small" for="switchOpen">
-              {{ isStoreOpen ? '🟢 目前開放本門市線上點餐、加入購物車' : '🔴 目前本店暫停接單，顧客僅提供菜單瀏覽' }}
-            </label>
-          </div>
+        <label class="form-label fw-bold text-dark fs-6">🏪 單店線上點餐營業開關 (快捷操作)</label>
+        <div class="form-check form-switch mt-1">
+          <input 
+            v-model="isStoreOpen" 
+            @change="handleStoreStatusChange"
+            :disabled="true"
+            class="form-check-input" 
+            type="checkbox" 
+            id="switchOpen" 
+            style="cursor: not-allowed;"
+          >
+          <label class="form-check-label text-secondary fw-semibold small" for="switchOpen">
+            {{ isStoreOpen ? '🟢 目前開放本門市線上點餐、加入購物車' : '🔴 目前本店暫停接單，顧客僅提供菜單瀏覽' }}
+            <span class="badge bg-light text-secondary border ms-1">開發中</span>
+          </label>
         </div>
+      </div>
         <!-- 🏪 店長看到的版本：可操作（標示開發中）的開關 -->
         <div v-if="!isAdmin" class="mb-4 pb-3 border-bottom border-light-subtle">
           <label class="form-label fw-bold text-dark fs-6">📦 庫存售罄自動化控制</label>
