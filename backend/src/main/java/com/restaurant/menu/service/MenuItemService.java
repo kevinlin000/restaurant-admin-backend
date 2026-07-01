@@ -294,9 +294,9 @@ public class MenuItemService {
             // ==================== 💰 智慧核心：價格動態咬合防線 ====================
             // 優先用分店客製價，沒有才套用群組計算
             if (currentStoreSetting != null && currentStoreSetting.getPrice() != null) {
-                response.setPrice(currentStoreSetting.getPrice());
+                response.setFinalPrice(currentStoreSetting.getPrice());
             } else {
-                response.setPrice(calculateStorePrice(item.getPrice(), storeId));
+                response.setFinalPrice(calculateStorePrice(item.getPrice(), storeId));
             }
             
 
