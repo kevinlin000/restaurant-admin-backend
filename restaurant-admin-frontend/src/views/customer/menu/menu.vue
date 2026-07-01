@@ -539,7 +539,7 @@ onUnmounted(() => {
 
 /* ================= Hero Section (職人風格優化) ================= */
 .custom-vue-hero-container {
-  position: fixed; top: 90px; left: 0; width: 100%; height: 460px; z-index: 1; 
+  position: fixed; top: 0; left: 0; width: 100%; height: 460px; z-index: 1; 
 }
 
 /* 🌟 漸層遮罩優化：解決圖片過亮、大幅增加文字的可讀性與高級感 */
