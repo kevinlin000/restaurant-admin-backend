@@ -71,6 +71,16 @@ const routers = [
         component: CustomerOrder,
       },
       {
+        path: "payment-success",
+        name: "PaymentSuccess",
+        component: () => import("@/views/customer/order/PaymentSuccessView.vue"),
+      },
+      {
+        path: "guest-order-detail",
+        name: "GuestOrderDetail",
+        component: () => import("@/views/customer/order/GuestOrderDetail.vue"),
+      },
+      {
         path: "store",
         name: "CustomerStore",
         component: CustomerStore,
@@ -258,7 +268,10 @@ router.beforeEach((to, from, next) => {
   const allowedRoles = getRouteRoles(to);
 
   if (!token && (requiresAuth || isAdminPage || isProfilePage)) {
-    next("/login");
+    next({
+      path: "/login",
+      query: { redirect: to.fullPath },
+    });
     return;
   }
 

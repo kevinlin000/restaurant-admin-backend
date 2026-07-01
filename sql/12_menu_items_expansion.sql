@@ -4,7 +4,6 @@
 -- 建立日期：2026-06-25
 -- =========================================================================
 
-
 INSERT INTO menu_item (category_id, item_name, description, base_price, image_url, allergen_info, is_active, created_at, updated_at, feature_tags) VALUES
 -- ==========================================
 -- 1. 前菜 (category_id = 1)

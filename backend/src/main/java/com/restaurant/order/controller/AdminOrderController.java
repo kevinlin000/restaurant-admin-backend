@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-
 import com.restaurant.order.dto.OrderResponse;
 import com.restaurant.order.service.OrderService;
 
@@ -40,9 +39,17 @@ public class AdminOrderController {
     @PatchMapping("/{orderId}/status")
     public OrderResponse updateOrderStatus(
             @PathVariable Long orderId,
-            @RequestBody Map<String, String> request
-    ) {
+            @RequestBody Map<String, String> request) {
         String status = request.get("status");
         return orderService.updateOrderStatusForAdmin(orderId, status);
+    }
+
+    // 後台：完成現場付款
+    @PatchMapping("/{orderId}/payment/paid")
+    public OrderResponse markPaymentPaid(
+            @PathVariable Long orderId,
+            @RequestBody Map<String, String> request) {
+        String paymentMethod = request.get("paymentMethod");
+        return orderService.markPaymentPaidForAdmin(orderId, paymentMethod);
     }
 }

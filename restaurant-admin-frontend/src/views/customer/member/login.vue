@@ -13,11 +13,7 @@
         <div class="form-group">
           <label>密碼</label>
           <div class="password-wrapper">
-            <input
-              v-model="form.password"
-              :type="showPassword ? 'text' : 'password'"
-              placeholder="請輸入密碼"
-            />
+            <input v-model="form.password" :type="showPassword ? 'text' : 'password'" placeholder="請輸入密碼" />
             <span class="eye-icon" @click="showPassword = !showPassword">
               <i :class="showPassword ? 'bi bi-eye' : 'bi bi-eye-slash'"></i>
             </span>
@@ -51,31 +47,15 @@
         <div class="form-group">
           <label>電子信箱 (Email)</label>
           <div class="email-row">
-            <input
-              v-model="forgotForm.email"
-              type="email"
-              placeholder="請輸入電子信箱"
-            />
-            <button
-              type="button"
-              class="verify-btn"
-              @click="sendResetCode"
-              :disabled="
-                isSendingCode || resetCodeCountdown > 0 || !forgotEmailValid
-              "
-            >
+            <input v-model="forgotForm.email" type="email" placeholder="請輸入電子信箱" />
+            <button type="button" class="verify-btn" @click="sendResetCode" :disabled="isSendingCode || resetCodeCountdown > 0 || !forgotEmailValid
+              ">
               <span v-if="isSendingCode">發送中...</span>
-              <span v-else-if="resetCodeCountdown > 0"
-                >重新發送 {{ resetCodeCountdown }}s</span
-              >
+              <span v-else-if="resetCodeCountdown > 0">重新發送 {{ resetCodeCountdown }}s</span>
               <span v-else>發送驗證碼</span>
             </button>
           </div>
-          <p
-            v-if="forgotEmailStatus"
-            class="status-text"
-            :class="forgotEmailStatusClass"
-          >
+          <p v-if="forgotEmailStatus" class="status-text" :class="forgotEmailStatusClass">
             {{ forgotEmailStatus }}
           </p>
         </div>
@@ -83,28 +63,16 @@
         <div class="form-group">
           <label>驗證碼</label>
           <div class="code-row">
-            <input
-              v-model="forgotForm.verifyCode"
-              type="text"
-              maxlength="6"
-              placeholder="請輸入 6 位數驗證碼"
-            />
-            <button
-              type="button"
-              class="verify-btn code-verify-btn"
-              @click="verifyResetCode"
-              :disabled="!canVerifyResetCode"
-            >
+            <input v-model="forgotForm.verifyCode" type="text" maxlength="6" placeholder="請輸入 6 位數驗證碼" />
+            <button type="button" class="verify-btn code-verify-btn" @click="verifyResetCode"
+              :disabled="!canVerifyResetCode">
               <span v-if="isVerifyingResetCode">驗證中...</span>
               <span v-else-if="resetCodeVerified">已驗證</span>
               <span v-else>驗證</span>
             </button>
           </div>
-          <p
-            v-if="forgotForm.verifyCode || resetCodeVerified"
-            class="status-text"
-            :class="resetCodeVerified ? 'status-success' : 'status-muted'"
-          >
+          <p v-if="forgotForm.verifyCode || resetCodeVerified" class="status-text"
+            :class="resetCodeVerified ? 'status-success' : 'status-muted'">
             {{
               resetCodeVerified
                 ? "驗證碼已通過，請設定新密碼"
@@ -116,12 +84,8 @@
         <div class="form-group">
           <label>新密碼</label>
           <div class="password-wrapper">
-            <input
-              v-model="forgotForm.newPassword"
-              :type="showNewPassword ? 'text' : 'password'"
-              placeholder="至少 8 碼，最多 20 碼"
-              :disabled="!resetCodeVerified"
-            />
+            <input v-model="forgotForm.newPassword" :type="showNewPassword ? 'text' : 'password'"
+              placeholder="至少 8 碼，最多 20 碼" :disabled="!resetCodeVerified" />
             <span class="eye-icon" @click="showNewPassword = !showNewPassword">
               <i :class="showNewPassword ? 'bi bi-eye' : 'bi bi-eye-slash'"></i>
             </span>
@@ -139,26 +103,14 @@
         <div class="form-group">
           <label>確認新密碼</label>
           <div class="password-wrapper">
-            <input
-              v-model="forgotForm.confirmPassword"
-              :type="showConfirmPassword ? 'text' : 'password'"
-              placeholder="再次輸入新密碼"
-              :disabled="!resetCodeVerified"
-            />
-            <span
-              class="eye-icon"
-              @click="showConfirmPassword = !showConfirmPassword"
-            >
-              <i
-                :class="showConfirmPassword ? 'bi bi-eye' : 'bi bi-eye-slash'"
-              ></i>
+            <input v-model="forgotForm.confirmPassword" :type="showConfirmPassword ? 'text' : 'password'"
+              placeholder="再次輸入新密碼" :disabled="!resetCodeVerified" />
+            <span class="eye-icon" @click="showConfirmPassword = !showConfirmPassword">
+              <i :class="showConfirmPassword ? 'bi bi-eye' : 'bi bi-eye-slash'"></i>
             </span>
           </div>
-          <p
-            v-if="forgotForm.confirmPassword"
-            class="status-text"
-            :class="passwordConfirmed ? 'status-success' : 'status-error'"
-          >
+          <p v-if="forgotForm.confirmPassword" class="status-text"
+            :class="passwordConfirmed ? 'status-success' : 'status-error'">
             {{
               passwordConfirmed ? "兩次輸入的密碼一致" : "兩次輸入的密碼不一致"
             }}
@@ -167,12 +119,7 @@
 
         <p v-if="forgotErrorMsg" class="error-msg">{{ forgotErrorMsg }}</p>
 
-        <button
-          class="submit-btn"
-          type="button"
-          @click="handleResetPassword"
-          :disabled="!canSubmitResetPassword"
-        >
+        <button class="submit-btn" type="button" @click="handleResetPassword" :disabled="!canSubmitResetPassword">
           {{ isResettingPassword ? "重設中..." : "重設密碼" }}
         </button>
       </template>
@@ -182,7 +129,7 @@
 
 <script setup>
 import { computed, onUnmounted, reactive, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import {
   forgotPassword,
   login,
@@ -192,6 +139,7 @@ import {
 import Swal from "sweetalert2";
 
 const router = useRouter();
+const route = useRoute();
 
 const currentView = ref("login");
 const showPassword = ref(false);
@@ -504,6 +452,22 @@ const getDefaultPathByRole = (roleName) => {
   return "/home";
 };
 
+const getRedirectPath = (roleName) => {
+  const redirect = route.query.redirect;
+
+  if (
+    typeof redirect === "string" &&
+    redirect.startsWith("/") &&
+    !redirect.startsWith("//") &&
+    redirect !== "/login" &&
+    redirect !== "/register"
+  ) {
+    return redirect;
+  }
+
+  return getDefaultPathByRole(roleName);
+};
+
 const handleLogin = async () => {
   errorMsg.value = "";
   isLoading.value = true;
@@ -529,9 +493,11 @@ const handleLogin = async () => {
       title: "登入成功",
       text: `歡迎回來，${data.name}`,
       confirmButtonColor: "#d9a372",
+      showConfirmButton: false,
+      timer: 900,
     });
 
-    router.push(getDefaultPathByRole(data.roleName));
+    router.push(getRedirectPath(data.roleName));
   } catch (err) {
     errorMsg.value = err.response?.data?.message || "登入失敗，請稍後再試";
   } finally {
@@ -541,6 +507,40 @@ const handleLogin = async () => {
 </script>
 
 <style scoped>
+.login-container {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 180px 16px 70px;
+  background:
+    linear-gradient(115deg, rgba(11, 8, 6, 0.78) 0%, rgba(32, 22, 15, 0.5) 48%, rgba(8, 6, 5, 0.82) 100%),
+    url("@/assets/images/caramel-pudding.jpg") center / cover no-repeat;
+}
+
+.login-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 24% 20%, rgba(227, 172, 127, 0.24), transparent 30%),
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: auto, 110px 110px, 110px 110px;
+}
+
+.login-container::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.58));
+}
+
 .title {
   text-align: center;
   color: #55606e;
@@ -548,23 +548,28 @@ const handleLogin = async () => {
   font-weight: 700;
 }
 
-.login-container {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 180px 16px 60px;
-  min-height: 100vh;
-}
-
 .login-box {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 500px;
   padding: 50px;
-  border: none;
-  border-radius: 16px;
-  position: relative;
-  background: white;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.46);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.login-box::before {
+  content: "敘日會員登入";
+  display: block;
+  margin-bottom: 8px;
+  color: #d99b68;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-align: center;
 }
 
 .form-group {
@@ -580,12 +585,13 @@ label {
 
 input {
   width: 100%;
-  padding: 10px;
+  padding: 11px 12px;
   margin-top: 5px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
+  border: 1px solid #dfcdbd;
+  border-radius: 10px;
   box-sizing: border-box;
   color: #333;
+  background: rgba(255, 255, 255, 0.92);
 }
 
 input:focus {
@@ -734,8 +740,9 @@ input:disabled {
   color: white;
   border: none;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: 12px;
   margin-top: 10px;
+  box-shadow: 0 12px 26px rgba(227, 172, 127, 0.28);
   font-weight: 700;
 }
 
@@ -762,7 +769,8 @@ input:disabled {
 
 @media (max-width: 576px) {
   .login-container {
-    padding: 140px 16px 40px;
+    padding: 130px 16px 40px;
+    background-position: 58% center;
   }
 
   .login-box {

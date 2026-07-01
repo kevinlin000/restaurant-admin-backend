@@ -27,3 +27,7 @@ export const updateAdminOrderStatus = (orderId, status) => {
     getAuthConfig()
   )
 }
+export const markAdminOrderPaymentPaid = (orderId, paymentMethod) =>
+  api.patch(`/api/admin/orders/${orderId}/payment/paid`, {
+    paymentMethod,
+  });

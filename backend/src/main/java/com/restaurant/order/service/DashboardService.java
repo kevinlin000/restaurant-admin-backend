@@ -36,12 +36,12 @@ public class DashboardService {
         LocalDateTime monthStart = today.withDayOfMonth(1).atStartOfDay();
         LocalDateTime nextMonthStart = today.plusMonths(1).withDayOfMonth(1).atStartOfDay();
 
-        return new DashboardSummaryResponse(
-                orderRepository.sumRevenueBetween(todayStart, tomorrowStart),
-                orderRepository.sumRevenueBetween(monthStart, nextMonthStart),
-                orderRepository.countOrdersBetween(todayStart, tomorrowStart),
-                orderRepository.averageOrderAmountBetween(monthStart, nextMonthStart)
-        );
+       return new DashboardSummaryResponse(
+        orderRepository.sumRevenueBetween(todayStart, tomorrowStart),
+        orderRepository.sumRevenueBetween(monthStart, nextMonthStart),
+        orderRepository.countCompletedOrdersBetween(todayStart, tomorrowStart),
+        orderRepository.averageOrderAmountBetween(monthStart, nextMonthStart)
+);
     }
 
     public List<DailyRevenueResponse> getDailyRevenue() {
