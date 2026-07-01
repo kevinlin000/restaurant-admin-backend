@@ -71,6 +71,7 @@ const selectItem = (item) => {
   formData.value = { 
     ...item,
     price: item.price ,
+    isActive: item.isSelectable,
     // ⚡ 核心回填：從下方列表選取時，若有標籤陣列，將第一個值抽出來做為單選值回填
     featureTags: (item.featureTags && item.featureTags.length > 0) ? item.featureTags[0] : ''
   }
@@ -174,6 +175,31 @@ const handleToggleStatus = async () => {
     alert('❌ 操作失敗，請檢查後端控制台！')
   }
 }
+
+// 🚀7.Admin永久刪除品項
+const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+const isAdmin = userInfo.roleName === 'ADMIN'
+
+const handlePermanentDelete = async () => {
+  if (!formData.value.id) {
+    alert('請先在下方列表選擇一個餐點才能操作！')
+    return
+  }
+
+  const confirmDelete = confirm(`⚠️ 確定要永久刪除【${formData.value.itemName}】嗎？此操作無法復原！`)
+  if (!confirmDelete) return
+
+  try {
+    await axios.delete(`/api/menu-items/${formData.value.id}/permanent`)
+    alert('✅ 已永久刪除！')
+    formData.value = { id: null, categoryId: 1, itemName: '', price: '', description: '', imageUrl: '', isActive: true, allergenInfo: '', featureTags: '' }
+    menuItemId.value = null
+    fetchAllMenuItems()
+  } catch (error) {
+    console.error('永久刪除失敗：', error)
+    alert('❌ 刪除失敗，請檢查後端控制台！')
+  }
+}
 </script>
 
 <template>
@@ -205,8 +231,8 @@ const handleToggleStatus = async () => {
             <select v-model="formData.categoryId" class="form-select form-control-solid bg-white" style="color: #374151; border-color: #fed7aa; font-weight: 500;">
               <option 
                 v-for="cat in categoryList" 
-                :key="cat.categoryId" 
-                :value="cat.categoryId"
+                :key="cat.id" 
+                :value="cat.id"
                 style="color: #374151;">
                 {{ cat.categoryName }}
               </option>
@@ -266,6 +292,10 @@ const handleToggleStatus = async () => {
         <div class="text-end mt-4">
           <button @click="handleToggleStatus" class="btn btn-light-danger px-3 py-2 me-2 fw-bold small" style="border-radius: 8px; border: 1px solid #fecaca; color: #dc2626;">
             快速上/下架切換
+          </button>
+          <!-- 🎯 ADMIN 專用：永久刪除按鈕 -->
+          <button v-if="isAdmin" @click="handlePermanentDelete" class="btn px-3 py-2 me-2 fw-bold small text-white" style="border-radius: 8px; background-color: #7f1d1d; border: none;">
+            🗑️ 永久刪除
           </button>
           <button @click="handleUpdateMenu" class="btn px-4 py-2 text-white fw-bold shadow-sm" style="background-color: #ea580c; background-image: linear-gradient(135deg, #f97316 0%, #ea580c 100%); border: none; border-radius: 8px;">
             <i class="fa-solid fa-square-check me-2"></i>確認並儲存修改
@@ -328,7 +358,7 @@ const handleToggleStatus = async () => {
                   <span v-else class="text-muted small">無</span>
                 </td>
                 <td>
-                  <span v-if="item.isActive === true || item.isActive === 'true' || item.isActive == 1" class="badge border border-success-subtle" style="color: #16a34a; font-weight: bold; background-color: #f0fdf4 !important;">供應中</span>
+                  <span v-if="item.isSelectable === true" class="badge border border-success-subtle" style="color: #16a34a; font-weight: bold; background-color: #f0fdf4 !important;">供應中</span>
                   <span v-else class="badge border border-danger-subtle" style="color: #dc2626; font-weight: bold; background-color: #fef2f2 !important;">已下架</span>
                 </td>
                 <td class="px-4">
