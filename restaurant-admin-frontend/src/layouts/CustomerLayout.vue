@@ -242,7 +242,8 @@ const logout = async () => {
 .logo-text {
   font-size: 30px;
   font-weight: 700;
-  color: #566a7f;
+  /* color: #566a7f; */
+  color: #ffffff;
 }
 
 /* layout */
@@ -256,7 +257,7 @@ const logout = async () => {
 /* navbar */
 
 .landing-navbar {
-  position: fixed;
+  position: absolute;
   top: 20px;
   left: 0;
   width: 100%;
@@ -264,7 +265,7 @@ const logout = async () => {
 }
 
 .landing-navbar .navbar {
-  background: rgba(255, 255, 255, 0.99);
+  background: rgb(35, 32, 32);
   border-radius: 10px;
   padding: 10px 20px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
@@ -274,7 +275,8 @@ const logout = async () => {
 
 .navbar-nav .nav-link {
   font-weight: 500;
-  color: #566a7f;
+  /* color: #566a7f; */
+  color: #ffffff;
   margin: 0 10px;
   transition: all 0.25s ease;
   font-size: 20px;
