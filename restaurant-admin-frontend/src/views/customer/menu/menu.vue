@@ -116,15 +116,21 @@ const handleWindowScroll = () => {
 
 // 🌟 6. 絲滑平滑滾動至指定分類區 (修正版)
 const scrollToCategory = (categoryId) => {
-  if (selectedFeatureTag.value) { selectedFeatureTag.value = null; }
+  const hadFeatureTag = !!selectedFeatureTag.value  // ✅ 先記錄有沒有 banner
+  
+  if (selectedFeatureTag.value) { 
+    selectedFeatureTag.value = null
+  }
   
   setTimeout(() => {
     const el = document.getElementById(`category-section-${categoryId}`)
-    
     if (el) {
       const rect = el.getBoundingClientRect()
       const scrollTop = window.scrollY || document.documentElement.scrollTop
-      const targetOffset = scrollTop + rect.top - 160
+      
+      // ✅ 根據之前有沒有 banner 決定偏移量
+      const offset = hadFeatureTag ? 500 : 132
+      const targetOffset = scrollTop + rect.top - offset
       
       window.scrollTo({ 
         top: targetOffset, 
@@ -133,7 +139,7 @@ const scrollToCategory = (categoryId) => {
       
       activeCategoryId.value = categoryId
     }
-  }, 60)
+  }, 100)
 }
 
 // 🌟 7. 點擊特色膠囊滑動到動態大標題
@@ -151,7 +157,7 @@ const handleFeatureTagClick = (tag) => {
     if (el) {
       const targetOffset = el.getBoundingClientRect().top + window.scrollY;
       window.scrollTo({ 
-        top: targetOffset - 80, 
+        top: targetOffset - 112, 
         behavior: 'smooth' 
       });
     }
@@ -432,10 +438,10 @@ const goToOrder = (item) => {
           <div class="carousel-fade-wrapper">
             <div class="hero-overlay"></div>
             <img :src="slide.url" class="d-block w-100 h-100 object-fit-cover" alt="形象圖">
-            <div class="carousel-caption hero-text-box animate__animated animate__fadeInUp">
-              <h2 class="fw-bold text-white">{{ slide.title }}</h2>
+            <div class="carousel-caption hero-text-box animate__animated animate__fadeInUp" style="bottom: 25%;">
+             <h2 class="fw-bold text-white" style="font-size: 2.8rem; letter-spacing: 0.05em;">{{ slide.title }}</h2>
               <div class="hero-divider"></div>
-              <p class="text-white fw-light">{{ slide.desc }}</p>
+              <p class="text-white fw-light" style="letter-spacing: 0.08em; font-size: 1.05rem;">{{ slide.desc }}</p>
             </div>
           </div>
         </div>
@@ -750,20 +756,30 @@ const goToOrder = (item) => {
 
 /* ================= 其餘元件設定 (全部保留) ================= */
 .custom-hero-indicators {
-  position: absolute !important; z-index: 50 !important; bottom: 85px !important; 
+  position: absolute !important; z-index: 50 !important; bottom: 12px !important; 
   left: 0 !important; right: 0 !important; display: flex !important; justify-content: center !important;
   margin: 0 !important; list-style: none !important; pointer-events: auto !important; 
 }
 .custom-hero-indicators button {
   pointer-events: auto !important; width: 24px !important; height: 3px !important; 
-  border-radius: 20px !important; margin: 0 4px !important; 
+  border-radius: 4px !important; margin: 0 4px !important; 
   background-color: rgba(255, 255, 255, 0.25) !important; border: none !important;
-  border-top: 15px solid transparent !important; border-bottom: 15px solid transparent !important; 
+  border-top: 0 !important; border-bottom: 0 !important; 
   transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important; cursor: pointer !important;
 }
 .custom-hero-indicators button.active { background-color: rgba(92, 64, 51, 0.7) !important; width: 36px !important; }
 
-.main-content-wrapper { position: relative; z-index: 10; background-color: #fafafa !important; margin-top: 460px; padding-top: 25px; padding-bottom: 100px; }
+.main-content-wrapper { 
+  position: relative; 
+  z-index: 10; 
+  background-color: #f8f2ea !important;
+  background-image: url('@/assets/images/background.png');
+  background-repeat: repeat;
+  background-size: auto;
+  margin-top: 460px; 
+  padding-top: 25px; 
+  padding-bottom: 100px; 
+}
 .menu-sections-container { background-color: #fafafa; border-radius: 12px; padding: 20px; }
 .sidebar-item { 
   transition: all 0.2s ease; 
