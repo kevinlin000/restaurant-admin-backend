@@ -432,7 +432,6 @@ const loadPageData = async ({ silent = false } = {}) => {
         try {
           await reservationSettingApi.rebuildCapacity(slot.slotId)
         } catch (error) {
-          // Keep the list usable even if one slot cannot be recalculated.
         }
       }
       try {
@@ -756,11 +755,11 @@ watch(() => form.storeId, () => {
   loadModalStoreHolidays()
 })
 // 掛載時：註冊點擊事件載入資料
-// 離開頁面時：移除事件
 onMounted(() => {
   document.addEventListener('click', handleOutsideClick)
   loadStores()
 })
+// 離開頁面時：移除事件
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleOutsideClick)
 })

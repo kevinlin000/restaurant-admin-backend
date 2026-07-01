@@ -36,7 +36,7 @@ public class ReservationAdminController {
     private final ReservationAdminAccessService reservationAdminAccessService;
     private final StoreService storeService;
 
-    // 訂位後台分店：STAFF/MANAGER：只有自己分店，ADMIN：全部
+    // 訂位後台分店 - STAFF/MANAGER：只有自己分店 / ADMIN：全部
     @GetMapping("/stores")
     public ApiResponse<List<StoreListResponse>> getManageableStores(Authentication authentication) {
         return ApiResponse.success(reservationAdminAccessService.filterManageableStores(
