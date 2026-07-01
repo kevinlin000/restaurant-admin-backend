@@ -6,6 +6,22 @@ import axios from '@/api/axios';
 // 🚀 2. 啟動導航推手
 const router = useRouter()
 
+// 🎯 讀取登入角色，判斷是否為 ADMIN
+const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+const isAdmin = userInfo.roleName === 'ADMIN'
+
+// 🎯 ADMIN 專用：分店清單
+const storeList = ref([])
+
+const fetchStores = async () => {
+  try {
+    const response = await axios.get('/api/menu-component/stores')
+    storeList.value = response.data.data || response.data
+  } catch (error) {
+    console.error('分店列表載入失敗', error)
+  }
+}
+
 // 🏪 多租戶防禦點火線：獲取當前店長專屬的 storeId (可根據你們組內的 localStorage 鍵名調整，如 'storeId' 或 'user')
 const currentStoreId = ref(localStorage.getItem('storeId') || 1) 
 
@@ -65,6 +81,9 @@ const fetchMenuItems = async () => {
 onMounted(() => {
   fetchMenuItems()
   fetchCategories()
+  if (isAdmin) {
+    fetchStores()  // 只有 ADMIN 需要載入分店清單
+  }
 })
 
 // 🚀 9. 點擊「編輯此項」跨頁面轉跳方法（對齊 /admin/menu-edit/:id 路由）
@@ -96,7 +115,7 @@ const handleAddItemMenu = async () => {
       description: newItem.value.description || "日式職人手作美味。",
       imageUrl: newItem.value.imageUrl || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c",
       allergenInfo: newItem.value.allergenInfo || "無特殊過敏原提示。",
-      isActive: true,
+      isActive: newItem.value.isActive,  // ✅ 讀取表單實際選擇的值
       
       // ⚡ 完美對齊！將清洗好、符合 Java 陣列或 String[] 規格的標籤送往後端
       featureTags: processedTags 
@@ -140,6 +159,17 @@ const handleAddItemMenu = async () => {
           <i class="fa-solid fa-wand-magic-sparkles me-2" style="color: #8162c9;"></i>填寫日式定食餐點資訊
         </h5>
 
+        <!-- 🎯 ADMIN 專用：選擇定價範圍 -->
+        <div v-if="isAdmin" class="col-md-12 mb-2">
+          <label class="form-label fw-bold small" style="color: #4b5563;">🏪 定價範圍</label>
+          <select v-model="currentStoreId" class="form-select form-control-solid" style="color: #374151; border-color: #cbd5e1; font-weight: 500;">
+            <option value="ALL">🌐 全台統一定價（修改基準價）</option>
+            <option v-for="store in storeList" :key="store.id" :value="store.id">
+              🏪 {{ store.name }}
+            </option>
+          </select>
+        </div>
+
         <div class="row g-3">
           <div class="col-md-4">
             <label class="form-label fw-bold small" style="color: #4b5563;">餐點名稱</label>
@@ -156,8 +186,8 @@ const handleAddItemMenu = async () => {
             <select v-model="newItem.categoryId" class="form-select form-control-solid" style="color: #374151; border-color: #cbd5e1; font-weight: 500;">
               <option 
                 v-for="cat in categoryList" 
-                :key="cat.categoryId" 
-                :value="cat.categoryId"
+                :key="cat.id" 
+                :value="cat.id"
                 style="color: #374151;">
                 {{ cat.categoryName }}
               </option>
@@ -261,14 +291,14 @@ const handleAddItemMenu = async () => {
                   <span v-else-if="(item.categoryId || item.category_id) === 8" class="badge px-3 py-1.5 rounded-pill border" style="background-color: #f8fafc !important; color: #475569 !important; border-color: #e2e8f0 !important; font-weight: 600;">酒水</span>
                 </td>
                 <td class="fw-bold" style="color: #4b5563;">{{ item.itemName }}</td>
-                <td class="fw-bold" style="color: #16a34a;">${{ item.price || item.basePrice }}</td>
+                <td class="fw-bold" style="color: #16a34a;">${{ item.finalPrice || item.basePrice }}</td>
                 <td class="text-muted small" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ item.description || '暫無描述' }}</td>
                 <td>
                   <span v-if="item.allergenInfo" class="badge text-amber-800 bg-warning bg-opacity-10 border border-warning-subtle rounded-2" style="font-size: 0.75rem; color: #9a3412; background-color: #ffedd5 !important;">{{ item.allergenInfo }}</span>
                   <span v-else class="text-muted small">無</span>
                 </td>
                 <td>
-                  <span v-if="item.isActive === true || item.isActive === 'true' || item.isActive == 1" class="badge border border-success-subtle" style="color: #16a34a; font-weight: bold; background-color: #f0fdf4 !important;">供應中</span>
+                  <span v-if="item.isSelectable === true" class="badge border border-success-subtle" style="color: #16a34a; font-weight: bold; background-color: #f0fdf4 !important;">供應中</span>
                   <span v-else class="badge border border-danger-subtle" style="color: #dc2626; font-weight: bold; background-color: #fef2f2 !important;">已下架</span>
                 </td>
                 <td class="px-4">

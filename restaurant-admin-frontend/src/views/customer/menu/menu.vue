@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed as vueComputed } from 'vue'
 import axios from 'axios'
+import { useRouter } from 'vue-router'
 
 // 🤝 1. 引進餐點列表本機圖片
 import tofuImg from "@/assets/images/tofu.jpg";
@@ -150,7 +151,7 @@ const handleFeatureTagClick = (tag) => {
     if (el) {
       const targetOffset = el.getBoundingClientRect().top + window.scrollY;
       window.scrollTo({ 
-        top: targetOffset - 160, 
+        top: targetOffset - 80, 
         behavior: 'smooth' 
       });
     }
@@ -290,7 +291,12 @@ const totalFilteredItemsCount = vueComputed(() => {
 
 const addToCart = (item) => { alert(`🎉 成功將【${item.itemName}】加入購物車！`) }
 
-watch(currentStoreId, (newStoreId) => { if (newStoreId) fetchMenuData(newStoreId) })
+watch(currentStoreId, (newStoreId) => { 
+  if (newStoreId) {
+    selectedFeatureTag.value = null  // ✅ 切換分店時重設特色篩選
+    fetchMenuData(newStoreId)
+  }
+})
 
 onMounted(async () => {
   await fetchHeroBanners(); 
@@ -305,6 +311,15 @@ onUnmounted(() => {
   window.removeEventListener('scroll', handleWindowScroll);
   stopHeroAutoPlay() 
 })
+
+//浮卡導入order頁面
+const router = useRouter()
+
+const goToOrder = (item) => {
+  router.push('/order')
+  closeItemModal()
+}
+
 </script>
 
 <template>
@@ -378,23 +393,31 @@ onUnmounted(() => {
         <button class="item-modal-close" @click="closeItemModal">✖</button>
         <div class="item-modal-img-wrapper">
           <img :src="getMenuItemImage(selectedItem)" alt="餐點圖片">
-        </div>
-        <div class="item-modal-body">
-          <div class="d-flex justify-content-between align-items-start mb-3">
-            <h3 class="fw-bold text-dark mb-0">{{ selectedItem.itemName }}</h3>
-            <span class="price-text fs-4">${{ selectedItem.price }}</span>
-          </div>
-          <p class="text-muted mb-3" style="line-height: 1.8;">{{ selectedItem.description }}</p>
-          <div class="d-flex flex-wrap gap-2 mb-3">
+          <div class="item-modal-img-overlay"></div>
+          <div class="item-modal-tags-floating">
             <template v-for="tag in parseFeatureTags(selectedItem.featureTags)">
-              <span v-if="cleanTagText(tag) && ['主廚推薦', '手作工法', '人氣爆棚', '鮮味極致', '經典必點', '職人精神', '嚴選食材', '季節限定', '極致奢華', '限量供應'].includes(cleanTagText(tag))" :key="tag" class="badge-feature">{{ cleanTagText(tag) }}</span>
+              <span v-if="cleanTagText(tag) && ['主廚推薦', '手作工法', '人氣爆棚', '鮮味極致', '經典必點', '職人精神', '嚴選食材', '季節限定', '極致奢華', '限量供應'].includes(cleanTagText(tag))" :key="tag" class="item-modal-tag-pill">
+                {{ cleanTagText(tag) }}
+              </span>
             </template>
           </div>
-          <div v-if="selectedItem.allergenInfo" class="mb-4" style="font-size: 13px; color: #78350f;">
-            🔸 本產品含{{ selectedItem.allergenInfo }}
+        </div>
+        <div class="item-modal-body">
+          <div class="item-modal-title-row">
+            <h3 class="item-modal-title">{{ selectedItem.itemName }}</h3>
+            <span class="item-modal-price">${{ selectedItem.price }}</span>
           </div>
-          <button @click="addToCart(selectedItem); closeItemModal()" class="btn yayoi-btn-primary w-100 fw-bold py-2" :disabled="selectedItem.isSelectable === false">
-            {{ selectedItem.isSelectable === false ? '暫不供應' : '加入購物車' }}
+
+          <div class="item-modal-divider"></div>
+
+          <p class="item-modal-desc">{{ selectedItem.description }}</p>
+
+          <div v-if="selectedItem.allergenInfo" class="item-modal-allergen">
+            <span>🔸 本產品含{{ selectedItem.allergenInfo }}</span>
+          </div>
+
+          <button @click="goToOrder(selectedItem)" class="btn yayoi-btn-primary w-100 fw-bold py-2" :disabled="selectedItem.isSelectable === false">
+            {{ selectedItem.isSelectable === false ? '已售完' : '立即點餐' }}
           </button>
         </div>
       </div>
@@ -430,9 +453,12 @@ onUnmounted(() => {
               <div class="card shadow-sm mb-4 border-0 rounded-3" style="border-radius: 12px !important; overflow: hidden;">
                 <div class="card-body p-3 bg-white">
                   <label class="form-label fw-bold text-secondary small">📍 當前查看門市：</label>
-                  <select v-model="currentStoreId" class="form-select border-2 fw-bold store-select">
-                    <option v-for="store in storeList" :key="store.id" :value="store.id">{{ store.name }}</option>
-                  </select>
+                  <div style="position: relative;">
+                    <select v-model="currentStoreId" class="form-select fw-bold store-select-custom">
+                      <option v-for="store in storeList" :key="store.id" :value="store.id">{{ store.name }}</option>
+                    </select>
+                    <i class="store-select-icon">▼</i>
+                  </div>
                 </div>
               </div>
 
@@ -483,7 +509,7 @@ onUnmounted(() => {
                           <div v-if="selectedFeatureTag" class="mb-2"><span class="badge bg-light text-secondary border px-2 py-1 small fw-normal">{{ cat.name }}系列</span></div>
                           <div class="d-flex justify-content-between mb-2">
                             <h5 class="fw-bold mb-0 text-dark">{{ item.itemName }}</h5>
-                            <span class="price-text">${{ item.price }}</span>
+                            <span class="price-text">${{ item.finalPrice }}</span>
                           </div>
                           <p class="text-muted small mb-3 flex-grow-1" style="line-height: 1.6;">{{ item.description }}</p>
                           <div class="mb-2 d-flex flex-wrap gap-1 align-items-center" style="min-height: 26px;">
@@ -494,9 +520,6 @@ onUnmounted(() => {
                           <div v-if="item.allergenInfo || item.allergen_info" class="mb-3 d-flex align-items-center gap-1 mt-2" style="font-size: 11px; font-weight: 400; letter-spacing: 0.1px;">
                             <span style="color: #78350f; opacity: 0.8;">🔸 本產品含{{ item.allergenInfo || item.allergen_info }}</span>
                           </div>
-                          <button @click="addToCart(item)" class="btn yayoi-btn-primary w-100 fw-bold py-2 mt-auto" :disabled="item.isSelectable === false || item.is_active === 0">
-                            {{ (item.isSelectable === false || item.is_active === 0) ? '暫不供應' : '加入購物車' }}
-                          </button>
                         </div>
                       </div>
                     </div>
@@ -671,7 +694,7 @@ onUnmounted(() => {
 
 /* 圖片區塊優化 */
 .card-img-wrapper {
-  height: 220px;
+  height: 280px;
   overflow: hidden;
   position: relative;
 }
@@ -679,8 +702,45 @@ onUnmounted(() => {
 .card-img-wrapper img {
   width: 100%;
   height: 100%;
-  object-fit: cover !important;
-  transition: transform 0.6s ease;     /* 減慢縮放速度，更有質感 */
+  object-fit: cover;
+  transition: transform 0.6s ease;
+}
+
+.item-card:hover .card-img-wrapper img {
+  transform: scale(1.05);
+}
+
+.card-img-wrapper::after {
+  content: '查看詳情';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.item-card:hover .card-img-wrapper::after {
+  opacity: 1;
+}
+
+/*點擊按鈕*/
+.card-tap-hint {
+  font-size: 12px;
+  color: #b45309;
+  font-weight: 500;
+  margin-top: auto;
+  padding-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.7;
 }
 
 /* 當卡片 hover 時，圖片稍微放大，增加視覺互動性 */
@@ -826,11 +886,13 @@ onUnmounted(() => {
   color: #b45309;
 }
 
+/*浮卡設計*/
 .item-modal-img-wrapper {
   width: 100%;
-  height: 260px;
+  height: 300px;
   overflow: hidden;
   border-radius: 16px 16px 0 0;
+  position: relative;
 }
 
 .item-modal-img-wrapper img {
@@ -839,13 +901,117 @@ onUnmounted(() => {
   object-fit: cover;
 }
 
+.item-modal-img-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 35%);
+}
+
+.item-modal-tags-floating {
+  position: absolute;
+  bottom: 14px;
+  left: 18px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.item-modal-tag-pill {
+  background: rgba(255, 255, 255, 0.92);
+  color: #9a3412;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
 .item-modal-body {
-  padding: 24px;
+  padding: 24px 22px 22px;
+}
+
+.item-modal-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+.item-modal-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #2d2a2a;
+}
+
+.item-modal-price {
+  font-size: 20px;
+  font-weight: 700;
+  color: #b45309;
+  white-space: nowrap;
+  margin-left: 12px;
+}
+
+.item-modal-divider {
+  width: 32px;
+  height: 2px;
+  background: #b45309;
+  opacity: 0.5;
+  margin: 10px 0 14px;
+}
+
+.item-modal-desc {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #6b6b66;
+  margin: 0 0 18px;
+}
+
+.item-modal-allergen {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  background: #fef3e2;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  font-size: 12px;
+  color: #7c2d12;
 }
 
 @keyframes modalFadeIn {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+.store-select-custom {
+  width: 100%;
+  padding: 11px 40px 11px 14px;
+  border: 1px solid #f3e2d3 !important;
+  border-radius: 10px !important;
+  background-color: #fffaf3 !important;
+  color: #5c4033 !important;
+  font-size: 14px;
+  font-weight: 500;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  background-image: none !important;
+}
+
+.store-select-custom:focus {
+  border-color: #d6a36e !important;
+  box-shadow: 0 0 0 0.15rem rgba(180, 83, 9, 0.1) !important;
+  outline: none;
+}
+
+.store-select-icon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: #b08968;
+  pointer-events: none;
 }
 
 .sold-out { opacity: 0.65; }
