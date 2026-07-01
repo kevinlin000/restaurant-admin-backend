@@ -298,6 +298,8 @@ public class MenuItemService {
             } else {
                 response.setFinalPrice(calculateStorePrice(item.getPrice(), storeId));
             }
+
+            response.setBasePrice(item.getPrice());  // ✅ 設定總部基準價
             
 
            // ==================== 🛒 上架狀態動態咬合防線 ====================

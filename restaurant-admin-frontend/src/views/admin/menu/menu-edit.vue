@@ -1,7 +1,7 @@
 <script setup>
-import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router' // 1. 導入 Vue Router 的捕手手套
 import axios from '@/api/axios';
+import { ref, onMounted, computed, nextTick, watch } from 'vue'
 
 //上下架選單預設
 const actualIsActive = ref(null)
@@ -10,8 +10,14 @@ const actualIsActive = ref(null)
 const route = useRoute()
 const menuItemId = ref(null)
 
+// 🚀
+const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+const isAdmin = userInfo.roleName === 'ADMIN'
+
 // 🏪 多租戶防禦點火線：獲取當前店長專屬的 storeId 
-const currentStoreId = ref(localStorage.getItem('storeId') || 1)
+const currentStoreId = ref(
+  isAdmin ? 'ALL' : (Number(localStorage.getItem('storeId')) || 1)
+)
 
 // 3. 🎯 完美對齊 Java MenuItem.java 的屬性規格！
 const formData = ref({
@@ -55,19 +61,17 @@ const filteredMenuItems = computed(() => {
 // 撈取所有菜單 —— ⚡ 史詩級升級：改為只顯示自己店裡的餐點列表，避開隔壁店家！
 const fetchAllMenuItems = async () => {
   try {
-    // 🎯 移除硬編碼，使用分店隔離查詢 API
     const response = await axios.get(`/api/menu-items/store/${currentStoreId.value}`)
-    
-    // 將後端多表動態計算出來的 price 對齊前端表單的 price 變數名
     const formattedData = (response.data.data || response.data).map(item => ({
       ...item,
-      price: item.finalPrice // 讓分店修改時，預設帶出的是該分店的專屬定價
+      price: isAdmin ? item.basePrice : item.finalPrice
     }))
     menuItems.value = formattedData
   } catch (error) {
     console.error('撈取分店菜單列表失敗：', error)
   }
 }
+
 
 // 點擊下方列表快速切換編輯對象（並絲滑滾動至頂部與自動聚焦）
 const selectItem = (item) => {
@@ -124,12 +128,14 @@ onMounted(async () => {
 })
 
 // ✅ 共用函式，放在 handleUpdateMenu 上方
-const submitMenuUpdate = async (overrideData = {}) => {
+  const submitMenuUpdate = async (overrideData = {}) => {
   const cleanMenuId = parseInt(menuItemId.value, 10)
-  const cleanStoreId = parseInt(currentStoreId.value, 10)
   const processedTags = formData.value.featureTags || null
 
-  await axios.put(`/api/menu-items/${cleanMenuId}/store/${cleanStoreId}`, {
+  // ✅ 判斷是全台統一還是特定分店
+  const storeIdValue = currentStoreId.value === 'ALL' ? 'ALL' : parseInt(currentStoreId.value, 10)
+
+  await axios.put(`/api/menu-items/${cleanMenuId}/store/${storeIdValue}`, {
     categoryId: Number(formData.value.categoryId),
     itemName: formData.value.itemName,
     price: Number(formData.value.price),
@@ -145,7 +151,8 @@ const submitMenuUpdate = async (overrideData = {}) => {
 const handleUpdateMenu = async () => {
   try {
     await submitMenuUpdate({ isActive: formData.value.isActive })
-    alert(`🎉 第 ${parseInt(currentStoreId.value, 10)} 號分店餐點數據客製修改成功！`)
+    const storeLabel = currentStoreId.value === 'ALL' ? '全台' : `第 ${currentStoreId.value} 號`
+    alert(`🎉 ${storeLabel} 分店餐點數據客製修改成功！`)
     fetchAllMenuItems()
   } catch (error) {
     console.error('分店更新餐點失敗：', error)
@@ -184,9 +191,6 @@ const handleToggleStatus = async () => {
   }
 }
 
-// 🚀7.Admin永久刪除品項
-const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-const isAdmin = userInfo.roleName === 'ADMIN'
 
 const handlePermanentDelete = async () => {
   if (!formData.value.id) {
@@ -216,6 +220,11 @@ const handlePermanentDelete = async () => {
       <span style="color: #374151;">📝 菜單管理</span>
       <span class="text-muted fs-5 fw-normal"> / 編輯與修改項目</span>
     </h3>
+
+    <!-- 🎯 ADMIN 專用：說明文字 -->
+    <div v-if="isAdmin" class="alert mb-3" style="background-color: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; font-size: 13px; border-radius: 10px; padding: 10px 14px;">
+      💡 以總部身份修改菜單，將同步更新所有分店的基準價格，各店依區域規則自動計算最終售價。
+    </div>
 
     <div class="card mb-5 border-0 shadow-sm" style="background-color: #fff7ed;">
       <div class="card-body p-4">
