@@ -405,7 +405,7 @@ const goToOrder = (item) => {
         <div class="item-modal-body">
           <div class="item-modal-title-row">
             <h3 class="item-modal-title">{{ selectedItem.itemName }}</h3>
-            <span class="item-modal-price">${{ selectedItem.price }}</span>
+            <span class="item-modal-price">${{ selectedItem.finalPrice }}</span>
           </div>
 
           <div class="item-modal-divider"></div>
