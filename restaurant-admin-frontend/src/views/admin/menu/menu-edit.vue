@@ -1,7 +1,10 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router' // 1. 導入 Vue Router 的捕手手套
 import axios from '@/api/axios';
+
+//上下架選單預設
+const actualIsActive = ref(null)
 
 // 2. 啟動手套
 const route = useRoute()
@@ -58,7 +61,7 @@ const fetchAllMenuItems = async () => {
     // 將後端多表動態計算出來的 price 對齊前端表單的 price 變數名
     const formattedData = (response.data.data || response.data).map(item => ({
       ...item,
-      price: item.price // 讓分店修改時，預設帶出的是該分店的專屬定價
+      price: item.finalPrice // 讓分店修改時，預設帶出的是該分店的專屬定價
     }))
     menuItems.value = formattedData
   } catch (error) {
@@ -70,12 +73,13 @@ const fetchAllMenuItems = async () => {
 const selectItem = (item) => {
   formData.value = { 
     ...item,
-    price: item.price ,
+    price: item.finalPrice ,
     isActive: item.isSelectable,
     // ⚡ 核心回填：從下方列表選取時，若有標籤陣列，將第一個值抽出來做為單選值回填
     featureTags: (item.featureTags && item.featureTags.length > 0) ? item.featureTags[0] : ''
   }
   menuItemId.value = item.id
+  actualIsActive.value = item.isSelectable
   
   // 🎯 絲滑滾動大絕招
   window.scrollTo({
@@ -157,19 +161,23 @@ const handleToggleStatus = async () => {
     return
   }
 
-  const isCurrentlyAvailable = formData.value.isActive === true || formData.value.isActive === 'true'
+  const isCurrentlyAvailable = actualIsActive.value === true
   const newStatus = !isCurrentlyAvailable
   const actionText = isCurrentlyAvailable ? '下架移出分店菜單' : '分店重新上架還原'
+
   const confirmAction = confirm(`確定要將【${formData.value.itemName}】進行${actionText}嗎？`)
-  if (!confirmAction) return
+  if (!confirmAction) {
+    // ✅ 使用者取消時，把下拉選單還原回真實狀態
+    formData.value.isActive = actualIsActive.value
+    return
+  }
 
   try {
     await submitMenuUpdate({ isActive: newStatus })
-
-    formData.value.isActive = newStatus  // ✅ API 成功後才更新前端
+    formData.value.isActive = newStatus
+    actualIsActive.value = newStatus
     alert(`🎉 【${formData.value.itemName}】${actionText}成功！`)
     fetchAllMenuItems()
-
   } catch (error) {
     console.error('狀態切換失敗：', error)
     alert('❌ 操作失敗，請檢查後端控制台！')

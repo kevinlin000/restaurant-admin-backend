@@ -291,7 +291,7 @@ const handleAddItemMenu = async () => {
                   <span v-else-if="(item.categoryId || item.category_id) === 8" class="badge px-3 py-1.5 rounded-pill border" style="background-color: #f8fafc !important; color: #475569 !important; border-color: #e2e8f0 !important; font-weight: 600;">酒水</span>
                 </td>
                 <td class="fw-bold" style="color: #4b5563;">{{ item.itemName }}</td>
-                <td class="fw-bold" style="color: #16a34a;">${{ item.price || item.basePrice }}</td>
+                <td class="fw-bold" style="color: #16a34a;">${{ item.finalPrice || item.basePrice }}</td>
                 <td class="text-muted small" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ item.description || '暫無描述' }}</td>
                 <td>
                   <span v-if="item.allergenInfo" class="badge text-amber-800 bg-warning bg-opacity-10 border border-warning-subtle rounded-2" style="font-size: 0.75rem; color: #9a3412; background-color: #ffedd5 !important;">{{ item.allergenInfo }}</span>

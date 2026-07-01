@@ -16,7 +16,7 @@ public class StoreMenuDisplayResponse {
     private String description; // 餐點描述
     
     // 💥 精髓：經過後端判斷後的「該店最終售價」
-    private BigDecimal price;
+    private BigDecimal finalPrice;
     
     private String imageUrl;    // 圖片 URL
     private String allergenInfo;// 過敏原
