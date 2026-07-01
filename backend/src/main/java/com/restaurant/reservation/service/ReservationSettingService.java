@@ -44,7 +44,7 @@ public class ReservationSettingService {
         // if (date == null) {
         //     return timeSlotRepository.findByStoreIdOrderByReservationDateAscStartTimeAsc(storeId);
         // }
-        
+
         // return timeSlotRepository.findByStoreIdAndReservationDateOrderByStartTimeAsc(storeId, date);
         // 依目前開放天數同步 is_open
         List<TimeSlot> slots = date == null
