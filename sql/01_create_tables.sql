@@ -292,7 +292,7 @@ CREATE TABLE reservation_table (
 -- ============================================================
 CREATE TABLE orders (
     order_id        BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id         BIGINT NOT NULL,
+    user_id BIGINT NULL COMMENT '會員ID，訪客點餐可為 NULL',
     store_id        BIGINT NOT NULL,
     table_id        BIGINT COMMENT '用餐桌位（外帶可為 null）',
     reservation_id  BIGINT COMMENT '關聯訂位（可為 null，外帶不需訂位）',
