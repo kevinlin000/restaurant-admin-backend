@@ -324,6 +324,10 @@
 
         <p>點數折抵：${{ selectedOrder.pointsUsed || 0 }}</p>
 
+        <p v-if="Number(selectedOrder.pointsEarned || 0) > 0" class="earned-points-line">
+          本次獲得點數：+{{ selectedOrder.pointsEarned }} 點
+        </p>
+
         <h2>應收金額：${{ selectedOrder.finalAmount }}</h2>
       </div>
     </div>
@@ -1602,6 +1606,10 @@ button:hover {
   border: 1px solid #95de64;
   color: #237804;
   font-size: 12px;
+}
+.earned-points-line {
+  color: #d48806;
+  font-weight: 700;
 }
 </style>
 
