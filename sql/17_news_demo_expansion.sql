@@ -16,8 +16,10 @@ INSERT INTO news_article (
     start_date,
     end_date,
     store_id,
+    cover_image_url,
     is_featured,
-    sort_order
+    sort_order,
+    created_at
 )
 SELECT
     'OPENING',
@@ -29,8 +31,10 @@ SELECT
     '2026-07-05',
     '2026-07-31',
     NULL,
+    '/news-images/sushi.jpg',
     TRUE,
-    5
+    5,
+    NOW()
 WHERE NOT EXISTS (
     SELECT 1 FROM news_article WHERE title = '台中勤美店試營運公告｜午間席次優先開放'
 );
@@ -45,8 +49,10 @@ INSERT INTO news_article (
     start_date,
     end_date,
     store_id,
+    cover_image_url,
     is_featured,
-    sort_order
+    sort_order,
+    created_at
 )
 SELECT
     'EVENT',
@@ -58,8 +64,10 @@ SELECT
     '2026-06-27',
     '2026-08-28',
     NULL,
+    '/news-images/asahi-beer.jpg',
     FALSE,
-    35
+    35,
+    NOW()
 WHERE NOT EXISTS (
     SELECT 1 FROM news_article WHERE title = '雙人餐酒夜｜週四晚餐限定席'
 );
@@ -74,8 +82,10 @@ INSERT INTO news_article (
     start_date,
     end_date,
     store_id,
+    cover_image_url,
     is_featured,
-    sort_order
+    sort_order,
+    created_at
 )
 SELECT
     'NOTICE',
@@ -87,8 +97,10 @@ SELECT
     NULL,
     NULL,
     NULL,
+    '/news-images/seafood-salad.jpg',
     FALSE,
-    40
+    40,
+    NOW()
 WHERE NOT EXISTS (
     SELECT 1 FROM news_article WHERE title = '外帶自取包裝調整｜鍋物與生食餐點分裝升級'
 );
@@ -103,8 +115,10 @@ INSERT INTO news_article (
     start_date,
     end_date,
     store_id,
+    cover_image_url,
     is_featured,
-    sort_order
+    sort_order,
+    created_at
 )
 SELECT
     'NOTICE',
@@ -116,8 +130,10 @@ SELECT
     '2026-07-02',
     '2026-08-31',
     NULL,
+    '/news-images/tempura.jpg',
     TRUE,
-    2
+    2,
+    NOW()
 WHERE NOT EXISTS (
     SELECT 1 FROM news_article WHERE title = '暑期熱門餐期提醒｜晚餐尖峰建議提前完成訂位'
 );
@@ -132,8 +148,10 @@ INSERT INTO news_article (
     start_date,
     end_date,
     store_id,
+    cover_image_url,
     is_featured,
-    sort_order
+    sort_order,
+    created_at
 )
 SELECT
     'MEMBER',
@@ -145,8 +163,10 @@ SELECT
     '2026-07-01',
     '2026-12-31',
     NULL,
+    '/news-images/caramel-pudding.jpg',
     FALSE,
-    45
+    45,
+    NOW()
 WHERE NOT EXISTS (
     SELECT 1 FROM news_article WHERE title = '生日禮使用說明｜會員本人用餐享指定甘味招待'
 );
@@ -161,8 +181,10 @@ INSERT INTO news_article (
     start_date,
     end_date,
     store_id,
+    cover_image_url,
     is_featured,
-    sort_order
+    sort_order,
+    created_at
 )
 SELECT
     'EVENT',
@@ -174,8 +196,10 @@ SELECT
     '2026-07-03',
     '2026-08-30',
     NULL,
+    '/news-images/japanese-tea.jpg',
     FALSE,
-    50
+    50,
+    NOW()
 WHERE NOT EXISTS (
     SELECT 1 FROM news_article WHERE title = '午後甘味席｜抹茶甜點與焙茶飲品組合上市'
 );
@@ -190,8 +214,10 @@ INSERT INTO news_article (
     start_date,
     end_date,
     store_id,
+    cover_image_url,
     is_featured,
-    sort_order
+    sort_order,
+    created_at
 )
 SELECT
     'NOTICE',
@@ -203,8 +229,10 @@ SELECT
     NULL,
     NULL,
     NULL,
+    '/news-images/reservation.jpg',
     FALSE,
-    55
+    55,
+    NOW()
 WHERE NOT EXISTS (
     SELECT 1 FROM news_article WHERE title = '訂位訂金規則更新｜特殊餐期需於期限內完成付款'
 );
@@ -219,8 +247,10 @@ INSERT INTO news_article (
     start_date,
     end_date,
     store_id,
+    cover_image_url,
     is_featured,
-    sort_order
+    sort_order,
+    created_at
 )
 SELECT
     'MEMBER',
@@ -232,8 +262,25 @@ SELECT
     '2026-07-01',
     NULL,
     NULL,
+    '/news-images/aburi-salmon-sushi.jpg',
     FALSE,
-    60
+    60,
+    NOW()
 WHERE NOT EXISTS (
     SELECT 1 FROM news_article WHERE title = '會員點數制度調整｜折抵點數與升等點數分開累積'
 );
+
+-- ============================================================
+-- 既有種子資料補圖：三篇早於本檔案存在的消息缺 cover_image_url，
+-- 導致前端全靠分類預設圖，同分類文章畫面看起來重複。
+-- 只在尚未設定時補值，可重複執行。
+-- ============================================================
+
+UPDATE news_article SET cover_image_url = '/news-images/sashimi.jpg'
+WHERE title = '夏旬和食祭｜海味、炙燒與清酒佐餐同步登場' AND cover_image_url IS NULL;
+
+UPDATE news_article SET cover_image_url = '/news-images/tofu.jpg'
+WHERE title = '重要提醒｜請透過官方網站、APP 或門市電話完成訂位' AND cover_image_url IS NULL;
+
+UPDATE news_article SET cover_image_url = '/news-images/matcha-dessert.jpg'
+WHERE title = '敘日會員週｜平日午餐點數雙倍累積' AND cover_image_url IS NULL;
