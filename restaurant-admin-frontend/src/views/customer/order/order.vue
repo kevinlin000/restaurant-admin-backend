@@ -395,6 +395,7 @@ async function loadStoreMenu(storeId) {
 
         if (Array.isArray(items) && items.length > 0) {
             menuItems.value = items.map(normalizeStoreMenuItem);
+            console.log(menuItems.value);
             return;
         }
 
@@ -439,17 +440,20 @@ const getRankIcon = (index) => {
 };
 
 const findMenuByRecommend = (recommend) => {
-    return menuItems.value.find((item) => {
-        return (
-            item.id === recommend.menuItemId ||
-            item.menuItemId === recommend.menuItemId ||
-            item.itemName === recommend.itemName
-        );
-    });
+    const recommendId = recommend.menuItemId ?? recommend.id;
+
+    if (recommendId) {
+        return menuItems.value.find((item) => item.id === recommendId);
+    }
+
+    return menuItems.value.find((item) => item.itemName === recommend.itemName);
 };
 
 const addRecommendItem = (recommend) => {
+    console.log("推薦", recommend);
     const menuItem = findMenuByRecommend(recommend);
+
+    console.log("找到餐點", menuItem);
 
     if (!menuItem) {
         showError("此推薦餐點目前不在本門市菜單中");
@@ -3457,6 +3461,84 @@ onMounted(async () => {
 :deep(.restaurant-login-popup .benefit-item span:first-child) {
     color: #37b24d;
     font-size: 22px;
+}
+@media (max-width: 1100px) {
+    .content-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .cart-section {
+        position: static;
+        width: 100%;
+    }
+
+    .menu-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 820px) {
+    .order-page {
+        padding: 16px;
+        margin: 20px auto;
+    }
+
+    .content-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .menu-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .menu-card {
+        min-height: auto;
+    }
+
+    .menu-main {
+        flex-direction: column;
+    }
+
+    .image-wrapper {
+        width: 100%;
+        height: 180px;
+    }
+
+    .menu-text h3,
+    .description,
+    .menu-meta span {
+        word-break: normal;
+        white-space: normal;
+        writing-mode: horizontal-tb;
+    }
+
+    .cart-section {
+        position: static;
+        margin-top: 24px;
+    }
+}
+
+@media (max-width: 600px) {
+    .category-tabs {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding-bottom: 8px;
+    }
+
+    .category-tabs button {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .store-context {
+        flex-wrap: wrap;
+        border-radius: 16px;
+    }
+
+    .payment-methods,
+    .invoice-options {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 <style>
