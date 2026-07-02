@@ -7,8 +7,6 @@ import seasonalImage from "@/assets/images/salmon-sashimi.jpg";
 import openingImage from "@/assets/images/sushi.jpg";
 import memberImage from "@/assets/images/matcha-dessert.jpg";
 import noticeImage from "@/assets/images/japanese-tea.jpg";
-import takeoutImage from "@/assets/images/sukiyaki.jpg";
-import diningImage from "@/assets/images/asahi-beer.jpg";
 
 const categories = [
   { label: "全部", value: "all" },
@@ -18,97 +16,8 @@ const categories = [
   { label: "會員", value: "member" },
 ];
 
-const fallbackNews = [
-  {
-    id: 1,
-    category: "event",
-    categoryLabel: "活動",
-    publishedAt: "2026.06.24",
-    period: "2026.06.24 - 2026.08.31",
-    title: "夏旬和食祭｜海味、炙燒與清酒佐餐同步登場",
-    summary:
-      "以鮭魚、干貝、季節野菜與吟釀酒香搭出夏季限定菜色，內用套餐可加購指定佐餐飲品。",
-    storeScope: "全門市適用",
-    image: seasonalImage,
-    highlight: true,
-    ctaText: "預約席次",
-    ctaTo: "/reservation",
-  },
-  {
-    id: 2,
-    category: "opening",
-    categoryLabel: "展店",
-    publishedAt: "2026.06.21",
-    period: "2026.07.05 - 2026.07.31",
-    title: "台中勤美店試營運公告｜午間席次優先開放",
-    summary:
-      "新門市試營運期間採分段開放訂位，午餐、下午茶與晚餐席次將依現場準備狀況逐步增加。",
-    storeScope: "台中勤美店",
-    image: openingImage,
-    ctaText: "查看門市",
-    ctaTo: "/store",
-  },
-  {
-    id: 3,
-    category: "notice",
-    categoryLabel: "公告",
-    publishedAt: "2026.06.20",
-    period: "長期公告",
-    title: "重要提醒｜請透過官方網站、APP 或門市電話完成訂位",
-    summary:
-      "敘日未授權第三方代訂平台收取訂金或轉售席次，所有訂位資訊以官方網站、會員 APP 與門市公告為準。",
-    storeScope: "全門市適用",
-    image: noticeImage,
-    ctaText: "查看門市電話",
-    ctaTo: "/store",
-    important: true,
-  },
-  {
-    id: 4,
-    category: "member",
-    categoryLabel: "會員",
-    publishedAt: "2026.06.18",
-    period: "2026.07.01 - 2026.07.14",
-    title: "敘日會員週｜平日午餐點數雙倍累積",
-    summary:
-      "會員平日 11:30 至 14:00 內用，單筆滿額享點數雙倍累積，可與生日禮擇優使用。",
-    storeScope: "全門市適用",
-    image: memberImage,
-    ctaText: "會員登入",
-    ctaTo: "/login",
-  },
-  {
-    id: 5,
-    category: "event",
-    categoryLabel: "活動",
-    publishedAt: "2026.06.14",
-    period: "2026.06.27 - 2026.08.28",
-    title: "雙人餐酒夜｜週四晚餐限定席",
-    summary:
-      "精選雙人套餐搭配指定飲品，適合慶生、約會與下班後的小型聚餐。部分門市提供吧檯席。",
-    storeScope: "台北信義店、新竹巨城店、台中勤美店",
-    image: diningImage,
-    ctaText: "預約晚餐",
-    ctaTo: "/reservation",
-  },
-  {
-    id: 6,
-    category: "notice",
-    categoryLabel: "公告",
-    publishedAt: "2026.06.10",
-    period: "長期公告",
-    title: "外帶自取包裝調整｜鍋物與生食餐點分裝升級",
-    summary:
-      "為維持餐點狀態，外帶自取餐盒將依品項調整為冷熱分裝，部分套餐備餐時間同步延長。",
-    storeScope: "供應外帶門市",
-    image: takeoutImage,
-    ctaText: "前往點餐",
-    ctaTo: "/order",
-  },
-];
-
 const activeCategory = ref("all");
-const newsItems = ref(fallbackNews);
+const newsItems = ref([]);
 const newsLoading = ref(false);
 const newsError = ref("");
 
@@ -128,9 +37,12 @@ const ctaByCategory = {
 
 const normalizeCategory = (category) => `${category || "event"}`.toLowerCase();
 
+const getCategoryImage = (category) => imageByCategory[category] || seasonalImage;
+
 const normalizeNews = (article) => {
   const category = normalizeCategory(article.category);
   const cta = ctaByCategory[category] || ctaByCategory.event;
+  const coverImageUrl = typeof article.coverImageUrl === "string" ? article.coverImageUrl.trim() : "";
   return {
     id: article.newsId,
     category,
@@ -140,14 +52,14 @@ const normalizeNews = (article) => {
     title: article.title,
     summary: article.summary,
     storeScope: article.storeScope,
-    image: article.coverImageUrl || imageByCategory[category] || seasonalImage,
+    image: coverImageUrl || getCategoryImage(category),
     highlight: Boolean(article.isFeatured),
     important: category === "notice",
     ...cta,
   };
 };
 
-const featuredNews = computed(() => newsItems.value.find((item) => item.highlight) || newsItems.value[0]);
+const featuredNews = computed(() => newsItems.value.find((item) => item.highlight) || newsItems.value[0] || null);
 
 const filteredNews = computed(() => {
   if (activeCategory.value === "all") {
@@ -158,10 +70,27 @@ const filteredNews = computed(() => {
 });
 
 const listNews = computed(() =>
-  filteredNews.value.filter((item) => item.id !== featuredNews.value.id),
+  featuredNews.value
+    ? filteredNews.value.filter((item) => item.id !== featuredNews.value.id)
+    : filteredNews.value,
 );
 
 const visibleCountLabel = computed(() => `${filteredNews.value.length} 則消息`);
+
+const emptyMessage = computed(() => {
+  if (activeCategory.value === "all") {
+    return "目前沒有已發布的最新消息。";
+  }
+  const category = categories.find((item) => item.value === activeCategory.value);
+  return `目前沒有${category?.label || ""}分類的已發布消息。`;
+});
+
+const handleNewsImageError = (event, category) => {
+  const fallbackImage = getCategoryImage(category);
+  if (event.target.src !== fallbackImage) {
+    event.target.src = fallbackImage;
+  }
+};
 
 const loadNews = async () => {
   newsLoading.value = true;
@@ -169,12 +98,10 @@ const loadNews = async () => {
 
   try {
     const articles = await newsApi.getPublishedNews();
-    if (articles.length) {
-      newsItems.value = articles.map(normalizeNews);
-    }
+    newsItems.value = Array.isArray(articles) ? articles.map(normalizeNews) : [];
   } catch (error) {
-    newsError.value = "最新消息暫時無法更新，以下顯示精選消息";
-    newsItems.value = fallbackNews;
+    newsError.value = "最新消息暫時無法載入，請稍後再試";
+    newsItems.value = [];
   } finally {
     newsLoading.value = false;
   }
@@ -208,14 +135,18 @@ onMounted(async () => {
     </header>
 
     <main class="news-container news-content">
-      <section class="featured-block" aria-labelledby="featured-title">
+      <section v-if="featuredNews" class="featured-block" aria-labelledby="featured-title">
         <div class="section-heading">
           <p class="section-label">Selected</p>
           <h2 id="featured-title">本期焦點</h2>
         </div>
 
         <article class="featured-article">
-          <img :src="featuredNews.image" :alt="featuredNews.title" />
+          <img
+            :src="featuredNews.image"
+            :alt="featuredNews.title"
+            @error="handleNewsImageError($event, featuredNews.category)"
+          />
           <div class="featured-copy">
             <div class="news-meta">
               <span>{{ featuredNews.categoryLabel }}</span>
@@ -275,7 +206,11 @@ onMounted(async () => {
               <time>{{ item.publishedAt }}</time>
               <span>{{ item.categoryLabel }}</span>
             </div>
-            <img :src="item.image" :alt="item.title" />
+            <img
+              :src="item.image"
+              :alt="item.title"
+              @error="handleNewsImageError($event, item.category)"
+            />
             <div class="news-item__body">
               <h3>{{ item.title }}</h3>
               <p>{{ item.summary }}</p>
@@ -295,6 +230,12 @@ onMounted(async () => {
               <i class="bi bi-arrow-right"></i>
             </RouterLink>
           </article>
+        </div>
+
+        <div v-if="!newsLoading && filteredNews.length === 0" class="news-empty" role="status">
+          <p class="section-label">No News</p>
+          <h3>{{ emptyMessage }}</h3>
+          <p>後台發布消息後，這裡會依日期與分類自動更新。</p>
         </div>
       </section>
     </main>
@@ -510,6 +451,28 @@ onMounted(async () => {
   margin-bottom: 14px;
   padding: 12px 14px;
   font-weight: 900;
+}
+
+.news-empty {
+  border: 1px solid #d8cbbd;
+  border-radius: 6px;
+  background: #fffaf5;
+  margin-top: 24px;
+  padding: 34px;
+}
+
+.news-empty h3 {
+  color: #25313f;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: 0;
+  margin: 0 0 10px;
+}
+
+.news-empty p:last-child {
+  color: #657284;
+  line-height: 1.7;
+  margin: 0;
 }
 
 .category-tab {
