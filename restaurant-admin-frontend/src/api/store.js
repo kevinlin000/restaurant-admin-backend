@@ -1,4 +1,4 @@
-// 測試：訂位頁面讀取分店資料
+// 訂位頁面讀取分店資料
 import http from './http'
 
 export const storeApi = {

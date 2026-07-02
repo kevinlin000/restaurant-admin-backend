@@ -1,14 +1,23 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router' // 1. 導入 Vue Router 的捕手手套
 import axios from '@/api/axios';
+import { ref, onMounted, computed, nextTick, watch } from 'vue'
+
+//上下架選單預設
+const actualIsActive = ref(null)
 
 // 2. 啟動手套
 const route = useRoute()
 const menuItemId = ref(null)
 
+// 🚀
+const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+const isAdmin = userInfo.roleName === 'ADMIN'
+
 // 🏪 多租戶防禦點火線：獲取當前店長專屬的 storeId 
-const currentStoreId = ref(localStorage.getItem('storeId') || 1)
+const currentStoreId = ref(
+  isAdmin ? 'ALL' : (Number(localStorage.getItem('storeId')) || 1)
+)
 
 // 3. 🎯 完美對齊 Java MenuItem.java 的屬性規格！
 const formData = ref({
@@ -52,13 +61,10 @@ const filteredMenuItems = computed(() => {
 // 撈取所有菜單 —— ⚡ 史詩級升級：改為只顯示自己店裡的餐點列表，避開隔壁店家！
 const fetchAllMenuItems = async () => {
   try {
-    // 🎯 移除硬編碼，使用分店隔離查詢 API
     const response = await axios.get(`/api/menu-items/store/${currentStoreId.value}`)
-    
-    // 將後端多表動態計算出來的 price 對齊前端表單的 price 變數名
     const formattedData = (response.data.data || response.data).map(item => ({
       ...item,
-      price: item.price // 讓分店修改時，預設帶出的是該分店的專屬定價
+      price: isAdmin ? item.basePrice : item.finalPrice
     }))
     menuItems.value = formattedData
   } catch (error) {
@@ -66,15 +72,18 @@ const fetchAllMenuItems = async () => {
   }
 }
 
+
 // 點擊下方列表快速切換編輯對象（並絲滑滾動至頂部與自動聚焦）
 const selectItem = (item) => {
   formData.value = { 
     ...item,
-    price: item.price ,
+    price: item.finalPrice ,
+    isActive: item.isSelectable,
     // ⚡ 核心回填：從下方列表選取時，若有標籤陣列，將第一個值抽出來做為單選值回填
     featureTags: (item.featureTags && item.featureTags.length > 0) ? item.featureTags[0] : ''
   }
   menuItemId.value = item.id
+  actualIsActive.value = item.isSelectable
   
   // 🎯 絲滑滾動大絕招
   window.scrollTo({
@@ -119,12 +128,14 @@ onMounted(async () => {
 })
 
 // ✅ 共用函式，放在 handleUpdateMenu 上方
-const submitMenuUpdate = async (overrideData = {}) => {
+  const submitMenuUpdate = async (overrideData = {}) => {
   const cleanMenuId = parseInt(menuItemId.value, 10)
-  const cleanStoreId = parseInt(currentStoreId.value, 10)
   const processedTags = formData.value.featureTags || null
 
-  await axios.put(`/api/menu-items/${cleanMenuId}/store/${cleanStoreId}`, {
+  // ✅ 判斷是全台統一還是特定分店
+  const storeIdValue = currentStoreId.value === 'ALL' ? 'ALL' : parseInt(currentStoreId.value, 10)
+
+  await axios.put(`/api/menu-items/${cleanMenuId}/store/${storeIdValue}`, {
     categoryId: Number(formData.value.categoryId),
     itemName: formData.value.itemName,
     price: Number(formData.value.price),
@@ -140,7 +151,8 @@ const submitMenuUpdate = async (overrideData = {}) => {
 const handleUpdateMenu = async () => {
   try {
     await submitMenuUpdate({ isActive: formData.value.isActive })
-    alert(`🎉 第 ${parseInt(currentStoreId.value, 10)} 號分店餐點數據客製修改成功！`)
+    const storeLabel = currentStoreId.value === 'ALL' ? '全台' : `第 ${currentStoreId.value} 號`
+    alert(`🎉 ${storeLabel} 分店餐點數據客製修改成功！`)
     fetchAllMenuItems()
   } catch (error) {
     console.error('分店更新餐點失敗：', error)
@@ -156,22 +168,48 @@ const handleToggleStatus = async () => {
     return
   }
 
-  const isCurrentlyAvailable = formData.value.isActive === true || formData.value.isActive === 'true'
+  const isCurrentlyAvailable = actualIsActive.value === true
   const newStatus = !isCurrentlyAvailable
   const actionText = isCurrentlyAvailable ? '下架移出分店菜單' : '分店重新上架還原'
+
   const confirmAction = confirm(`確定要將【${formData.value.itemName}】進行${actionText}嗎？`)
-  if (!confirmAction) return
+  if (!confirmAction) {
+    // ✅ 使用者取消時，把下拉選單還原回真實狀態
+    formData.value.isActive = actualIsActive.value
+    return
+  }
 
   try {
     await submitMenuUpdate({ isActive: newStatus })
-
-    formData.value.isActive = newStatus  // ✅ API 成功後才更新前端
+    formData.value.isActive = newStatus
+    actualIsActive.value = newStatus
     alert(`🎉 【${formData.value.itemName}】${actionText}成功！`)
     fetchAllMenuItems()
-
   } catch (error) {
     console.error('狀態切換失敗：', error)
     alert('❌ 操作失敗，請檢查後端控制台！')
+  }
+}
+
+
+const handlePermanentDelete = async () => {
+  if (!formData.value.id) {
+    alert('請先在下方列表選擇一個餐點才能操作！')
+    return
+  }
+
+  const confirmDelete = confirm(`⚠️ 確定要永久刪除【${formData.value.itemName}】嗎？此操作無法復原！`)
+  if (!confirmDelete) return
+
+  try {
+    await axios.delete(`/api/menu-items/${formData.value.id}/permanent`)
+    alert('✅ 已永久刪除！')
+    formData.value = { id: null, categoryId: 1, itemName: '', price: '', description: '', imageUrl: '', isActive: true, allergenInfo: '', featureTags: '' }
+    menuItemId.value = null
+    fetchAllMenuItems()
+  } catch (error) {
+    console.error('永久刪除失敗：', error)
+    alert('❌ 刪除失敗，請檢查後端控制台！')
   }
 }
 </script>
@@ -182,6 +220,11 @@ const handleToggleStatus = async () => {
       <span style="color: #374151;">📝 菜單管理</span>
       <span class="text-muted fs-5 fw-normal"> / 編輯與修改項目</span>
     </h3>
+
+    <!-- 🎯 ADMIN 專用：說明文字 -->
+    <div v-if="isAdmin" class="alert mb-3" style="background-color: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; font-size: 13px; border-radius: 10px; padding: 10px 14px;">
+      💡 以總部身份修改菜單，將同步更新所有分店的基準價格，各店依區域規則自動計算最終售價。
+    </div>
 
     <div class="card mb-5 border-0 shadow-sm" style="background-color: #fff7ed;">
       <div class="card-body p-4">
@@ -205,8 +248,8 @@ const handleToggleStatus = async () => {
             <select v-model="formData.categoryId" class="form-select form-control-solid bg-white" style="color: #374151; border-color: #fed7aa; font-weight: 500;">
               <option 
                 v-for="cat in categoryList" 
-                :key="cat.categoryId" 
-                :value="cat.categoryId"
+                :key="cat.id" 
+                :value="cat.id"
                 style="color: #374151;">
                 {{ cat.categoryName }}
               </option>
@@ -266,6 +309,10 @@ const handleToggleStatus = async () => {
         <div class="text-end mt-4">
           <button @click="handleToggleStatus" class="btn btn-light-danger px-3 py-2 me-2 fw-bold small" style="border-radius: 8px; border: 1px solid #fecaca; color: #dc2626;">
             快速上/下架切換
+          </button>
+          <!-- 🎯 ADMIN 專用：永久刪除按鈕 -->
+          <button v-if="isAdmin" @click="handlePermanentDelete" class="btn px-3 py-2 me-2 fw-bold small text-white" style="border-radius: 8px; background-color: #7f1d1d; border: none;">
+            🗑️ 永久刪除
           </button>
           <button @click="handleUpdateMenu" class="btn px-4 py-2 text-white fw-bold shadow-sm" style="background-color: #ea580c; background-image: linear-gradient(135deg, #f97316 0%, #ea580c 100%); border: none; border-radius: 8px;">
             <i class="fa-solid fa-square-check me-2"></i>確認並儲存修改
@@ -328,7 +375,7 @@ const handleToggleStatus = async () => {
                   <span v-else class="text-muted small">無</span>
                 </td>
                 <td>
-                  <span v-if="item.isActive === true || item.isActive === 'true' || item.isActive == 1" class="badge border border-success-subtle" style="color: #16a34a; font-weight: bold; background-color: #f0fdf4 !important;">供應中</span>
+                  <span v-if="item.isSelectable === true" class="badge border border-success-subtle" style="color: #16a34a; font-weight: bold; background-color: #f0fdf4 !important;">供應中</span>
                   <span v-else class="badge border border-danger-subtle" style="color: #dc2626; font-weight: bold; background-color: #fef2f2 !important;">已下架</span>
                 </td>
                 <td class="px-4">

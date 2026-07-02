@@ -72,7 +72,6 @@ const form = reactive({
   customDates: [],
   startTime: '12:00',
   endTime: '14:00',
-  isOpen: true,
   requiresDeposit: false,
   depositAmount: 0,
 })
@@ -83,7 +82,6 @@ const editForm = reactive({
   reservationDate: '',
   startTime: '',
   endTime: '',
-  isOpen: true,
   requiresDeposit: false,
   depositAmount: 0,
 })
@@ -432,7 +430,6 @@ const loadPageData = async ({ silent = false } = {}) => {
         try {
           await reservationSettingApi.rebuildCapacity(slot.slotId)
         } catch (error) {
-          // Keep the list usable even if one slot cannot be recalculated.
         }
       }
       try {
@@ -474,7 +471,6 @@ const createTimeSlot = async () => {
       reservationDate,
       startTime: `${form.startTime}:00`,
       endTime: `${form.endTime}:00`,
-      isOpen: form.isOpen,
       ruleGenerated: isRuleGeneratedDate(reservationDate),
       requiresDeposit: form.requiresDeposit,
       depositAmount: form.requiresDeposit ? Number(form.depositAmount || 0) : 0,
@@ -511,7 +507,6 @@ const openEditModal = (slot) => {
   editForm.reservationDate = firstSlot.reservationDate
   editForm.startTime = firstSlot.startTime?.slice(0, 5) || ''
   editForm.endTime = firstSlot.endTime?.slice(0, 5) || ''
-  editForm.isOpen = Boolean(firstSlot.isOpen)
   editForm.requiresDeposit = Boolean(firstSlot.requiresDeposit)
   editForm.depositAmount = Number(firstSlot.depositAmount || 0)
   errorMessage.value = ''
@@ -544,7 +539,6 @@ const updateTimeSlot = async () => {
       reservationDate: isBulkEditing.value ? slot.reservationDate : editForm.reservationDate,
       startTime: `${editForm.startTime}:00`,
       endTime: `${editForm.endTime}:00`,
-      isOpen: editForm.isOpen,
       ruleGenerated: isBulkEditing.value,
       requiresDeposit: editForm.requiresDeposit,
       depositAmount: editForm.requiresDeposit ? Number(editForm.depositAmount || 0) : 0,
@@ -756,11 +750,11 @@ watch(() => form.storeId, () => {
   loadModalStoreHolidays()
 })
 // 掛載時：註冊點擊事件載入資料
-// 離開頁面時：移除事件
 onMounted(() => {
   document.addEventListener('click', handleOutsideClick)
   loadStores()
 })
+// 離開頁面時：移除事件
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleOutsideClick)
 })
@@ -888,7 +882,8 @@ onBeforeUnmount(() => {
           </div>
           <div class="col-6 col-md-4 d-flex flex-wrap gap-3">
             <button type="button" class="btn btn-dark" @click="clearSlotFilters">顯示全部</button>
-            <button type="button" class="btn btn-dark" :disabled="loading" @click="loadPageData">
+            <button type="button" class="btn btn-dark d-flex align-items-center flex-wrap gap-2" :disabled="loading" @click="loadPageData">
+              <i class="bx bx-search "></i>
               查詢剩餘桌位
             </button>
           </div>
@@ -903,7 +898,7 @@ onBeforeUnmount(() => {
         <div class="section-divider"></div>
 
         <!-- 開放天數設定 -->
-        <div class="row g-3 align-items-end mb-4">
+        <!-- <div class="row g-3 align-items-end mb-4">
           <div class="col-12 col-md-4">
             <label class="form-label">統一開放幾天前訂位</label>
             <input v-model.number="reservationOpenDays" type="number" min="1" class="form-control" :disabled="!canManageSettings" />
@@ -916,7 +911,7 @@ onBeforeUnmount(() => {
           <div class="col-12 col-md-5 text-muted">套用所有已設定的訂位時段</div>
         </div>
 
-        <div class="section-divider"></div>
+        <div class="section-divider"></div> -->
 
         <!-- 日期＆時段名單 -->
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
@@ -1215,14 +1210,8 @@ onBeforeUnmount(() => {
               </div>
               <div class="col-12">
                 <label class="form-check">
-                  <input v-model="form.isOpen" class="form-check-input" type="checkbox" />
-                  <span class="form-check-label">開放訂位</span>
-                </label>
-              </div>
-              <div class="col-12">
-                <label class="form-check">
                   <input v-model="form.requiresDeposit" class="form-check-input" type="checkbox" />
-                  <span class="form-check-label">需支付訂金</span>
+                  <span class="form-check-label">需支付訂金＄</span>
                 </label>
               </div>
               <div v-if="form.requiresDeposit" class="col-12">
@@ -1348,12 +1337,6 @@ onBeforeUnmount(() => {
                     <option v-for="minute in minuteOptions" :key="`edit-end-minute-${minute}`" :value="minute">{{ minute }}</option>
                   </select>
                 </div>
-              </div>
-              <div class="col-12">
-                <label class="form-check">
-                  <input v-model="editForm.isOpen" class="form-check-input" type="checkbox" />
-                  <span class="form-check-label">開放訂位</span>
-                </label>
               </div>
               <div class="col-12">
                 <label class="form-check">

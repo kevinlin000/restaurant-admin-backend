@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed as vueComputed } from 'vue'
 import axios from 'axios'
+import { useRouter } from 'vue-router'
 
 // 🤝 1. 引進餐點列表本機圖片
 import tofuImg from "@/assets/images/tofu.jpg";
@@ -24,7 +25,7 @@ const edmConfig = ref({
     title: "極上生魚片盛合",
     desc: "嚴選每日直送頂級鮮味與極上鮭魚肚，主廚以精湛刀工完美留住海洋鮮甜。",
     price: "NT$ 480",
-    imageUrl: "https://i.ibb.co/NdZthW9t/sashimi.png" 
+    imageUrl: "https://i.ibb.co/NdZthW9t/sashimi.png"
   },
   pork: {
     title: "生薑燒肉定食",
@@ -35,12 +36,12 @@ const edmConfig = ref({
 });
 
 // 🎛️ 2. 狀態控制中心
-const showEdmModal = ref(true)      
-const activeCategoryId = ref(null)  
-const currentStoreId = ref(null)    
-const storeList = ref([])          
-const categoryList = ref([])        
-const menuItems = ref([]) 
+const showEdmModal = ref(true)
+const activeCategoryId = ref(null)
+const currentStoreId = ref(null)
+const storeList = ref([])
+const categoryList = ref([])
+const menuItems = ref([])
 const selectedItem = ref(null)  // 記錄被點擊的餐點
 
 const openItemModal = (item) => {
@@ -51,7 +52,7 @@ const closeItemModal = () => {
   selectedItem.value = null
 }
 
-const heroOpacity = ref(1)          
+const heroOpacity = ref(1)
 
 // 🌟 3. 紀錄客人在畫面上點擊了哪一個行銷特色標籤
 const selectedFeatureTag = ref(null)
@@ -70,12 +71,12 @@ const currentSlideIndex = ref(0)
 let heroTimer = null
 
 const startHeroAutoPlay = () => {
-  stopHeroAutoPlay() 
+  stopHeroAutoPlay()
   heroTimer = setInterval(() => {
     if (carouselImages.value.length > 0) {
       currentSlideIndex.value = (currentSlideIndex.value + 1) % carouselImages.value.length
     }
-  }, 4500) 
+  }, 4500)
 }
 
 const stopHeroAutoPlay = () => {
@@ -84,22 +85,22 @@ const stopHeroAutoPlay = () => {
 
 const handleIndicatorClick = (index) => {
   currentSlideIndex.value = index
-  startHeroAutoPlay() 
+  startHeroAutoPlay()
 }
 
 // 🌟 5. 精準 Scrollspy 偵測與大圖透明度線性漸變
 const handleWindowScroll = () => {
   const scrollTop = window.scrollY
   const fadeStart = 0
-  const fadeEnd = 350 
-  
-  if (scrollTop <= fadeStart) { heroOpacity.value = 1 } 
-  else if (scrollTop >= fadeEnd) { heroOpacity.value = 0 } 
+  const fadeEnd = 350
+
+  if (scrollTop <= fadeStart) { heroOpacity.value = 1 }
+  else if (scrollTop >= fadeEnd) { heroOpacity.value = 0 }
   else { heroOpacity.value = 1 - (scrollTop - fadeStart) / (fadeEnd - fadeStart) }
-  
-  if (selectedFeatureTag.value) return; 
-  
-  const scrollPosition = window.scrollY + 280 
+
+  if (selectedFeatureTag.value) return;
+
+  const scrollPosition = window.scrollY + 280
   for (const cat of categoryList.value) {
     const el = document.getElementById(`category-section-${cat.id}`)
     if (el) {
@@ -115,24 +116,30 @@ const handleWindowScroll = () => {
 
 // 🌟 6. 絲滑平滑滾動至指定分類區 (修正版)
 const scrollToCategory = (categoryId) => {
-  if (selectedFeatureTag.value) { selectedFeatureTag.value = null; }
-  
+  const hadFeatureTag = !!selectedFeatureTag.value  // ✅ 先記錄有沒有 banner
+
+  if (selectedFeatureTag.value) {
+    selectedFeatureTag.value = null
+  }
+
   setTimeout(() => {
     const el = document.getElementById(`category-section-${categoryId}`)
-    
     if (el) {
       const rect = el.getBoundingClientRect()
       const scrollTop = window.scrollY || document.documentElement.scrollTop
-      const targetOffset = scrollTop + rect.top - 160
-      
-      window.scrollTo({ 
-        top: targetOffset, 
-        behavior: 'smooth' 
+
+      // ✅ 根據之前有沒有 banner 決定偏移量
+      const offset = hadFeatureTag ? 500 : 132
+      const targetOffset = scrollTop + rect.top - offset
+
+      window.scrollTo({
+        top: targetOffset,
+        behavior: 'smooth'
       })
-      
+
       activeCategoryId.value = categoryId
     }
-  }, 60)
+  }, 100)
 }
 
 // 🌟 7. 點擊特色膠囊滑動到動態大標題
@@ -141,17 +148,17 @@ const handleFeatureTagClick = (tag) => {
     selectedFeatureTag.value = null;
     return;
   }
-  
+
   selectedFeatureTag.value = tag;
-  activeCategoryId.value = null; 
+  activeCategoryId.value = null;
 
   setTimeout(() => {
     const el = document.getElementById('dynamic-feature-title');
     if (el) {
       const targetOffset = el.getBoundingClientRect().top + window.scrollY;
-      window.scrollTo({ 
-        top: targetOffset - 160, 
-        behavior: 'smooth' 
+      window.scrollTo({
+        top: targetOffset - 112,
+        behavior: 'smooth'
       });
     }
   }, 80);
@@ -161,7 +168,7 @@ const handleFeatureTagClick = (tag) => {
 const getMenuItemImage = (item) => {
   if (item.imageUrl && (item.imageUrl.startsWith('http'))) return item.imageUrl;
   const name = (item.itemName || '').toLowerCase();
-  
+
   if (name.includes('胡麻豆腐') || name.includes('豆腐') || name.includes('胡麻菠菜')) return tofuImg;
   if (name.includes('海鮮沙拉') || name.includes('沙拉') || name.includes('拌番茄') || name.includes('小黃瓜')) return seafoodSaladImg;
   if (name.includes('綜合生魚片') || name.includes('刺身盛合') || name.includes('生魚片')) return sashimiImg;
@@ -241,8 +248,8 @@ const parseFeatureTags = (tags) => {
   if (typeof tags === 'string') {
     try {
       const parsed = JSON.parse(tags)
-      return Array.isArray(parsed) 
-        ? parsed.map(t => cleanTagText(t)).filter(Boolean) 
+      return Array.isArray(parsed)
+        ? parsed.map(t => cleanTagText(t)).filter(Boolean)
         : []
     } catch {
       return tags.split(',').map(t => cleanTagText(t)).filter(Boolean)
@@ -258,7 +265,7 @@ const activeAvailableTags = vueComputed(() => {
   const allowedTags = ["主廚推薦", "手作工法", "人氣爆棚", "鮮味極致", "經典必點", "職人精神", "嚴選食材", "季節限定", "極致奢華", "限量供應"]
   if (!Array.isArray(menuItems.value)) return []
   const tagCounts = {}
-  
+
   menuItems.value.forEach(item => {
   const tags = parseFeatureTags(item.featureTags)
   tags.forEach(tag => {
@@ -290,26 +297,40 @@ const totalFilteredItemsCount = vueComputed(() => {
 
 const addToCart = (item) => { alert(`🎉 成功將【${item.itemName}】加入購物車！`) }
 
-watch(currentStoreId, (newStoreId) => { if (newStoreId) fetchMenuData(newStoreId) })
+watch(currentStoreId, (newStoreId) => {
+  if (newStoreId) {
+    selectedFeatureTag.value = null  // ✅ 切換分店時重設特色篩選
+    fetchMenuData(newStoreId)
+  }
+})
 
 onMounted(async () => {
-  await fetchHeroBanners(); 
-  await fetchStores(); 
+  await fetchHeroBanners();
+  await fetchStores();
   await fetchCategories();
   if (currentStoreId.value) await fetchMenuData(currentStoreId.value)
   window.addEventListener('scroll', handleWindowScroll)
-  startHeroAutoPlay() 
+  startHeroAutoPlay()
 })
 
-onUnmounted(() => { 
+onUnmounted(() => {
   window.removeEventListener('scroll', handleWindowScroll);
-  stopHeroAutoPlay() 
+  stopHeroAutoPlay()
 })
+
+//浮卡導入order頁面
+const router = useRouter()
+
+const goToOrder = (item) => {
+  router.push('/order')
+  closeItemModal()
+}
+
 </script>
 
 <template>
   <div class="menu-root">
-    
+
     <div v-if="showEdmModal" class="edm-overlay">
       <div class="edm-container shadow-lg">
         <button class="edm-close-btn" @click="showEdmModal = false">✖</button>
@@ -378,23 +399,31 @@ onUnmounted(() => {
         <button class="item-modal-close" @click="closeItemModal">✖</button>
         <div class="item-modal-img-wrapper">
           <img :src="getMenuItemImage(selectedItem)" alt="餐點圖片">
-        </div>
-        <div class="item-modal-body">
-          <div class="d-flex justify-content-between align-items-start mb-3">
-            <h3 class="fw-bold text-dark mb-0">{{ selectedItem.itemName }}</h3>
-            <span class="price-text fs-4">${{ selectedItem.price }}</span>
-          </div>
-          <p class="text-muted mb-3" style="line-height: 1.8;">{{ selectedItem.description }}</p>
-          <div class="d-flex flex-wrap gap-2 mb-3">
+          <div class="item-modal-img-overlay"></div>
+          <div class="item-modal-tags-floating">
             <template v-for="tag in parseFeatureTags(selectedItem.featureTags)">
-              <span v-if="cleanTagText(tag) && ['主廚推薦', '手作工法', '人氣爆棚', '鮮味極致', '經典必點', '職人精神', '嚴選食材', '季節限定', '極致奢華', '限量供應'].includes(cleanTagText(tag))" :key="tag" class="badge-feature">{{ cleanTagText(tag) }}</span>
+              <span v-if="cleanTagText(tag) && ['主廚推薦', '手作工法', '人氣爆棚', '鮮味極致', '經典必點', '職人精神', '嚴選食材', '季節限定', '極致奢華', '限量供應'].includes(cleanTagText(tag))" :key="tag" class="item-modal-tag-pill">
+                {{ cleanTagText(tag) }}
+              </span>
             </template>
           </div>
-          <div v-if="selectedItem.allergenInfo" class="mb-4" style="font-size: 13px; color: #78350f;">
-            🔸 本產品含{{ selectedItem.allergenInfo }}
+        </div>
+        <div class="item-modal-body">
+          <div class="item-modal-title-row">
+            <h3 class="item-modal-title">{{ selectedItem.itemName }}</h3>
+            <span class="item-modal-price">${{ selectedItem.finalPrice }}</span>
           </div>
-          <button @click="addToCart(selectedItem); closeItemModal()" class="btn yayoi-btn-primary w-100 fw-bold py-2" :disabled="selectedItem.isSelectable === false">
-            {{ selectedItem.isSelectable === false ? '暫不供應' : '加入購物車' }}
+
+          <div class="item-modal-divider"></div>
+
+          <p class="item-modal-desc">{{ selectedItem.description }}</p>
+
+          <div v-if="selectedItem.allergenInfo" class="item-modal-allergen">
+            <span>🔸 本產品含{{ selectedItem.allergenInfo }}</span>
+          </div>
+
+          <button @click="goToOrder(selectedItem)" class="btn yayoi-btn-primary w-100 fw-bold py-2" :disabled="selectedItem.isSelectable === false">
+            {{ selectedItem.isSelectable === false ? '已售完' : '立即點餐' }}
           </button>
         </div>
       </div>
@@ -409,10 +438,10 @@ onUnmounted(() => {
           <div class="carousel-fade-wrapper">
             <div class="hero-overlay"></div>
             <img :src="slide.url" class="d-block w-100 h-100 object-fit-cover" alt="形象圖">
-            <div class="carousel-caption hero-text-box animate__animated animate__fadeInUp">
-              <h2 class="fw-bold text-white">{{ slide.title }}</h2>
+            <div class="carousel-caption hero-text-box animate__animated animate__fadeInUp" style="bottom: 25%;">
+             <h2 class="fw-bold text-white" style="font-size: 2.8rem; letter-spacing: 0.05em;">{{ slide.title }}</h2>
               <div class="hero-divider"></div>
-              <p class="text-white fw-light">{{ slide.desc }}</p>
+              <p class="text-white fw-light" style="letter-spacing: 0.08em; font-size: 1.05rem;">{{ slide.desc }}</p>
             </div>
           </div>
         </div>
@@ -430,9 +459,12 @@ onUnmounted(() => {
               <div class="card shadow-sm mb-4 border-0 rounded-3" style="border-radius: 12px !important; overflow: hidden;">
                 <div class="card-body p-3 bg-white">
                   <label class="form-label fw-bold text-secondary small">📍 當前查看門市：</label>
-                  <select v-model="currentStoreId" class="form-select border-2 fw-bold store-select">
-                    <option v-for="store in storeList" :key="store.id" :value="store.id">{{ store.name }}</option>
-                  </select>
+                  <div style="position: relative;">
+                    <select v-model="currentStoreId" class="form-select fw-bold store-select-custom">
+                      <option v-for="store in storeList" :key="store.id" :value="store.id">{{ store.name }}</option>
+                    </select>
+                    <i class="store-select-icon">▼</i>
+                  </div>
                 </div>
               </div>
 
@@ -483,7 +515,7 @@ onUnmounted(() => {
                           <div v-if="selectedFeatureTag" class="mb-2"><span class="badge bg-light text-secondary border px-2 py-1 small fw-normal">{{ cat.name }}系列</span></div>
                           <div class="d-flex justify-content-between mb-2">
                             <h5 class="fw-bold mb-0 text-dark">{{ item.itemName }}</h5>
-                            <span class="price-text">${{ item.price }}</span>
+                            <span class="price-text">${{ item.finalPrice }}</span>
                           </div>
                           <p class="text-muted small mb-3 flex-grow-1" style="line-height: 1.6;">{{ item.description }}</p>
                           <div class="mb-2 d-flex flex-wrap gap-1 align-items-center" style="min-height: 26px;">
@@ -494,9 +526,6 @@ onUnmounted(() => {
                           <div v-if="item.allergenInfo || item.allergen_info" class="mb-3 d-flex align-items-center gap-1 mt-2" style="font-size: 11px; font-weight: 400; letter-spacing: 0.1px;">
                             <span style="color: #78350f; opacity: 0.8;">🔸 本產品含{{ item.allergenInfo || item.allergen_info }}</span>
                           </div>
-                          <button @click="addToCart(item)" class="btn yayoi-btn-primary w-100 fw-bold py-2 mt-auto" :disabled="item.isSelectable === false || item.is_active === 0">
-                            {{ (item.isSelectable === false || item.is_active === 0) ? '暫不供應' : '加入購物車' }}
-                          </button>
                         </div>
                       </div>
                     </div>
@@ -539,7 +568,7 @@ onUnmounted(() => {
 
 /* ================= Hero Section (職人風格優化) ================= */
 .custom-vue-hero-container {
-  position: fixed; top: 90px; left: 0; width: 100%; height: 460px; z-index: 1; 
+  position: fixed; top: 0; left: 0; width: 100%; height: 460px; z-index: 1;
 }
 
 /* 🌟 漸層遮罩優化：解決圖片過亮、大幅增加文字的可讀性與高級感 */
@@ -551,51 +580,51 @@ onUnmounted(() => {
 
 /* 修改這個既有的 class，加入 transition */
 .carousel-fade-item {
-  position: absolute !important; 
-  top: 0; left: 0; width: 100%; height: 100%; 
-  opacity: 0 !important; 
+  position: absolute !important;
+  top: 0; left: 0; width: 100%; height: 100%;
+  opacity: 0 !important;
   transition: opacity 1.2s ease-in-out !important; /* 這是淡入淡出的關鍵 */
   pointer-events: none; /* 讓未選中的圖層不影響點擊 */
 }
 
 /* 當有 active 時，顯示該圖片 */
-.carousel-fade-item.active { 
-  opacity: 1 !important; 
-  z-index: 1 !important; 
+.carousel-fade-item.active {
+  opacity: 1 !important;
+  z-index: 1 !important;
 }
 
 /* 🌟 文字佈局優化：調整至中下方 (top: 65%)，改用 translate 精準置中 */
-.carousel-caption { 
-  z-index: 10 !important; 
+.carousel-caption {
+  z-index: 10 !important;
   text-align: center !important;
-  left: 50% !important; 
+  left: 50% !important;
   top: 65% !important;
-  transform: translate(-50%, -50%) !important;    
+  transform: translate(-50%, -50%) !important;
   width: 100%;
   padding: 0 20px;
 }
 
 /* 🌟 主標題優化：加粗、加大、並拉開字距展現職人內斂感 */
-.carousel-caption h2 { 
-  font-size: 2.6rem !important; 
-  font-weight: 800 !important; 
-  color: #ffffff !important; 
-  letter-spacing: 0.18rem !important; 
+.carousel-caption h2 {
+  font-size: 2.6rem !important;
+  font-weight: 800 !important;
+  color: #ffffff !important;
+  letter-spacing: 0.18rem !important;
   margin-bottom: 18px !important;
   text-shadow: none !important; /* 捨棄厚重陰影，改靠遮罩襯托 */
 }
 
 /* 🌟 置中極細線裝飾點綴 */
-.hero-divider { 
-  width: 50px; 
-  height: 1.5px; 
-  background-color: rgba(255, 255, 255, 0.85); 
-  margin: 0 auto 18px auto; 
+.hero-divider {
+  width: 50px;
+  height: 1.5px;
+  background-color: rgba(255, 255, 255, 0.85);
+  margin: 0 auto 18px auto;
 }
 
 /* 🌟 副標題優化：輕量字體與微調字距，呈現呼吸空氣感 */
-.carousel-caption p { 
-  font-size: 1.15rem !important; 
+.carousel-caption p {
+  font-size: 1.15rem !important;
   color: #ffffff !important;
   font-weight: 300 !important;
   letter-spacing: 0.05rem !important;
@@ -612,7 +641,7 @@ onUnmounted(() => {
 
 /* 核心：強行覆蓋 Bootstrap 的 display 設定 */
 #mainHeroCarousel .carousel-fade-item {
-  display: block !important; 
+  display: block !important;
   opacity: 0;
   transition: opacity 1.2s ease-in-out !important;
   position: absolute;
@@ -638,7 +667,7 @@ onUnmounted(() => {
 /* 滑鼠懸浮時的效果：模擬浮起感 */
 .item-card:hover {
   transform: translateY(-8px);          /* 調整移動距離，更明顯的懸浮感 */
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important; 
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
 }
 
 /* --- 新增：高質感分類標題 (呼吸感與層次提升) --- */
@@ -646,13 +675,13 @@ onUnmounted(() => {
 /* --- 優化後的分類標題樣式 --- */
 .category-section-block h3 {
   font-size: 1.75rem !important;
-  color: #2d2a2a !important; 
+  color: #2d2a2a !important;
   font-weight: 800 !important;
-  
+
   /* 改用 block + margin 來撐開空間，不再使用 ::after */
-  display: block !important; 
+  display: block !important;
   width: fit-content !important; /* 寬度自動貼合文字 */
-  
+
   /* 透過 border-bottom 畫線，這最穩定且不會消失 */
   padding-bottom: 8px !important;
   margin-bottom: 24px !important;
@@ -661,7 +690,7 @@ onUnmounted(() => {
 
 /* 滑鼠滑過時延伸到 100% */
 .category-section-block:hover h3::after {
-  transform: scaleX(1); 
+  transform: scaleX(1);
 }
 
 /* 懸浮效果：讓分類標題在視覺上更靈動 */
@@ -671,7 +700,7 @@ onUnmounted(() => {
 
 /* 圖片區塊優化 */
 .card-img-wrapper {
-  height: 220px;
+  height: 280px;
   overflow: hidden;
   position: relative;
 }
@@ -679,8 +708,45 @@ onUnmounted(() => {
 .card-img-wrapper img {
   width: 100%;
   height: 100%;
-  object-fit: cover !important;
-  transition: transform 0.6s ease;     /* 減慢縮放速度，更有質感 */
+  object-fit: cover;
+  transition: transform 0.6s ease;
+}
+
+.item-card:hover .card-img-wrapper img {
+  transform: scale(1.05);
+}
+
+.card-img-wrapper::after {
+  content: '查看詳情';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.item-card:hover .card-img-wrapper::after {
+  opacity: 1;
+}
+
+/*點擊按鈕*/
+.card-tap-hint {
+  font-size: 12px;
+  color: #b45309;
+  font-weight: 500;
+  margin-top: auto;
+  padding-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.7;
 }
 
 /* 當卡片 hover 時，圖片稍微放大，增加視覺互動性 */
@@ -690,32 +756,42 @@ onUnmounted(() => {
 
 /* ================= 其餘元件設定 (全部保留) ================= */
 .custom-hero-indicators {
-  position: absolute !important; z-index: 50 !important; bottom: 85px !important; 
+  position: absolute !important; z-index: 50 !important; bottom: 12px !important;
   left: 0 !important; right: 0 !important; display: flex !important; justify-content: center !important;
-  margin: 0 !important; list-style: none !important; pointer-events: auto !important; 
+  margin: 0 !important; list-style: none !important; pointer-events: auto !important;
 }
 .custom-hero-indicators button {
-  pointer-events: auto !important; width: 24px !important; height: 3px !important; 
-  border-radius: 20px !important; margin: 0 4px !important; 
+  pointer-events: auto !important; width: 24px !important; height: 3px !important;
+  border-radius: 4px !important; margin: 0 4px !important;
   background-color: rgba(255, 255, 255, 0.25) !important; border: none !important;
-  border-top: 15px solid transparent !important; border-bottom: 15px solid transparent !important; 
+  border-top: 0 !important; border-bottom: 0 !important;
   transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important; cursor: pointer !important;
 }
 .custom-hero-indicators button.active { background-color: rgba(92, 64, 51, 0.7) !important; width: 36px !important; }
 
-.main-content-wrapper { position: relative; z-index: 10; background-color: #fafafa !important; margin-top: 460px; padding-top: 25px; padding-bottom: 100px; }
+.main-content-wrapper {
+  position: relative;
+  z-index: 10;
+  background-color: #f8f2ea !important;
+  background-image: url('@/assets/images/background.png');
+  background-repeat: repeat;
+  background-size: auto;
+  margin-top: 460px;
+  padding-top: 25px;
+  padding-bottom: 100px;
+}
 .menu-sections-container { background-color: #fafafa; border-radius: 12px; padding: 20px; }
-.sidebar-item { 
-  transition: all 0.2s ease; 
+.sidebar-item {
+  transition: all 0.2s ease;
   font-size: 15px;
   letter-spacing: 0.05rem;
   font-weight: 500;
   color: #3d2b1f;
 }
-.sidebar-item:hover:not(.yayoi-active) { 
-  background-color: #fff7ed !important; 
-  color: #b45309 !important; 
-  padding-left: 1.5rem !important; 
+.sidebar-item:hover:not(.yayoi-active) {
+  background-color: #fff7ed !important;
+  color: #b45309 !important;
+  padding-left: 1.5rem !important;
 }
 .yayoi-active { background-color: #b45309 !important; color: white !important; border-left: 5px solid #ffc107 !important; padding-left: 1.5rem !important; box-shadow: 0 4px 10px rgba(180, 83, 9, 0.3); }
 .store-select:focus { border-color: #b45309; box-shadow: 0 0 0 0.25rem rgba(180, 83, 9, 0.2); }
@@ -723,14 +799,14 @@ onUnmounted(() => {
 .badge-feature { background: #fdf2e9; color: #ca8a04; border: 1px solid #fef08a; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; }
 .yayoi-btn-primary { background: linear-gradient(135deg, #f97316, #ea580c); color: white; border: none; border-radius: 6px; }
 
-.tag-pill { 
-  border: 1px solid #e5e7eb; 
-  border-radius: 6px !important; 
-  padding: 6px 14px; 
-  font-size: 13px; 
-  font-weight: 500; 
-  color: #5c4033; 
-  background-color: #ffffff; 
+.tag-pill {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px !important;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #5c4033;
+  background-color: #ffffff;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
 }
@@ -750,23 +826,23 @@ onUnmounted(() => {
   opacity: 0.8;
 }
 
-.tag-pill:hover { 
-  border-color: #fdba74; 
-  color: #c2410c; 
-  background-color: #fff7ed; 
-  transform: translateY(-1px); 
+.tag-pill:hover {
+  border-color: #fdba74;
+  color: #c2410c;
+  background-color: #fff7ed;
+  transform: translateY(-1px);
 }
 
 .tag-pill:hover::after {
   transform: scaleX(1);
 }
 
-.tag-pill.active { 
-  background: linear-gradient(135deg, #fff7ed, #ffedd5) !important; 
-  border-color: #b45309 !important; 
-  color: #78350f !important; 
-  font-weight: 600; 
-  box-shadow: 0 4px 12px rgba(180, 83, 9, 0.15) !important; 
+.tag-pill.active {
+  background: linear-gradient(135deg, #fff7ed, #ffedd5) !important;
+  border-color: #b45309 !important;
+  color: #78350f !important;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(180, 83, 9, 0.15) !important;
 }
 
 .tag-pill.active::after {
@@ -826,11 +902,13 @@ onUnmounted(() => {
   color: #b45309;
 }
 
+/*浮卡設計*/
 .item-modal-img-wrapper {
   width: 100%;
-  height: 260px;
+  height: 300px;
   overflow: hidden;
   border-radius: 16px 16px 0 0;
+  position: relative;
 }
 
 .item-modal-img-wrapper img {
@@ -839,13 +917,117 @@ onUnmounted(() => {
   object-fit: cover;
 }
 
+.item-modal-img-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 35%);
+}
+
+.item-modal-tags-floating {
+  position: absolute;
+  bottom: 14px;
+  left: 18px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.item-modal-tag-pill {
+  background: rgba(255, 255, 255, 0.92);
+  color: #9a3412;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
 .item-modal-body {
-  padding: 24px;
+  padding: 24px 22px 22px;
+}
+
+.item-modal-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+.item-modal-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #2d2a2a;
+}
+
+.item-modal-price {
+  font-size: 20px;
+  font-weight: 700;
+  color: #b45309;
+  white-space: nowrap;
+  margin-left: 12px;
+}
+
+.item-modal-divider {
+  width: 32px;
+  height: 2px;
+  background: #b45309;
+  opacity: 0.5;
+  margin: 10px 0 14px;
+}
+
+.item-modal-desc {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #6b6b66;
+  margin: 0 0 18px;
+}
+
+.item-modal-allergen {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  background: #fef3e2;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  font-size: 12px;
+  color: #7c2d12;
 }
 
 @keyframes modalFadeIn {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+.store-select-custom {
+  width: 100%;
+  padding: 11px 40px 11px 14px;
+  border: 1px solid #f3e2d3 !important;
+  border-radius: 10px !important;
+  background-color: #fffaf3 !important;
+  color: #5c4033 !important;
+  font-size: 14px;
+  font-weight: 500;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  background-image: none !important;
+}
+
+.store-select-custom:focus {
+  border-color: #d6a36e !important;
+  box-shadow: 0 0 0 0.15rem rgba(180, 83, 9, 0.1) !important;
+  outline: none;
+}
+
+.store-select-icon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: #b08968;
+  pointer-events: none;
 }
 
 .sold-out { opacity: 0.65; }

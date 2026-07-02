@@ -596,16 +596,22 @@ onBeforeUnmount(() => {
 <style scoped>
 .reservation-page {
   min-height: 100vh;
-  background-color:#e4e2dd;
+  background-color:#f8f2ea;
   /* background: url('../../../assets/images/background.png'); */
 }
 
 .reservation-hero {
   min-height: 458px;
   padding: 138px 0 62px;
-  background: url('@/assets/images/reservation.jpg');
-  background-position: center;
+  background-image: linear-gradient(
+      180deg,
+      rgba(35, 34, 30, 0.25) 0%,
+      rgba(35, 34, 30, 0.62) 100%
+    ),
+    url('@/assets/images/reservation.jpg');
+  background-blend-mode: multiply;
   background-size: 113% auto;
+  background-position: center;
   background-repeat: no-repeat;
 }
 
@@ -618,7 +624,6 @@ onBeforeUnmount(() => {
 .reservation-hero-content {
   max-width: 750px;
   padding-left: 100px;
-  padding-bottom: 10px;
   color: #ffffff;
 }
 
@@ -634,7 +639,7 @@ onBeforeUnmount(() => {
 .reservation-hero-content h1 {
   max-width: 680px;
   margin: 12px 0 18px;
-  font-size: 58px;
+  font-size: 60px;
   font-weight: 700;
   line-height: 1.05;
   letter-spacing: 0;

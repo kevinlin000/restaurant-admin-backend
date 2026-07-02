@@ -108,6 +108,18 @@ public class OrderService {
 
                 Reservation reservation = resolveReservation(request, user, store, orderType);
 
+                // 若是從訂位進來點餐，訂單歸屬以訂位資料為主。
+                // 會員訂位：訂單歸訂位會員
+                // 非會員訂位：訂單 user 為 null
+                if (reservation != null) {
+                        if (reservation.getUserId() != null) {
+                                user = userRepository.findById(reservation.getUserId())
+                                                .orElseThrow(() -> new BusinessException("找不到訂位會員"));
+                        } else {
+                                user = null;
+                        }
+                }
+
                 if (reservation != null
                                 && reservation.getDepositAmount() != null
                                 && reservation.getDepositAmount().compareTo(BigDecimal.ZERO) > 0
@@ -437,10 +449,10 @@ public class OrderService {
                         throw new BusinessException("訂位門市與訂單門市不一致");
                 }
 
-                if (reservation.getUserId() != null && user != null &&
-                                !reservation.getUserId().equals(user.getUserId())) {
-                        throw new BusinessException("訂位會員與訂單會員不一致");
-                }
+                // if (reservation.getUserId() != null && user != null &&
+                // !reservation.getUserId().equals(user.getUserId())) {
+                // throw new BusinessException("訂位會員與訂單會員不一致");
+                // }
 
                 if ("CANCELLED".equals(reservation.getStatus())) {
                         throw new BusinessException("已取消的訂位不可建立訂單");
