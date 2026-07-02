@@ -31,8 +31,8 @@ const newItem = ref({
   price: '',
   description: '',
   imageUrl: '',
-  categoryId: 1,
-  status: 'AVAILABLE',
+  categoryId: null,
+  isActive: true,
   allergenInfo: '',
   featureTags: '' // 👈 前端下拉選單先用空字串綁定單選值
 })
@@ -102,6 +102,13 @@ const handleAddItemMenu = async () => {
     alert('請填寫完整餐點名稱與價格！')
     return
   }
+
+  // ✅ 加上分類驗證
+  if (!newItem.value.categoryId) {
+    alert('請選擇餐點分類！')
+    return
+  }
+
   try {
     // ⚡【全端資料清洗管線】對齊 SQL JSON 陣列格式！
     // 如果店長有選標籤，就用陣列包裹打包（例如: ["主廚推薦"]）；若無則傳送 null
@@ -161,13 +168,9 @@ const handleAddItemMenu = async () => {
 
         <!-- 🎯 ADMIN 專用：選擇定價範圍 -->
         <div v-if="isAdmin" class="col-md-12 mb-2">
-          <label class="form-label fw-bold small" style="color: #4b5563;">🏪 定價範圍</label>
-          <select v-model="currentStoreId" class="form-select form-control-solid" style="color: #374151; border-color: #cbd5e1; font-weight: 500;">
-            <option value="ALL">🌐 全台統一定價（修改基準價）</option>
-            <option v-for="store in storeList" :key="store.id" :value="store.id">
-              🏪 {{ store.name }}
-            </option>
-          </select>
+          <div style="padding: 10px 14px; border: 1px solid #d8b4fe; border-radius: 10px; background-color: #f5f3ff; color: #7c6b9e; font-size: 14px; font-weight: 500;">
+            🌐 全台統一定價（設定基準價，各店依區域規則自動計算最終售價。）
+          </div>
         </div>
 
         <div class="row g-3">
@@ -183,15 +186,12 @@ const handleAddItemMenu = async () => {
 
           <div class="col-md-3">
             <label class="form-label fw-bold small" style="color: #4b5563;">餐點分類</label>
-            <select v-model="newItem.categoryId" class="form-select form-control-solid" style="color: #374151; border-color: #cbd5e1; font-weight: 500;">
-              <option 
-                v-for="cat in categoryList" 
-                :key="cat.id" 
-                :value="cat.id"
-                style="color: #374151;">
-                {{ cat.categoryName }}
-              </option>
-            </select>
+           <select v-model="newItem.categoryId" class="form-select form-control-solid">
+            <option value="" disabled selected style="color: #9ca3af;">請選擇餐點分類（必填）</option>
+            <option v-for="cat in categoryList" :key="cat.id" :value="cat.id">
+              {{ cat.categoryName }}
+            </option>
+          </select>
           </div>
 
           <div class="col-md-3">

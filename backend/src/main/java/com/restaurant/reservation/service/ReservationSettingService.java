@@ -26,6 +26,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ReservationSettingService {
+    // 寫死開放天數，前端訂位頁只顯示今天起 30 天內的日期，超過 30 天的日期不顯示
+    private static final int RESERVATION_OPEN_DAYS = 30;
 
     private final TableInfoRepository tableInfoRepository;
     private final TimeSlotRepository timeSlotRepository;
@@ -39,10 +41,16 @@ public class ReservationSettingService {
 
     // 日期時段設定名單：查分店全部時段
     public List<TimeSlot> getTimeSlots(Long storeId, java.time.LocalDate date) {
-        if (date == null) {
-            return timeSlotRepository.findByStoreIdOrderByReservationDateAscStartTimeAsc(storeId);
-        }
-        return timeSlotRepository.findByStoreIdAndReservationDateOrderByStartTimeAsc(storeId, date);
+        // if (date == null) {
+        //     return timeSlotRepository.findByStoreIdOrderByReservationDateAscStartTimeAsc(storeId);
+        // }
+
+        // return timeSlotRepository.findByStoreIdAndReservationDateOrderByStartTimeAsc(storeId, date);
+        // 依目前開放天數同步 is_open
+        List<TimeSlot> slots = date == null
+                ? timeSlotRepository.findByStoreIdOrderByReservationDateAscStartTimeAsc(storeId)
+                : timeSlotRepository.findByStoreIdAndReservationDateOrderByStartTimeAsc(storeId, date);
+        return syncOpenStatus(slots);
     }
 
     // 新增訂位日期時段
@@ -71,7 +79,7 @@ public class ReservationSettingService {
                 .dayOfWeek(resolveDayOfWeek(request.getReservationDate()))
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
-                .isOpen(request.getIsOpen() == null || request.getIsOpen())
+                .isOpen(isWithinReservationOpenWindow(request.getReservationDate()))
                 .ruleGenerated(Boolean.TRUE.equals(request.getRuleGenerated()))
                 .requiresDeposit(Boolean.TRUE.equals(request.getRequiresDeposit()))
                 .depositAmount(depositAmount)
@@ -110,7 +118,7 @@ public class ReservationSettingService {
         slot.setDayOfWeek(resolveDayOfWeek(request.getReservationDate()));
         slot.setStartTime(request.getStartTime());
         slot.setEndTime(request.getEndTime());
-        slot.setIsOpen(request.getIsOpen() == null || request.getIsOpen());
+        slot.setIsOpen(isWithinReservationOpenWindow(request.getReservationDate()));
         slot.setRuleGenerated(Boolean.TRUE.equals(request.getRuleGenerated()));
         slot.setRequiresDeposit(Boolean.TRUE.equals(request.getRequiresDeposit()));
         slot.setDepositAmount(depositAmount);
@@ -191,6 +199,30 @@ public class ReservationSettingService {
 
     private Integer resolveDayOfWeek(LocalDate reservationDate) {
         return reservationDate == null ? null : reservationDate.getDayOfWeek().getValue();
+    }
+
+    private boolean isWithinReservationOpenWindow(LocalDate reservationDate) {
+        if (reservationDate == null) {
+            return false;
+        }
+        LocalDate today = LocalDate.now();
+        return !reservationDate.isBefore(today)
+                && !reservationDate.isAfter(today.plusDays(RESERVATION_OPEN_DAYS));
+    }
+    // 是否開放訂位狀態 (寫死的30天內)
+    private List<TimeSlot> syncOpenStatus(List<TimeSlot> slots) {
+        boolean changed = false;
+        for (TimeSlot slot : slots) {
+            boolean shouldOpen = isWithinReservationOpenWindow(slot.getReservationDate());
+            if (!Boolean.valueOf(shouldOpen).equals(slot.getIsOpen())) {
+                slot.setIsOpen(shouldOpen);
+                changed = true;
+            }
+        }
+        if (changed) {
+            return timeSlotRepository.saveAll(slots);
+        }
+        return slots;
     }
 
     private TimeSlot findTimeSlot(Long slotId) {
