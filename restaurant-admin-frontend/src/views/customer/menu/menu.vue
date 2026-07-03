@@ -267,6 +267,8 @@ const fetchMenuData = async (storeId) => {
       if (item.categoryId === undefined) item.categoryId = item.category_id;
       return item;
     })
+    console.log('第一筆資料完整內容:', menuItems.value[0])
+    console.log('第一筆資料的 featureTags:', menuItems.value[0]?.featureTags)
   } catch (error) { console.error('菜單載入失敗', error); menuItems.value = [] }
 }
 
@@ -825,11 +827,17 @@ html {
   color: #b45309 !important;
   padding-left: 1.5rem !important;
 }
-.yayoi-active { background-color: #b45309 !important; color: white !important; border-left: 5px solid #ffc107 !important; padding-left: 1.5rem !important; box-shadow: 0 4px 10px rgba(180, 83, 9, 0.3); }
-.store-select:focus { border-color: #b45309; box-shadow: 0 0 0 0.25rem rgba(180, 83, 9, 0.2); }
-.price-text { color: #b45309; font-size: 1.4rem; font-weight: 800; }
-.badge-feature { background: #fdf2e9; color: #ca8a04; border: 1px solid #fef08a; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; }
-.yayoi-btn-primary { background: linear-gradient(135deg, #f97316, #ea580c); color: white; border: none; border-radius: 6px; }
+.yayoi-btn-primary { 
+  background: linear-gradient(135deg, #f97316, #ea580c); 
+  color: white !important; 
+  border: none; 
+  border-radius: 6px; 
+  transition: background 0.2s ease; 
+}
+
+.yayoi-btn-primary:hover {
+  background: linear-gradient(135deg, #fdba74, #fb923c); /* 同色系但飽和度降低的淡橘色 */
+}
 
 .tag-pill {
   border: 1px solid #e5e7eb;
@@ -1068,4 +1076,28 @@ html {
 .object-fit-cover { object-fit: cover; }
 .brightness-50 { filter: brightness(0.5); }
 .shadow-text { text-shadow: 2px 2px 8px rgba(0,0,0,0.8); }
+
+.yayoi-active {
+  background-color: #b45309 !important;
+  color: white !important;
+  border-left: 5px solid #ffc107 !important;
+  padding-left: 1.5rem !important;
+  box-shadow: 0 4px 10px rgba(180, 83, 9, 0.3);
+}
+
+.price-text {
+  color: #b45309;
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.badge-feature {
+  background: #fdf2e9;
+  color: #ca8a04;
+  border: 1px solid #fef08a;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
 </style>

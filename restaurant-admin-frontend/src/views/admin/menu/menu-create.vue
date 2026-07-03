@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue' // 💡 完美引入動態計算屬性
+import { ref, onMounted, computed, watch } from 'vue' // 💡 完美引入動態計算屬性
 import { useRouter } from 'vue-router' // 🚀 1. 引入 Vue Router 的導航推手
 import axios from '@/api/axios';
 
@@ -34,8 +34,58 @@ const newItem = ref({
   categoryId: null,
   isActive: true,
   allergenInfo: '',
-  featureTags: '' // 👈 前端下拉選單先用空字串綁定單選值
+  featureTags: [] // 👈 改成陣列，支援多選
 })
+
+// ✨ 統一管理的 10 個特色行銷標籤（與前台一致）
+const featureTagOptions = [
+  { value: '主廚推薦', label: '👑 主廚推薦' },
+  { value: '手作工法', label: '👨‍🍳 手作工法' },
+  { value: '人氣爆棚', label: '🔥 人氣爆棚' },
+  { value: '鮮味極致', label: '🐟 鮮味極致' },
+  { value: '經典必點', label: '✨ 經典必點' },
+  { value: '職人精神', label: '🎯 職人精神' },
+  { value: '嚴選食材', label: '🌿 嚴選食材' },
+  { value: '季節限定', label: '🌸 季節限定' },
+  { value: '極致奢華', label: '💎 極致奢華 (限量)' },
+  { value: '限量供應', label: '⏳ 限量供應 (限量)' }
+]
+const MAX_FEATURE_TAGS = 3
+
+// ✅ 切換單一標籤的勾選狀態，最多 3 個
+const toggleFeatureTag = (tagValue) => {
+  const idx = newItem.value.featureTags.indexOf(tagValue)
+  if (idx > -1) {
+    newItem.value.featureTags.splice(idx, 1)
+  } else {
+    if (newItem.value.featureTags.length >= MAX_FEATURE_TAGS) {
+      alert(`最多只能選擇 ${MAX_FEATURE_TAGS} 個標籤喔！`)
+      return
+    }
+    newItem.value.featureTags.push(tagValue)
+  }
+}
+
+// ✅ 下拉按鈕上顯示已選標籤，收合成一排文字
+const selectedTagsText = computed(() => {
+  if (!newItem.value.featureTags.length) return '-- 請選擇標籤（最多 3 個）--'
+  return newItem.value.featureTags.join('、')
+})
+
+// ✅ 解析後端回傳的標籤（可能是陣列或 JSON 字串），供列表顯示用
+const parseFeatureTags = (tags) => {
+  if (!tags) return []
+  if (Array.isArray(tags)) return tags
+  if (typeof tags === 'string') {
+    try {
+      const parsed = JSON.parse(tags)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return tags.split(',').map(t => t.trim()).filter(Boolean)
+    }
+  }
+  return []
+}
 
 // 🚀 4. 初始化為空籃子，準備裝真實數據
 const menuItems = ref([])
@@ -112,7 +162,9 @@ const handleAddItemMenu = async () => {
   try {
     // ⚡【全端資料清洗管線】對齊 SQL JSON 陣列格式！
     // 如果店長有選標籤，就用陣列包裹打包（例如: ["主廚推薦"]）；若無則傳送 null
-    const processedTags = newItem.value.featureTags ? [newItem.value.featureTags] : null;
+    const processedTags = newItem.value.featureTags.length > 0 
+      ? newItem.value.featureTags.join(',')  // 👈 阵列转成逗号分隔字串，符合後端 String 型态
+      : null;
 
     // 🎯 完美咬合後端最新 POST /api/menu-items/store/{storeId} 隔離管線，精準寫入 store_menu！
     const response = await axios.post(`/api/menu-items/store/${currentStoreId.value}`, {
@@ -141,7 +193,7 @@ const handleAddItemMenu = async () => {
         categoryId: 1, 
         status: 'AVAILABLE', 
         allergenInfo: '',
-        featureTags: '' // 👈 清空重置
+        featureTags: [] // 👈 清空重置
       } 
     } else {
       alert('上架失敗：' + response.data.message)
@@ -221,21 +273,30 @@ const handleAddItemMenu = async () => {
             </div>
           </div>
 
-          <div class="col-md-3">
-            <label class="form-label fw-bold small" style="color: #4b5563;">✨ 特色行銷標籤</label>
-            <select v-model="newItem.featureTags" class="form-select form-control-solid" style="color: #374151; border-color: #cbd5e1; font-weight: 500; border-radius: 6px;">
-              <option value="">-- 不設定標籤（留白） --</option>
-              <option value="主廚推薦">👑 主廚推薦</option>
-              <option value="手作工法">👨‍🍳 手作工法</option>
-              <option value="人氣爆棚">🔥 人氣爆棚</option>
-              <option value="鮮味極致">🐟 鮮味極致</option>
-              <option value="經典必點">✨ 經典必點</option>
-              <option value="職人精神">🎯 職人精神</option>
-              <option value="嚴選食材">🌿 嚴選食材</option>
-              <option value="季節限定">🌸 季節限定</option>
-              <option value="極致奢華">💎 極致奢華 (限量)</option>
-              <option value="限量供應">⏳ 限量供應 (限量)</option>
-            </select>
+         <div class="col-md-3">
+            <label class="form-label fw-bold small" style="color: #4b5563;">✨ 特色行銷標籤（最多 3 個）</label>
+            <div class="dropdown">
+              <button
+                class="btn form-select form-control-solid text-start d-flex justify-content-between align-items-center"
+                type="button"
+                data-bs-toggle="dropdown"
+                data-bs-auto-close="outside"
+                aria-expanded="false"
+                style="color: #374151; border-color: #cbd5e1; font-weight: 500; border-radius: 6px;"
+              >
+                <span class="text-truncate">{{ selectedTagsText }}</span>
+              </button>
+              <ul class="dropdown-menu p-2" style="width: 100%; max-height: 260px; overflow-y: auto;">
+                <li v-for="tag in featureTagOptions" :key="tag.value">
+                  <a class="dropdown-item d-flex align-items-center gap-2" href="#" style="cursor: pointer;" @click.prevent="toggleFeatureTag(tag.value)">
+                    <span class="d-inline-flex align-items-center justify-content-center" :style="{ width: '16px', height: '16px', borderRadius: '4px', border: newItem.featureTags.includes(tag.value) ? '1px solid #7c3aed' : '1px solid #cbd5e1', backgroundColor: newItem.featureTags.includes(tag.value) ? '#7c3aed' : '#ffffff', color: '#ffffff', fontSize: '11px', flexShrink: 0 }">
+                      <i v-if="newItem.featureTags.includes(tag.value)" class="fa-solid fa-check"></i>
+                    </span>
+                    <span>{{ tag.label }}</span>
+                  </a>
+                </li>
+              </ul>
+            </div>
           </div>
 
           <div class="col-md-12">
@@ -273,6 +334,7 @@ const handleAddItemMenu = async () => {
                 <th style="width: 100px; color: #374151;">價格</th>
                 <th style="color: #374151;">餐點描述</th>
                 <th style="color: #374151;">過敏原</th>
+                <th style="width: 180px; color: #374151;">行銷標籤</th>
                 <th style="width: 120px; color: #374151;">狀態</th>
                 <th class="px-4" style="width: 100px; color: #374151;">操作</th>
               </tr>
@@ -295,6 +357,23 @@ const handleAddItemMenu = async () => {
                 <td class="text-muted small" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ item.description || '暫無描述' }}</td>
                 <td>
                   <span v-if="item.allergenInfo" class="badge text-amber-800 bg-warning bg-opacity-10 border border-warning-subtle rounded-2" style="font-size: 0.75rem; color: #9a3412; background-color: #ffedd5 !important;">{{ item.allergenInfo }}</span>
+                  <span v-else class="text-muted small">無</span>
+                </td>
+                <td>
+                  <template v-if="parseFeatureTags(item.featureTags).length">
+                    <span
+                      v-for="tag in parseFeatureTags(item.featureTags).slice(0, 2)"
+                      :key="tag"
+                      class="badge me-1"
+                      style="background-color: #fdf2e9; color: #ca8a04; border: 1px solid #fef08a; font-weight: 600;"
+                    >{{ tag }}</span>
+                    <span
+                      v-if="parseFeatureTags(item.featureTags).length > 2"
+                      class="badge bg-light text-secondary border"
+                      style="cursor: help;"
+                      :title="parseFeatureTags(item.featureTags).join('、')"
+                    >+{{ parseFeatureTags(item.featureTags).length - 2 }}</span>
+                  </template>
                   <span v-else class="text-muted small">無</span>
                 </td>
                 <td>

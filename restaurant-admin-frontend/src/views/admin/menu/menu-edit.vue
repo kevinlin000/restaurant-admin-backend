@@ -19,6 +19,21 @@ const currentStoreId = ref(
   isAdmin ? 'ALL' : (Number(localStorage.getItem('storeId')) || 1)
 )
 
+// ✨ 統一管理的 10 個特色行銷標籤（與前台一致）
+const featureTagOptions = [
+  { value: '主廚推薦', label: '👑 主廚推薦' },
+  { value: '手作工法', label: '👨‍🍳 手作工法' },
+  { value: '人氣爆棚', label: '🔥 人氣爆棚' },
+  { value: '鮮味極致', label: '🐟 鮮味極致' },
+  { value: '經典必點', label: '✨ 經典必點' },
+  { value: '職人精神', label: '🎯 職人精神' },
+  { value: '嚴選食材', label: '🌿 嚴選食材' },
+  { value: '季節限定', label: '🌸 季節限定' },
+  { value: '極致奢華', label: '💎 極致奢華 (限量)' },
+  { value: '限量供應', label: '⏳ 限量供應 (限量)' }
+]
+const MAX_FEATURE_TAGS = 3
+
 // 3. 🎯 完美對齊 Java MenuItem.java 的屬性規格！
 const formData = ref({
   id: null,
@@ -29,8 +44,43 @@ const formData = ref({
   imageUrl: '',
   isActive: true, // 🚀 史詩級同步：只用 isActive 布林值！
   allergenInfo: '',
-  featureTags: '' // 👈 前端下拉選單預設用空字串綁定單選值
+  featureTags: [] // 👈 改成陣列，支援多選
 })
+
+// ✅ 切換單一標籤的勾選狀態，最多 3 個
+const toggleFeatureTag = (tagValue) => {
+  const idx = formData.value.featureTags.indexOf(tagValue)
+  if (idx > -1) {
+    formData.value.featureTags.splice(idx, 1)
+  } else {
+    if (formData.value.featureTags.length >= MAX_FEATURE_TAGS) {
+      alert(`最多只能選擇 ${MAX_FEATURE_TAGS} 個標籤喔！`)
+      return
+    }
+    formData.value.featureTags.push(tagValue)
+  }
+}
+
+// ✅ 下拉按鈕上顯示已選標籤，收合成一排文字
+const selectedTagsText = computed(() => {
+  if (!formData.value.featureTags.length) return '-- 請選擇標籤（最多 3 個）--'
+  return formData.value.featureTags.join('、')
+})
+
+// ✅ 解析後端回傳的標籤（可能是陣列或 JSON 字串），供列表顯示用
+const parseFeatureTags = (tags) => {
+  if (!tags) return []
+  if (Array.isArray(tags)) return tags
+  if (typeof tags === 'string') {
+    try {
+      const parsed = JSON.parse(tags)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return tags.split(',').map(t => t.trim()).filter(Boolean)
+    }
+  }
+  return []
+}
 
 // 下方列表數據與搜尋字串
 const menuItems = ref([])
@@ -79,19 +129,17 @@ const selectItem = (item) => {
     ...item,
     price: item.finalPrice ,
     isActive: item.isSelectable,
-    // ⚡ 核心回填：從下方列表選取時，若有標籤陣列，將第一個值抽出來做為單選值回填
-    featureTags: (item.featureTags && item.featureTags.length > 0) ? item.featureTags[0] : ''
+    // ⚡ 核心回填：完整保留所有標籤，不再只取第一個
+    featureTags: parseFeatureTags(item.featureTags)
   }
   menuItemId.value = item.id
   actualIsActive.value = item.isSelectable
   
-  // 🎯 絲滑滾動大絕招
   window.scrollTo({
     top: 0,
     behavior: 'smooth'
   })
   
-  // 🎯 自動聚焦餐點名稱輸入框
   setTimeout(() => {
     const nameInput = document.getElementById('itemNameInput')
     if (nameInput) nameInput.focus()
@@ -104,33 +152,28 @@ onMounted(async () => {
   fetchAllMenuItems()    //任務a:搬分店大清單
   fetchCategories()
   if (menuItemId.value) {  //任務b:去搬這「單一品項」的舊資料
-    try {
-      // 🎯 移除硬編碼，回歸相對路徑
-      const res = await axios.get(`/api/menu-items/${menuItemId.value}`)
-      const rawData = res.data.data || res.data
-      
-      // ⚡ 核心動態回填：將後端回傳的 List 標籤解構為單選下拉選單所需值
-      let currentTag = '';
-      if (rawData.featureTags && rawData.featureTags.length > 0) {
-        currentTag = rawData.featureTags[0];
-      }
+  try {
+    const res = await axios.get(`/api/menu-items/${menuItemId.value}`)
+    const rawData = res.data.data || res.data
 
-      formData.value = {
-        ...rawData,
-        // 如果是點進來的，由於是從總表撈單一品項，若分店有客製價則優先沿用，沒有就用總部的
-        price: rawData.price || rawData.basePrice,
-        featureTags: currentTag // 將解析後的標籤回填入 formData
-      }
-    } catch (error) {
-      console.error('撈取單一菜單資料失敗：', error)
+    formData.value = {
+      ...rawData,
+      price: rawData.price || rawData.basePrice,
+      // ⚡ 核心動態回填：完整保留所有標籤陣列，不再只取第一個
+      featureTags: parseFeatureTags(rawData.featureTags)
     }
+  } catch (error) {
+    console.error('撈取單一菜單資料失敗：', error)
   }
+}
 })
 
 // ✅ 共用函式，放在 handleUpdateMenu 上方
   const submitMenuUpdate = async (overrideData = {}) => {
   const cleanMenuId = parseInt(menuItemId.value, 10)
-  const processedTags = formData.value.featureTags || null
+  const processedTags = formData.value.featureTags.length > 0 
+    ? formData.value.featureTags.join(',')  // 👈 阵列转回逗号分隔字串
+    : null
 
   // ✅ 判斷是全台統一還是特定分店
   const storeIdValue = currentStoreId.value === 'ALL' ? 'ALL' : parseInt(currentStoreId.value, 10)
@@ -204,7 +247,7 @@ const handlePermanentDelete = async () => {
   try {
     await axios.delete(`/api/menu-items/${formData.value.id}/permanent`)
     alert('✅ 已永久刪除！')
-    formData.value = { id: null, categoryId: 1, itemName: '', price: '', description: '', imageUrl: '', isActive: true, allergenInfo: '', featureTags: '' }
+   formData.value = { id: null, categoryId: 1, itemName: '', price: '', description: '', imageUrl: '', isActive: true, allergenInfo: '', featureTags: [] }
     menuItemId.value = null
     fetchAllMenuItems()
   } catch (error) {
@@ -257,20 +300,29 @@ const handlePermanentDelete = async () => {
           </div>
 
           <div class="col-md-2">
-            <label class="form-label fw-bold small" style="color: #4b5563;">✨ 特色行銷標籤</label>
-            <select v-model="formData.featureTags" class="form-select form-control-solid bg-white" style="color: #374151; border-color: #fed7aa; font-weight: 500; border-radius: 6px;">
-              <option value="">-- 不設定標籤（留白） --</option>
-              <option value="主廚推薦">👑 主廚推薦</option>
-              <option value="手作工法">👨‍🍳 手作工法</option>
-              <option value="人氣爆棚">🔥 人氣爆棚</option>
-              <option value="鮮味極致">🐟 鮮味極致</option>
-              <option value="經典必點">✨ 經典必點</option>
-              <option value="職人精神">🎯 職人精神</option>
-              <option value="嚴選食材">🌿 嚴選食材</option>
-              <option value="季節限定">🌸 季節限定</option>
-              <option value="極致奢華">💎 極致奢華 (限量)</option>
-              <option value="限量供應">⏳ 限量供應 (限量)</option>
-            </select>
+            <label class="form-label fw-bold small" style="color: #4b5563;">✨ 特色行銷標籤（最多 3 個）</label>
+            <div class="dropdown">
+              <button
+                class="btn form-select form-control-solid bg-white text-start d-flex justify-content-between align-items-center"
+                type="button"
+                data-bs-toggle="dropdown"
+                data-bs-auto-close="outside"
+                aria-expanded="false"
+                style="color: #374151; border-color: #fed7aa; font-weight: 500; border-radius: 6px;"
+              >
+                <span class="text-truncate">{{ selectedTagsText }}</span>
+              </button>
+              <ul class="dropdown-menu p-2" style="width: 100%; max-height: 260px; overflow-y: auto;">
+                <li v-for="tag in featureTagOptions" :key="tag.value">
+                  <a class="dropdown-item d-flex align-items-center gap-2" href="#" style="cursor: pointer;" @click.prevent="toggleFeatureTag(tag.value)">
+                    <span class="d-inline-flex align-items-center justify-content-center" :style="{ width: '16px', height: '16px', borderRadius: '4px', border: formData.featureTags.includes(tag.value) ? '1px solid #ea580c' : '1px solid #cbd5e1', backgroundColor: formData.featureTags.includes(tag.value) ? '#ea580c' : '#ffffff', color: '#ffffff', fontSize: '11px', flexShrink: 0 }">
+                      <i v-if="formData.featureTags.includes(tag.value)" class="fa-solid fa-check"></i>
+                    </span>
+                    <span>{{ tag.label }}</span>
+                  </a>
+                </li>
+              </ul>
+            </div>
           </div>
 
           <div class="col-md-2">
@@ -363,9 +415,20 @@ const handlePermanentDelete = async () => {
                 <td class="fw-bold" style="color: #16a34a;">${{ item.price || item.basePrice }}</td>
                 
                 <td>
-                  <span v-if="item.featureTags && item.featureTags.length > 0 && item.featureTags[0]" class="badge border" style="background-color: #fff7ed; color: #c2410c; border-color: #fed7aa; font-weight: bold;">
-                    {{ item.featureTags[0] }}
-                  </span>
+                  <template v-if="parseFeatureTags(item.featureTags).length">
+                    <span
+                      v-for="tag in parseFeatureTags(item.featureTags).slice(0, 2)"
+                      :key="tag"
+                      class="badge border me-1"
+                      style="background-color: #fff7ed; color: #c2410c; border-color: #fed7aa; font-weight: bold;"
+                    >{{ tag }}</span>
+                    <span
+                      v-if="parseFeatureTags(item.featureTags).length > 2"
+                      class="badge bg-light text-secondary border"
+                      style="cursor: help;"
+                      :title="parseFeatureTags(item.featureTags).join('、')"
+                    >+{{ parseFeatureTags(item.featureTags).length - 2 }}</span>
+                  </template>
                   <span v-else class="text-muted small fw-normal">無</span>
                 </td>
 
