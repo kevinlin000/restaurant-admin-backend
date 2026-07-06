@@ -1,5 +1,15 @@
 import http from './http'
 
+const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
+
+// 前端直接跳轉到後端付款頁時使用。若沒有設定 VITE_API_BASE_URL，就走目前網域的 /api
+// 若 VITE_API_BASE_URL 已包含 /api，避免重複組成 /api/api。
+const buildApiUrl = (path) => {
+  if (!rawApiBaseUrl) return `/api${path}`
+  const apiPrefix = rawApiBaseUrl.endsWith('/api') ? '' : '/api'
+  return `${rawApiBaseUrl}${apiPrefix}${path}`
+}
+
 // ========== 顧客端訂位 API ==========
 export const reservationApi = {
   
@@ -45,7 +55,7 @@ export const reservationApi = {
 
   // 取得訂位訂金付款頁網址
   depositCheckoutUrl(reservationId) {
-    return `http://localhost:8080/api/reservation-payments/ecpay/checkout/${reservationId}`
+    return buildApiUrl(`/reservation-payments/ecpay/checkout/${reservationId}`)
   },
 }
 

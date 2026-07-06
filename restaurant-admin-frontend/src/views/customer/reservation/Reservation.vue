@@ -340,6 +340,7 @@ const submitReservation = async () => {
     successReservation.value = res.data
     editingReservationId.value = null
     successMessage.value = isEditing ? '訂位已更新' : ''
+    // 如果要訂金
     if (!isEditing && Number(res.data?.depositAmount || 0) > 0 && res.data?.paymentStatus !== 'PAID') {
       window.location.href = reservationApi.depositCheckoutUrl(res.data.reservationId)
       return

@@ -6,6 +6,7 @@ import com.restaurant.reservation.dto.ReservationResponse;
 import com.restaurant.reservation.entity.Reservation;
 import com.restaurant.reservation.repository.ReservationRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -29,6 +30,12 @@ public class ReservationPaymentService {
     private final ReservationService reservationService;
     private final ReservationEmailService reservationEmailService;
 
+    @Value("${app.frontend-base-url:http://localhost:5173}")
+    private String frontendBaseUrl;
+
+    @Value("${app.backend-base-url:http://localhost:8080}")
+    private String backendBaseUrl;
+
     // 依「已建立的訂位」產生綠界付款表單
     public String createEcpayCheckoutForm(Long reservationId) {
         Reservation reservation = findReservation(reservationId);
@@ -42,8 +49,8 @@ public class ReservationPaymentService {
         params.put("TotalAmount", String.valueOf(reservation.getDepositAmount().intValue()));
         params.put("TradeDesc", "Restaurant Reservation Deposit");
         params.put("ItemName", "Reservation Deposit");
-        params.put("ReturnURL", "http://localhost:8080/api/reservation-payments/ecpay/callback");
-        params.put("OrderResultURL", "http://localhost:8080/api/reservation-payments/ecpay/result?reservationId=" + reservationId);
+        params.put("ReturnURL", buildBackendUrl("/api/reservation-payments/ecpay/callback"));
+        params.put("OrderResultURL", buildBackendUrl("/api/reservation-payments/ecpay/result?reservationId=" + reservationId));
         params.put("ChoosePayment", "Credit");
         params.put("EncryptType", "1");
         params.put("CheckMacValue", generateCheckMacValue(params));
@@ -102,7 +109,7 @@ public class ReservationPaymentService {
     }
 
     private String buildRedirectHtml(ReservationResponse reservation) {
-        StringBuilder successUrl = new StringBuilder("http://localhost:5173/reservation-success?id=")
+        StringBuilder successUrl = new StringBuilder(buildFrontendUrl("/reservation-success?id="))
                 .append(reservation.getReservationId());
         if (reservation.getAccessToken() != null && !reservation.getAccessToken().isBlank()) {
             successUrl.append("&token=").append(reservation.getAccessToken());
@@ -124,6 +131,16 @@ public class ReservationPaymentService {
                 </body>
                 </html>
                 """.replace("{{SUCCESS_URL}}", successUrl.toString());
+    }
+
+    private String buildFrontendUrl(String path) {
+        String baseUrl = frontendBaseUrl == null ? "" : frontendBaseUrl.replaceAll("/+$", "");
+        return baseUrl + path;
+    }
+
+    private String buildBackendUrl(String path) {
+        String baseUrl = backendBaseUrl == null ? "" : backendBaseUrl.replaceAll("/+$", "");
+        return baseUrl + path;
     }
 
     private Reservation findReservation(Long reservationId) {
