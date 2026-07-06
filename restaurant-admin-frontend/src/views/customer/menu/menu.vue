@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch, computed as vueComputed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed as vueComputed, nextTick } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
 
@@ -43,6 +43,9 @@ const storeList = ref([])
 const categoryList = ref([])
 const menuItems = ref([])
 const selectedItem = ref(null)  // 記錄被點擊的餐點
+const showNavbarMask = ref(false)
+const contentZIndex = vueComputed(() => showNavbarMask.value ? 1001 : 10)
+const NAVBAR_MASK_THRESHOLD = 400 // 建議跟 Hero 高度(460px)接近,可依實際視覺微調
 
 const openItemModal = (item) => {
   selectedItem.value = item
@@ -98,6 +101,8 @@ const handleWindowScroll = () => {
   else if (scrollTop >= fadeEnd) { heroOpacity.value = 0 }
   else { heroOpacity.value = 1 - (scrollTop - fadeStart) / (fadeEnd - fadeStart) }
 
+  showNavbarMask.value = scrollTop > NAVBAR_MASK_THRESHOLD  // 新增這行
+
   if (selectedFeatureTag.value) return;
 
   const scrollPosition = window.scrollY + 280
@@ -115,21 +120,24 @@ const handleWindowScroll = () => {
 }
 
 // 🌟 6. 絲滑平滑滾動至指定分類區 (修正版)
-const scrollToCategory = (categoryId) => {
+const scrollToCategory = async (categoryId) => {
   const hadFeatureTag = !!selectedFeatureTag.value  // ✅ 先記錄有沒有 banner
 
   if (selectedFeatureTag.value) {
     selectedFeatureTag.value = null
   }
 
-  setTimeout(() => {
+  await nextTick()
+
+  // ✅ 多等一個 requestAnimationFrame，確保瀏覽器完成排版計算
+  requestAnimationFrame(() => {
     const el = document.getElementById(`category-section-${categoryId}`)
     if (el) {
       const rect = el.getBoundingClientRect()
       const scrollTop = window.scrollY || document.documentElement.scrollTop
 
       // ✅ 根據之前有沒有 banner 決定偏移量
-      const offset = hadFeatureTag ? 500 : 132
+      const offset = hadFeatureTag ? 280 : 150
       const targetOffset = scrollTop + rect.top - offset
 
       window.scrollTo({
@@ -139,11 +147,11 @@ const scrollToCategory = (categoryId) => {
 
       activeCategoryId.value = categoryId
     }
-  }, 100)
+  })
 }
 
 // 🌟 7. 點擊特色膠囊滑動到動態大標題
-const handleFeatureTagClick = (tag) => {
+const handleFeatureTagClick = async (tag) => {
   if (selectedFeatureTag.value === tag) {
     selectedFeatureTag.value = null;
     return;
@@ -152,16 +160,37 @@ const handleFeatureTagClick = (tag) => {
   selectedFeatureTag.value = tag;
   activeCategoryId.value = null;
 
-  setTimeout(() => {
-    const el = document.getElementById('dynamic-feature-title');
+  await nextTick()  // ✅ 確保 FEATURE SHOWCASE 框框已經渲染出來,才去抓它的位置
+
+  const el = document.getElementById('dynamic-feature-title');
+  if (el) {
+    const targetOffset = el.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo({
+      top: targetOffset - 25,
+      behavior: 'smooth'
+    });
+  }
+}
+
+const clearFeatureFilter = async () => {
+  selectedFeatureTag.value = null
+  await nextTick()
+
+  // 滾回目前分類清單第一個項目（或 activeCategoryId 對應的分類）的標題
+  const firstCat = categoryList.value[0]
+  if (firstCat) {
+    const el = document.getElementById(`category-section-${firstCat.id}`)
     if (el) {
-      const targetOffset = el.getBoundingClientRect().top + window.scrollY;
+      const rect = el.getBoundingClientRect()
+      const scrollTop = window.scrollY || document.documentElement.scrollTop
+      const targetOffset = scrollTop + rect.top - 60 // 90 這個數字對齊你之前調過的 scrollToCategory offset
       window.scrollTo({
-        top: targetOffset - 112,
+        top: targetOffset,
         behavior: 'smooth'
-      });
+      })
+      activeCategoryId.value = firstCat.id
     }
-  }, 80);
+  }
 }
 
 // 🌟 8. 智慧型本機圖片自動對應管線
@@ -448,13 +477,13 @@ const goToOrder = (item) => {
       </div>
     </div>
 
-    <div class="main-content-wrapper">
+    <div class="main-content-wrapper" :style="{ zIndex: contentZIndex }">
       <div class="container">
         <div class="row">
 
           <!-- 左側導覽 -->
           <div class="col-md-3">
-            <div class="sticky-top" style="top: 110px; z-index: 20;">
+            <div class="sticky-top" style="top: 25px; z-index: 20;">
 
               <div class="card shadow-sm mb-4 border-0 rounded-3" style="border-radius: 12px !important; overflow: hidden;">
                 <div class="card-body p-3 bg-white">
@@ -486,9 +515,9 @@ const goToOrder = (item) => {
 
           <!-- 右側內容 -->
           <div class="col-md-9">
-            <div v-if="activeAvailableTags.length > 0" class="mb-4 d-flex flex-wrap gap-2 align-items-center bg-white p-3 rounded-3 shadow-sm border-0">
+            <div v-if="activeAvailableTags.length > 0" class="mb-4 d-flex flex-wrap gap-1 align-items-center bg-white p-2 rounded-3 shadow-sm border-0" style="position: sticky; top: 20px; z-index: 1000;">
               <span class="fw-bold text-secondary small me-2">🔍 快速過濾：</span>
-              <button @click="selectedFeatureTag = null" :class="['btn tag-pill', !selectedFeatureTag ? 'active' : '']">全部特色</button>
+             <button @click="clearFeatureFilter" :class="['btn tag-pill', !selectedFeatureTag ? 'active' : '']">全部特色</button>
               <button v-for="tag in activeAvailableTags" :key="tag" @click="handleFeatureTagClick(tag)" :class="['btn tag-pill', selectedFeatureTag === tag ? 'active' : '']">{{ tag }}</button>
             </div>
 
@@ -549,7 +578,10 @@ const goToOrder = (item) => {
   </div>
 </template>
 
-<style scoped>
+<style >
+html {
+  scroll-padding-top: 90px;
+}
 /* ================= 原有的 EDM 樣式 (保留) ================= */
 .edm-overlay {
   position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
@@ -771,7 +803,6 @@ const goToOrder = (item) => {
 
 .main-content-wrapper {
   position: relative;
-  z-index: 10;
   background-color: #f8f2ea !important;
   background-image: url('@/assets/images/background.png');
   background-repeat: repeat;
@@ -780,6 +811,7 @@ const goToOrder = (item) => {
   padding-top: 25px;
   padding-bottom: 100px;
 }
+
 .menu-sections-container { background-color: #fafafa; border-radius: 12px; padding: 20px; }
 .sidebar-item {
   transition: all 0.2s ease;
@@ -802,8 +834,8 @@ const goToOrder = (item) => {
 .tag-pill {
   border: 1px solid #e5e7eb;
   border-radius: 6px !important;
-  padding: 6px 14px;
-  font-size: 13px;
+  padding: 4px 12px;
+  font-size: 12px;
   font-weight: 500;
   color: #5c4033;
   background-color: #ffffff;

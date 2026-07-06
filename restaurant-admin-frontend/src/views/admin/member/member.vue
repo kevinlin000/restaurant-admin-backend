@@ -1,8 +1,11 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import Swal from "sweetalert2";
 import { createStaff, getStaffList, resignStaff } from "@/api/member";
 import { storeApi } from "@/api/store";
+
+const route = useRoute();
 
 const isLoading = ref(false);
 const isSaving = ref(false);
@@ -12,6 +15,25 @@ const stores = ref([]);
 const keyword = ref("");
 const statusFilter = ref("ALL");
 const showPassword = ref(false);
+const activeSection = ref("form");
+
+const sectionMeta = computed(() => {
+  if (activeSection.value === "list") {
+    return {
+      title: "員工狀態清單",
+      desc: "查看所有員工與店長的在職狀態，可依姓名、Email、員工編號或手機搜尋。",
+    };
+  }
+
+  return {
+    title: "員工帳號設定",
+    desc: "建立員工/店長帳號，或將既有會員帳號轉為員工/店長帳號。",
+  };
+});
+
+const normalizeSection = (section) => {
+  return section === "list" ? "list" : "form";
+};
 
 const form = reactive({
   email: "",
@@ -263,6 +285,14 @@ const formatDate = (dateText) => {
 };
 
 watch(
+  () => route.query.section,
+  (section) => {
+    activeSection.value = normalizeSection(section);
+  },
+  { immediate: true },
+);
+
+watch(
   () => form.roleName,
   () => {
     form.staffNo = nextStaffNo.value;
@@ -282,13 +312,20 @@ onMounted(async () => {
       {{ loadError }}
     </p>
 
-    <div class="content-grid">
-      <section class="card form-card">
-        <h2>員工帳號設定</h2>
-        <p class="card-desc compact-desc">
-          帳號若已是會員，將直接轉為員工或店長職稱，並保留會員資料。
-        </p>
+    <div class="section-summary">
+      <div>
+        <span class="section-kicker">STAFF OPS</span>
+        <h2>{{ sectionMeta.title }}</h2>
+        <p>{{ sectionMeta.desc }}</p>
+      </div>
+    </div>
 
+    <div class="single-section">
+      <section
+        v-if="activeSection === 'form'"
+        class="card form-card section-card"
+      >
+        <h2>員工帳號設定</h2>
         <div class="form-grid">
           <label>
             Email
@@ -387,7 +424,7 @@ onMounted(async () => {
         </button>
       </section>
 
-      <section class="card list-card">
+      <section v-else class="card list-card section-card">
         <div class="list-header">
           <div>
             <h2>員工狀態清單</h2>
@@ -516,10 +553,49 @@ onMounted(async () => {
   font-weight: 700;
 }
 
-.content-grid {
-  display: grid;
-  grid-template-columns: minmax(320px, 0.85fr) minmax(0, 1.5fr);
-  gap: 20px;
+.section-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 18px;
+  padding: 22px 26px;
+  border-radius: 18px;
+  background: #fffaf6;
+  border: 1px solid #f1dfcf;
+}
+
+.section-kicker {
+  display: inline-block;
+  margin-bottom: 6px;
+  color: #b67848;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.section-summary h2 {
+  margin: 0;
+  color: #566a7f;
+  font-weight: 900;
+}
+
+.section-summary p {
+  margin: 8px 0 0;
+  color: #7d8b9a;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.single-section {
+  width: 100%;
+}
+
+.section-card {
+  width: 100%;
+}
+
+.form-card.section-card {
+  max-width: 1120px;
 }
 
 .card {
@@ -528,7 +604,7 @@ onMounted(async () => {
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   margin-top: 22px;
 }
@@ -704,12 +780,17 @@ td small {
 }
 
 @media (max-width: 1100px) {
-  .content-grid {
-    grid-template-columns: 1fr;
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 768px) {
+  .section-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .form-grid,
   .toolbar {
     grid-template-columns: 1fr;

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter, useRoute, RouterView, RouterLink } from "vue-router";
 import Swal from "sweetalert2";
 
@@ -19,6 +19,39 @@ const userInfo = ref(getUserInfo());
 
 const roleName = computed(() => userInfo.value?.roleName || "");
 const displayName = computed(() => userInfo.value?.name || "使用者");
+
+const currentTime = ref(new Date());
+let clockTimer = null;
+
+const clockDate = computed(() => {
+  return currentTime.value.toLocaleDateString("zh-TW", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+  });
+});
+
+const clockTime = computed(() => {
+  return currentTime.value.toLocaleTimeString("zh-TW", {
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+});
+
+onMounted(() => {
+  clockTimer = window.setInterval(() => {
+    currentTime.value = new Date();
+  }, 1000);
+});
+
+onBeforeUnmount(() => {
+  if (clockTimer) {
+    window.clearInterval(clockTimer);
+  }
+});
 
 const roleText = computed(() => {
   const roleMap = {
@@ -58,6 +91,15 @@ const goTo = (path, roles = []) => {
 
 const isActive = (path) => {
   if (typeof path !== "string") return false;
+
+  const [basePath, queryString] = path.split("?");
+
+  if (queryString) {
+    const params = new URLSearchParams(queryString);
+    const section = params.get("section");
+    return route.path === basePath && route.query.section === section;
+  }
+
   return route.path === path || route.path.startsWith(`${path}/`);
 };
 
@@ -176,11 +218,21 @@ const sidebarGroups = computed(() => [
   },
   {
     key: "member",
-    type: "single",
     label: "員工管理",
     icon: "bx bx-group",
-    path: "/admin/member",
     roles: ["ADMIN"],
+    children: [
+      {
+        label: "員工帳號設定",
+        path: "/admin/member?section=form",
+        roles: ["ADMIN"],
+      },
+      {
+        label: "員工狀態清單",
+        path: "/admin/member?section=list",
+        roles: ["ADMIN"],
+      },
+    ],
   },
   {
     key: "content",
@@ -225,6 +277,7 @@ const openMenu = ref({
   menu: route.path.startsWith("/admin/menu"),
   order: route.path.startsWith("/admin/order"),
   store: route.path.startsWith("/admin/store"),
+  member: route.path.startsWith("/admin/member"),
   content:
     route.path.startsWith("/admin/news") ||
     route.path.startsWith("/admin/faqs") ||
@@ -240,29 +293,10 @@ const adminDropdownItems = computed(() => {
   const items = [
     {
       label: "後台首頁",
-      subtitle: "返回工作總覽",
       path: "/admin/home",
       icon: "bx bx-tachometer",
       roles: ["STAFF", "MANAGER", "ADMIN"],
       menuClass: "admin-home-entry",
-    },
-    {
-      label: "個人資料",
-      path: "/profile",
-      icon: "bx bx-user-circle",
-      roles: ["STAFF", "MANAGER"],
-    },
-    {
-      label: "我的訂位紀錄",
-      path: { path: "/profile", query: { tab: "reservations" } },
-      icon: "bx bx-calendar-check",
-      roles: ["STAFF", "MANAGER"],
-    },
-    {
-      label: "我的消費紀錄",
-      path: { path: "/profile", query: { tab: "orders" } },
-      icon: "bx bx-receipt",
-      roles: ["STAFF", "MANAGER"],
     },
   ];
 
@@ -314,6 +348,12 @@ const logout = () => {
           </template>
         </li>
       </ul>
+
+      <div class="sidebar-clock" aria-label="目前時間">
+        <div class="clock-label">目前時間</div>
+        <div class="clock-time">{{ clockTime }}</div>
+        <div class="clock-date">{{ clockDate }}</div>
+      </div>
     </aside>
 
     <div class="main-wrapper">
@@ -332,17 +372,6 @@ const logout = () => {
           </div>
 
           <ul class="dropdown-menu dropdown-menu-end admin-user-menu">
-            <li>
-              <RouterLink class="dropdown-item" to="/home">
-                <i class="bx bx-arrow-back"></i>
-                <span>返回餐廳首頁</span>
-              </RouterLink>
-            </li>
-
-            <li>
-              <hr class="dropdown-divider" />
-            </li>
-
             <li v-for="item in adminDropdownItems" :key="item.label">
               <a href="#" :class="['dropdown-item', item.menuClass]" @click.prevent="goTo(item.path, item.roles)">
                 <i :class="item.icon"></i>
@@ -351,6 +380,17 @@ const logout = () => {
                   <small v-if="item.subtitle">{{ item.subtitle }}</small>
                 </span>
               </a>
+            </li>
+
+            <li>
+              <hr class="dropdown-divider" />
+            </li>
+
+            <li>
+              <RouterLink class="dropdown-item" to="/home">
+                <i class="bx bx-arrow-back"></i>
+                <span>返回餐廳首頁</span>
+              </RouterLink>
             </li>
 
             <li>
@@ -409,6 +449,39 @@ const logout = () => {
   padding: 0;
   flex: 1;
   overflow-y: auto;
+}
+
+.sidebar-clock {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid #f1d8c4;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fffaf5 0%, #fff1e5 100%);
+  color: #566a7f;
+  box-shadow: 0 8px 20px rgba(227, 172, 127, 0.12);
+}
+
+.clock-label {
+  margin-bottom: 6px;
+  color: #a8754b;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.clock-time {
+  color: #2f3b45;
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.clock-date {
+  margin-top: 4px;
+  color: #7f8fa0;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .menu-group {
@@ -533,20 +606,25 @@ const logout = () => {
 }
 
 .admin-user-menu {
-  min-width: 210px;
-  padding: 10px 0;
+  min-width: 220px;
+  padding: 8px;
   border: none;
-  border-radius: 4px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-radius: 14px;
+  margin-top: 10px !important;
+  box-shadow: 0 14px 34px rgba(86, 106, 127, 0.18);
 }
 
 .admin-user-menu .dropdown-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 11px 18px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 14px;
+  border-radius: 10px;
   color: #566a7f;
-  font-weight: 500;
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 .admin-user-menu .dropdown-item i {
@@ -577,12 +655,12 @@ const logout = () => {
 }
 
 .admin-user-menu .admin-home-entry {
-  margin: 0 8px 8px;
+  margin: 0;
   padding: 12px 14px;
   border-radius: 12px;
   background: linear-gradient(135deg, #e3ac7f 0%, #d5905f 100%);
   color: #fff !important;
-  box-shadow: 0 8px 18px rgba(227, 172, 127, 0.32);
+  box-shadow: 0 8px 18px rgba(227, 172, 127, 0.28);
 }
 
 .admin-user-menu .admin-home-entry i,
@@ -597,7 +675,7 @@ const logout = () => {
 }
 
 .admin-user-menu .dropdown-divider {
-  margin: 8px 0;
+  margin: 8px -8px;
 }
 
 .main-content {

@@ -12,12 +12,22 @@
           <div class="sidebar-card level-card compact-level-card">
             <div class="level-badge">{{ memberLevelText }}</div>
             <p class="level-discount">{{ memberDiscountText }}</p>
+            <button
+              class="point-rule-btn level-rule-btn tooltip-trigger tooltip-wide"
+              type="button"
+              :data-tooltip="pointRuleTooltip"
+              @click="showPointRuleModal = true"
+            >
+              會員集點規則
+            </button>
           </div>
 
           <div class="sidebar-card point-card combined-point-card">
             <div class="point-section discount-point-section">
               <div class="point-heading-row">
-                <p class="sidebar-title point-card-title">折抵點數</p>
+                <div class="point-label-stack">
+                  <p class="sidebar-title point-card-title">折抵點數</p>
+                </div>
                 <div class="point-value-inline">
                   <div class="point-main pulse-point" aria-label="折抵點數">
                     <span class="point-number">{{ pointInfo.pointBalance }}</span>
@@ -31,7 +41,9 @@
 
             <div class="point-section member-point-section">
               <div class="point-heading-row">
-                <p class="sidebar-title point-card-title">會員點數</p>
+                <div class="point-label-stack">
+                  <p class="sidebar-title point-card-title">會員點數</p>
+                </div>
                 <div class="point-value-inline">
                   <div class="point-main pulse-point" aria-label="會員點數">
                     <span class="point-number">{{ pointInfo.pointLevel }}</span>
@@ -54,14 +66,6 @@
                 <p class="level-progress-text">{{ levelProgressText }}</p>
               </div>
 
-              <button
-                class="point-rule-btn tooltip-trigger tooltip-wide"
-                type="button"
-                :data-tooltip="pointRuleTooltip"
-                @click="showPointRuleModal = true"
-              >
-                會員集點規則
-              </button>
             </div>
           </div>
         </aside>
@@ -201,13 +205,22 @@
 
 
             <div v-else-if="reservations.length" class="record-card">
-              <table>
+              <table class="record-table reservation-record-table">
+                <colgroup>
+                  <col class="col-res-id" />
+                  <col class="col-res-date" />
+                  <col class="col-res-time" />
+                  <col class="col-res-store" />
+                  <col class="col-res-people" />
+                  <col class="col-res-status" />
+                  <col class="col-res-note" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>訂位編號</th>
                     <th>訂位日期</th>
                     <th>訂位時間</th>
-                    <th>店名</th>
+                    <th>分店店名</th>
                     <th>人數</th>
                     <th>狀態</th>
                     <th>備註</th>
@@ -223,7 +236,7 @@
                     <td>{{ formatReservationTime(reservation) }}</td>
                     <td>{{ formatStore(reservation) }}</td>
                     <td>{{ reservation.partySize || 0 }} 人</td>
-                    <td>
+                    <td class="status-cell">
                       <span
                         class="status-badge"
                         :class="getReservationStatusClass(reservation.status)"
@@ -232,7 +245,9 @@
                       </span>
                     </td>
                     <td class="note-cell">
-                      {{ reservation.specialRequest || "無" }}
+                      <span class="note-text" :title="reservation.specialRequest || '無'">
+                        {{ reservation.specialRequest || "無" }}
+                      </span>
                     </td>
                   </tr>
                 </tbody>
@@ -263,14 +278,23 @@
 
 
             <div v-else-if="orders.length" class="record-card">
-              <table>
+              <table class="record-table order-record-table">
+                <colgroup>
+                  <col class="col-order-id" />
+                  <col class="col-order-time" />
+                  <col class="col-order-type" />
+                  <col class="col-order-store" />
+                  <col class="col-order-amount" />
+                  <col class="col-order-payment" />
+                  <col class="col-order-status" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>訂單編號</th>
-                    <th>消費日期</th>
+                    <th>消費時間</th>
                     <th>訂單類型</th>
-                    <th>門市</th>
-                    <th class="right">消費金額</th>
+                    <th>分店店名</th>
+                    <th>消費金額</th>
                     <th>付款狀態</th>
                     <th>訂單狀態</th>
                   </tr>
@@ -281,8 +305,8 @@
                     <td>{{ formatDateTime(order.createdAt) }}</td>
                     <td>{{ getOrderTypeText(order.orderType) }}</td>
                     <td>{{ formatOrderStore(order) }}</td>
-                    <td class="right">{{ formatCurrency(getOrderAmount(order)) }}</td>
-                    <td>
+                    <td class="amount-cell">{{ formatCurrency(getOrderAmount(order)) }}</td>
+                    <td class="status-cell">
                       <span
                         class="status-badge"
                         :class="getPaymentStatusClass(order.paymentStatus)"
@@ -290,7 +314,7 @@
                         {{ getPaymentStatusText(order.paymentStatus) }}
                       </span>
                     </td>
-                    <td>
+                    <td class="status-cell">
                       <span
                         class="status-badge"
                         :class="getOrderStatusClass(order.status)"
@@ -405,14 +429,17 @@
         >
           ×
         </button>
-        <h3>集點規則</h3>
         <div class="rule-content">
           <div class="rule-section">
             <h4>累積規則</h4>
             <p>每消費 $100 即可累積 1 點。</p>
           </div>
           <div class="rule-section">
-            <h4>會員升級</h4>
+            <h4>折抵點數</h4>
+            <p>每 1 點數可折抵 1 元，於點餐結帳時使用。</p>
+          </div>
+          <div class="rule-section">
+            <h4>會員點數</h4>
             <ul>
               <li>銅卡會員：0 ~ 29 點，來店消費享 95 折</li>
               <li>銀卡會員：30 ~ 59 點，來店消費享 9 折</li>
@@ -765,7 +792,7 @@ const memberDiscountText = computed(() => {
 });
 
 const pointRuleTooltip = computed(
-  () => "每消費 $100 累積 1 點\n30 點升銀卡\n60 點升金卡\n100 點升鑽石卡",
+  () => "累積規則：每消費 $100 即可累積 1 點\n折抵點數：每 1 點數可折抵 1 元，於點餐結帳時使用\n會員點數：30 點升銀卡、60 點升金卡、100 點升鑽石卡",
 );
 
 const levelThresholds = {
@@ -1228,8 +1255,38 @@ const formatBirthday = (birthday) => {
   letter-spacing: 0.04em;
 }
 
-.point-heading-row .point-card-title {
+.point-label-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
   margin-right: auto;
+}
+
+.point-type-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+.discount-chip {
+  background: #fff0df;
+  color: #cf7b3f;
+}
+
+.member-chip {
+  background: #eef5fb;
+  color: #647f98;
+}
+
+.point-heading-row .point-card-title {
+  margin-right: 0;
 }
 
 .combined-point-card {
@@ -1240,6 +1297,29 @@ const formatBirthday = (birthday) => {
 
 .point-section {
   position: relative;
+  padding: 14px 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(var(--point-accent), 0.18);
+  background: linear-gradient(135deg, var(--point-soft), rgba(255, 255, 255, 0.86));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+  --point-accent: 181, 121, 76;
+  --point-accent-solid: #b8794c;
+  --point-soft: #fff7ef;
+  --point-text: #5f4938;
+}
+
+.discount-point-section {
+  --point-accent: 181, 121, 76;
+  --point-accent-solid: #b8794c;
+  --point-soft: #fff7ef;
+  --point-text: #5f4938;
+}
+
+.member-point-section {
+  --point-accent: 126, 96, 72;
+  --point-accent-solid: #7e6048;
+  --point-soft: #fbf6ef;
+  --point-text: #514033;
 }
 
 .point-heading-row {
@@ -1257,7 +1337,7 @@ const formatBirthday = (birthday) => {
 
 .point-unit-label {
   flex: 0 0 auto;
-  color: #d88750;
+  color: var(--point-accent-solid);
   font-size: 18px;
   font-weight: 900;
   line-height: 1;
@@ -1267,7 +1347,7 @@ const formatBirthday = (birthday) => {
 .point-card-divider {
   width: 100%;
   height: 1px;
-  background: linear-gradient(90deg, rgba(227, 172, 127, 0.08), rgba(227, 172, 127, 0.42), rgba(227, 172, 127, 0.08));
+  background: linear-gradient(90deg, rgba(181, 121, 76, 0.08), rgba(181, 121, 76, 0.36), rgba(126, 96, 72, 0.1));
 }
 
 .level-badge {
@@ -1356,10 +1436,10 @@ const formatBirthday = (birthday) => {
   border-radius: 50%;
   background:
     radial-gradient(circle at 34% 28%, rgba(255, 246, 236, 0.96), rgba(248, 225, 204, 0.68));
-  border: 2px solid rgba(227, 172, 127, 0.34);
+  border: 2px solid rgba(var(--point-accent), 0.34);
   box-shadow:
     inset 0 0 0 5px rgba(255, 255, 255, 0.52),
-    0 8px 20px rgba(227, 172, 127, 0.14);
+    0 8px 20px rgba(var(--point-accent), 0.14);
   isolation: isolate;
   animation: pointBadgePulse 0.95s ease-in-out infinite;
 }
@@ -1369,15 +1449,15 @@ const formatBirthday = (birthday) => {
   position: absolute;
   inset: -5px;
   border-radius: inherit;
-  border: 1px solid rgba(227, 172, 127, 0.24);
-  box-shadow: 0 0 0 0 rgba(227, 172, 127, 0.2);
+  border: 1px solid rgba(var(--point-accent), 0.24);
+  box-shadow: 0 0 0 0 rgba(var(--point-accent), 0.2);
   opacity: 0.75;
   animation: pointRingPulse 0.95s ease-in-out infinite;
   z-index: -1;
 }
 
 .point-number {
-  color: #566a7f;
+  color: var(--point-text, #566a7f);
   font-family: Georgia, "Times New Roman", "Noto Serif TC", serif;
   font-size: clamp(29px, 2.8vw, 36px);
   line-height: 1;
@@ -1395,7 +1475,7 @@ const formatBirthday = (birthday) => {
 
 
 .level-progress {
-  margin: 14px 0 18px;
+  margin: 14px 0 0;
 }
 
 .level-progress-meta {
@@ -1435,19 +1515,32 @@ const formatBirthday = (birthday) => {
   font-weight: 900;
 }
 
+.member-point-section .level-progress-track {
+  background: #eee2d6;
+}
+
+.member-point-section .level-progress-fill {
+  background: linear-gradient(90deg, #7e6048, #b08a69);
+  box-shadow: 0 0 16px rgba(126, 96, 72, 0.32);
+}
+
+.member-point-section .level-progress-text {
+  color: #7e6048;
+}
+
 @keyframes pointBadgePulse {
   0%,
   100% {
     transform: scale(0.98);
     box-shadow:
       inset 0 0 0 5px rgba(255, 255, 255, 0.52),
-      0 8px 20px rgba(227, 172, 127, 0.14);
+      0 8px 20px rgba(var(--point-accent), 0.14);
   }
   44% {
     transform: scale(1.06);
     box-shadow:
       inset 0 0 0 5px rgba(255, 255, 255, 0.72),
-      0 10px 26px rgba(227, 172, 127, 0.24);
+      0 10px 26px rgba(var(--point-accent), 0.24);
   }
   68% {
     transform: scale(0.99);
@@ -1459,12 +1552,12 @@ const formatBirthday = (birthday) => {
   100% {
     opacity: 0.52;
     transform: scale(0.94);
-    box-shadow: 0 0 0 0 rgba(227, 172, 127, 0.2);
+    box-shadow: 0 0 0 0 rgba(var(--point-accent), 0.2);
   }
   44% {
     opacity: 1;
     transform: scale(1.08);
-    box-shadow: 0 0 0 8px rgba(227, 172, 127, 0.08);
+    box-shadow: 0 0 0 8px rgba(var(--point-accent), 0.08);
   }
   68% {
     opacity: 0.72;
@@ -1507,6 +1600,12 @@ const formatBirthday = (birthday) => {
 .point-rule-btn,
 .edit-profile-btn {
   padding: 10px 14px;
+}
+
+.level-rule-btn {
+  margin-top: 4px;
+  min-width: 132px;
+  box-shadow: 0 10px 22px rgba(227, 172, 127, 0.24);
 }
 
 .edit-profile-btn.outline,
@@ -1847,12 +1946,34 @@ button:disabled {
   border-collapse: collapse;
 }
 
+.record-table {
+  table-layout: fixed;
+  min-width: 860px;
+}
+
+.reservation-record-table .col-res-id { width: 11%; }
+.reservation-record-table .col-res-date { width: 14%; }
+.reservation-record-table .col-res-time { width: 17%; }
+.reservation-record-table .col-res-store { width: 20%; }
+.reservation-record-table .col-res-people { width: 9%; }
+.reservation-record-table .col-res-status { width: 12%; }
+.reservation-record-table .col-res-note { width: 17%; }
+
+.order-record-table .col-order-id { width: 11%; }
+.order-record-table .col-order-time { width: 20%; }
+.order-record-table .col-order-type { width: 12%; }
+.order-record-table .col-order-store { width: 20%; }
+.order-record-table .col-order-amount { width: 12%; }
+.order-record-table .col-order-payment { width: 13%; }
+.order-record-table .col-order-status { width: 12%; }
+
 .record-card th,
 .record-card td {
   padding: 16px 18px;
   border-bottom: 1px solid #f0e2d5;
   color: #566a7f;
   text-align: left;
+  vertical-align: middle;
 }
 
 .record-card th {
@@ -1860,25 +1981,79 @@ button:disabled {
   font-size: 13px;
 }
 
+.order-record-table th:nth-child(5),
+.order-record-table td:nth-child(5) {
+  text-align: left;
+  padding-left: 18px;
+}
+
+.order-record-table th:nth-child(6),
+.order-record-table th:nth-child(7),
+.reservation-record-table th:nth-child(6) {
+  text-align: left;
+  padding-left: 18px;
+}
+
+.order-record-table td:nth-child(6),
+.order-record-table td:nth-child(7),
+.reservation-record-table td:nth-child(6) {
+  text-align: left;
+  padding-left: 6px;
+}
+
+.status-cell .status-badge {
+  margin-left: 0;
+  vertical-align: middle;
+}
+
 .record-card .right {
   text-align: right;
   font-weight: 900;
 }
 
+.amount-cell {
+  text-align: left;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.status-cell {
+  text-align: left;
+  white-space: nowrap;
+}
+
+.amount-cell {
+  padding-left: 18px;
+}
+
+.status-cell {
+  padding-left: 6px;
+}
+
 .note-cell {
-  min-width: 160px;
+  min-width: 0;
+}
+
+.note-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.5;
+  word-break: break-word;
 }
 
 .status-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 68px;
-  padding: 6px 10px;
+  min-width: 0;
+  padding: 6px 12px;
   border-radius: 999px;
   font-size: 13px;
   font-weight: 900;
   white-space: nowrap;
+  line-height: 1.2;
 }
 
 .status-badge.pending {
@@ -1980,7 +2155,7 @@ button:disabled {
 
 .password-rules {
   margin: 0;
-  padding-left: 20px;
+  padding-left: 18px;
   color: #9aa6b2;
   line-height: 1.9;
 }

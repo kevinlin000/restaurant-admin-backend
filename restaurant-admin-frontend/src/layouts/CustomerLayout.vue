@@ -25,43 +25,46 @@ const dropdownItems = computed(() => {
     return [];
   }
 
-  // 前台首頁的下拉選單依角色顯示功能。
-  // MEMBER：顯示個人資料、訂位紀錄、消費紀錄。
-  // MANAGER / ADMIN：可以回後台，也可以切回餐廳首頁，但不進會員個人頁。
-  if (roleName.value === "ADMIN" || roleName.value === "MANAGER") {
-    return [
-      {
-        label: "返回後台首頁",
-        path: "/admin",
-        icon: "bi-speedometer2",
-        subtitle: "返回工作總覽",
-        menuClass: "back-office-item",
-      },
-      {
-        label: "前往餐廳首頁",
-        path: "/home",
-        icon: "bi-house",
-      },
-    ];
+  const role = roleName.value;
+  const items = [];
+  const canEnterBackOffice = ["ADMIN", "MANAGER", "STAFF"].includes(role);
+  const canViewMemberProfile = ["CUSTOMER", "MANAGER", "STAFF"].includes(role);
+
+  // 前台下拉選單依角色顯示：
+  // CUSTOMER：個人資料、訂位紀錄、消費紀錄。
+  // MANAGER / STAFF：同時保留會員個人功能，並提供後台首頁入口。
+  // ADMIN：只顯示後台首頁入口，避免導向被權限擋下的會員個人頁。
+  if (canEnterBackOffice) {
+    items.push({
+      label: "後台首頁",
+      path: "/admin/home",
+      icon: "bi-speedometer2",
+      subtitle: "返回工作總覽",
+      menuClass: "back-office-item",
+    });
   }
 
-  return [
-    {
-      label: "個人資料",
-      path: "/profile",
-      icon: "bi-person",
-    },
-    {
-      label: "訂位紀錄",
-      path: { path: "/profile", query: { tab: "reservations" } },
-      icon: "bi-calendar-check",
-    },
-    {
-      label: "消費紀錄",
-      path: { path: "/profile", query: { tab: "orders" } },
-      icon: "bi-receipt",
-    },
-  ];
+  if (canViewMemberProfile) {
+    items.push(
+      {
+        label: "個人資料",
+        path: "/profile",
+        icon: "bi-person",
+      },
+      {
+        label: "訂位紀錄",
+        path: { path: "/profile", query: { tab: "reservations" } },
+        icon: "bi-calendar-check",
+      },
+      {
+        label: "消費紀錄",
+        path: { path: "/profile", query: { tab: "orders" } },
+        icon: "bi-receipt",
+      }
+    );
+  }
+
+  return items;
 });
 
 const updateNavbarState = () => {
@@ -538,6 +541,7 @@ const logout = async () => {
   padding: 8px;
   border: 0;
   border-radius: 14px;
+  margin-top: 10px !important;
   box-shadow: 0 14px 34px rgba(86, 106, 127, 0.18);
 }
 
@@ -545,6 +549,8 @@ const logout = async () => {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
   padding: 11px 14px;
   border-radius: 10px;
   color: #566a7f;

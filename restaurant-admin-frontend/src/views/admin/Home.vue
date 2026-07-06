@@ -34,35 +34,35 @@ const availableFeatures = computed(() => {
     {
       title: "訂位管理",
       icon: "bx bx-calendar-check",
-      description: "查看顧客訂位資料與現場安排。",
+      description: "管理顧客現場訂位資料。",
       path: "/admin/reservation",
       roles: ["STAFF", "MANAGER", "ADMIN"],
     },
     {
       title: "訂單管理",
       icon: "bx bx-cart",
-      description: "查看顧客訂單與處理狀態。",
+      description: "管理顧客訂單處理狀態。",
       path: "/admin/order-manage",
       roles: ["STAFF", "MANAGER", "ADMIN"],
     },
     {
       title: "分店管理",
       icon: "bx bx-store",
-      description: "維護分店資訊與桌位設定。",
+      description: "管理分店資訊與分店桌位設定。",
       path: "/admin/store",
       roles: ["MANAGER", "ADMIN"],
     },
     {
       title: "菜單管理",
       icon: "bx bx-food-menu",
-      description: "管理分類、價格與上下架狀態。",
+      description: "管理菜單之分類、價格與上下架狀態。",
       path: "/admin/menu-setting",
       roles: ["ADMIN"],
     },
     {
       title: "員工管理",
       icon: "bx bx-group",
-      description: "新增員工與店長，管理離職狀態。",
+      description: "管理員工與店長帳號在職離職狀態。",
       path: "/admin/member",
       roles: ["ADMIN"],
     },
@@ -233,7 +233,7 @@ const roleSummary = computed(() => {
 }
 
 .feature-grid.is-admin-grid {
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .feature-card {
@@ -334,7 +334,19 @@ const roleSummary = computed(() => {
 
 @media (max-width: 1280px) {
   .feature-grid.is-admin-grid {
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 992px) {
+  .feature-grid.is-admin-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 576px) {
+  .feature-grid.is-admin-grid {
+    grid-template-columns: 1fr;
   }
 }
 

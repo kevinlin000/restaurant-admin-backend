@@ -5,7 +5,7 @@
       <aside class="member-sidebar">
         <div class="sidebar-heading">
           <span class="sidebar-kicker">JOIN US</span>
-          <h2 class="member-name">旭日會員註冊</h2>
+          <h2 class="member-name">敘日會員註冊</h2>
         </div>
 
         <div class="sidebar-divider"></div>
@@ -73,7 +73,6 @@
           現在開始訂位、點餐，並累積會員點數。
         </p>
 
-
         <div class="success-actions">
           <button class="submit-btn" type="button" @click="goToProfile">
             個人資料
@@ -86,7 +85,7 @@
 
       <section v-else class="content-card">
         <div class="card-header">
-          <h1>旭日會員基本資料</h1>
+          <h1>敘日會員基本資料</h1>
         </div>
 
         <div class="form-table">
@@ -270,7 +269,7 @@
             :disabled="!isFormValid || isLoading"
             @click="handleRegister"
           >
-            {{ isLoading ? "註冊中..." : "成為旭日會員" }}
+            {{ isLoading ? "註冊中..." : "成為敘日會員" }}
           </button>
         </div>
       </section>
@@ -524,7 +523,12 @@ const handleRegister = async () => {
   min-height: 100vh;
   padding: 120px 7vw 70px;
   background:
-    linear-gradient(115deg, rgba(9, 7, 5, 0.82) 0%, rgba(39, 26, 16, 0.5) 52%, rgba(9, 7, 5, 0.78) 100%),
+    linear-gradient(
+      115deg,
+      rgba(9, 7, 5, 0.82) 0%,
+      rgba(39, 26, 16, 0.5) 52%,
+      rgba(9, 7, 5, 0.78) 100%
+    ),
     url("@/assets/images/caramel-pudding.jpg") center / cover no-repeat;
 }
 
@@ -534,10 +538,17 @@ const handleRegister = async () => {
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(circle at 20% 18%, rgba(227, 172, 127, 0.26), transparent 32%),
+    radial-gradient(
+      circle at 20% 18%,
+      rgba(227, 172, 127, 0.26),
+      transparent 32%
+    ),
     linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-  background-size: auto, 110px 110px, 110px 110px;
+  background-size:
+    auto,
+    110px 110px,
+    110px 110px;
 }
 
 .register-page::after {
@@ -1000,7 +1011,6 @@ const handleRegister = async () => {
   .content-card {
     padding: 28px 24px;
   }
-
 
   .benefit-item {
     gap: 10px;
