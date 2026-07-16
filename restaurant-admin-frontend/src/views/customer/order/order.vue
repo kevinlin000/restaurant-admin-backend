@@ -382,15 +382,7 @@ async function loadMenuCategories() {
     } catch (error) {
         console.error("取得菜單分類失敗", error);
 
-        categories.value = [
-            { id: 1, name: "前菜" },
-            { id: 2, name: "刺身" },
-            { id: 3, name: "握壽司" },
-            { id: 4, name: "主餐" },
-            { id: 6, name: "甜點" },
-            { id: 7, name: "飲品" },
-            { id: 8, name: "酒類" },
-        ];
+        categories.value = demoMenuCategories;
 
         activeCategory.value = 1;
     }
