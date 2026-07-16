@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_URL = 'http://localhost:8080/api/admin/orders'
+const API_URL = '/api/admin/orders'
 
 const getAuthConfig = () => {
   const token = sessionStorage.getItem('accessToken')

@@ -45,7 +45,7 @@ export const reservationApi = {
 
   // 取得訂位訂金付款頁網址
   depositCheckoutUrl(reservationId) {
-    return `http://localhost:8080/api/reservation-payments/ecpay/checkout/${reservationId}`
+    return `/api/reservation-payments/ecpay/checkout/${reservationId}`
   },
 }
 
