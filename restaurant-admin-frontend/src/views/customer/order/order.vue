@@ -1020,8 +1020,7 @@ async function submitOrder() {
             confirmButtonColor: "#e8ad78",
         });
 
-        window.location.href =
-            `http://localhost:8080/api/payments/ecpay/checkout/${orderId}`;
+        window.location.href = `/api/payments/ecpay/checkout/${orderId}`;
         return;
     }
 
@@ -1034,8 +1033,7 @@ async function submitOrder() {
             confirmButtonColor: "#e8ad78",
         });
 
-        window.location.href =
-            `http://localhost:8080/api/payments/linepay/request/${orderId}`;
+        window.location.href = `/api/payments/linepay/request/${orderId}`;
         return;
     }
 
