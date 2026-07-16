@@ -1,84 +1,171 @@
 # 敘日餐廳管理系統
 
-餐廳訂位、點餐、付款與品牌營運後台整合專題。
+餐廳訂位、點餐、付款與營運後台整合系統。專案目標不是單純完成 CRUD，而是把顧客前台流程與餐廳內部營運資料串成同一套系統：門市狀態、訂位容量、菜單供應、訂單付款、消息發布與 FAQ 客服知識庫都由後台統一維護。
 
-> Main 分支目前作為 Kevin Lin 個人作品集展示版本使用。Vercel 線上版不連接雲端資料庫，採前端 demo fallback data 呈現可瀏覽內容；完整後台、登入、資料庫與付款流程請用本機環境展示。
+本倉庫目前以 `main` 作為 Kevin Lin 個人作品集穩定版。線上展示版只部署前端，遠端 MySQL/RDS 已停用；完整後台管理、登入權限、資料寫入與付款回寫流程請使用本機 MySQL + Spring Boot 環境展示。
 
-## 展示入口
+## System Overview
 
-建議展示路徑：
+```text
+Customer Web (Vue)
+  ├─ Home / Store / News / FAQ
+  ├─ Reservation
+  ├─ Menu / Order
+  └─ Member
 
-- `/home`：首頁、品牌內容、精選門市、最新消息
-- `/menu`：菜單瀏覽、分類、門市菜單 fallback
-- `/order`：點餐流程、購物車、門市與取餐時間
-- `/store`：分店資訊與營業狀態
-- `/news`：最新消息
-- `/faq`：FAQ 與客服查詢
+Admin Web (Vue)
+  ├─ Homepage / Store / News / FAQ
+  ├─ Reservation / Table / Time Slot
+  ├─ Menu / Price
+  ├─ Order / Dashboard
+  └─ Member
 
-線上版適合給面試官快速瀏覽 UI 與使用流程。後端 API、資料庫權限、後台管理與付款回寫要用本機版本看。
+Spring Boot API
+  ├─ Security / JWT / Role check
+  ├─ Service layer business rules
+  ├─ JPA repositories
+  └─ MySQL schema + migrations
+```
 
-## 專案重點
+## Core Capabilities
 
-敘日不是單一功能頁，而是把餐廳真實營運流程串起來：
-
-- 顧客端：訂位、菜單、點餐、付款、門市資訊、消息、FAQ。
-- 後台端：會員、訂位、訂單、菜單、門市、首頁、消息、FAQ 管理。
-- 營運邏輯：門市營業狀態、店長權限、訂金/付款狀態、FAQ 搜尋與未命中分析。
-- Demo 策略：無免費後端資料庫時，前端保留展示資料，避免線上作品變成空頁。
-
-## Kevin Lin 負責範圍
-
-我主要負責品牌營運後台與前台對應展示：
-
-| 模組 | 內容 |
+| Area | Capability |
 | --- | --- |
-| 首頁管理 | Hero 輪播、品牌文案、精選門市、精選消息、後台設定 |
-| 門市管理 | 門市資料、營業時間、公休日、桌位、特色標籤、店長權限 |
-| 最新消息 | 品牌公告、門市公告、發布/下架、軟刪除、zero datetime cleanup |
-| FAQ 客服 | FAQ 知識庫、客服浮窗、搜尋命中、未命中分析 |
-| Demo fallback | Vercel 無資料庫時仍顯示菜單、門市、消息與 FAQ |
+| Member | 註冊、登入、JWT 身分驗證、會員資料、點數紀錄 |
+| Reservation | 可訂時段、桌位容量、訂金欄位、訂位後台、桌位分配 |
+| Order | 內用/外帶點餐、購物車、訂單狀態、付款狀態、後台管理 |
+| Menu | 菜單分類、餐點上下架、分店菜單與價格設定 |
+| Store | 門市資訊、營業時間、公休日、桌位、圖片、特色標籤、營業狀態 |
+| Homepage | 首頁 Hero、品牌文案、精選門市、精選消息 |
+| News | 品牌公告、門市公告、發布/下架、軟刪除 |
+| FAQ | FAQ 知識庫、客服浮窗、搜尋命中、未命中分析 |
 
-### 我想讓面試官看到的深度
+## Kevin Lin Ownership
 
-- **權限邊界放後端**：店長只能管理自己門市，不靠前端隱藏按鈕防呆。
-- **營業狀態不是單一欄位**：門市是否營業會結合營業時間、公休日與目前時間。
-- **內容管理動態化**：首頁、消息、門市、FAQ 都由後台資料驅動，不寫死在頁面。
-- **FAQ 搜尋可控**：不是 AI 幻覺回答，而是基於後台知識庫、關鍵字與命中權重。
-- **資料保留與清理**：消息採軟刪除；遇到 MySQL zero date 問題時用 migration 清髒資料。
-- **展示可靠性**：AWS RDS 已停用，線上版用前端 fallback data，避免面試官看到空畫面。
+我主要負責品牌營運後台相關模組，以及線上展示版在無後端資料庫時的前端 fallback 設計。
 
-## 技術棧
+| Module | Responsibility | Engineering Focus |
+| --- | --- | --- |
+| Homepage | 首頁設定、Hero 輪播、精選門市、精選消息 | 單例設定資料、前台 fallback、防止首頁空白 |
+| Store | 門市 CRUD、營業時間、公休日、桌位、圖片、特色標籤 | 店長權限邊界、營業狀態計算、跨模組狀態供應 |
+| News | 最新消息前後台、發布/下架、軟刪除 | 保留歷史資料、zero datetime migration |
+| FAQ | FAQ 前台、客服浮窗、後台管理、搜尋紀錄 | 可控搜尋、未命中分析、營運補題循環 |
+| Demo Data | 前端 demo fallback data | 無雲端資料庫仍可展示核心前台流程 |
 
-| 層級 | 技術 |
+## Engineering Decisions
+
+### Backend owns authorization
+
+後台按鈕隱藏只能改善使用體驗，不能作為權限邊界。門市管理相關操作在後端 service layer 依登入者角色與所屬門市檢查：
+
+- `ADMIN` 可管理全部門市。
+- `MANAGER` 只能管理自己所屬門市。
+- 非授權門市操作會被後端拒絕，不依賴前端路由或 UI 狀態。
+
+### Store availability is derived state
+
+前台顯示「營業中」不是只讀單一狀態欄位。系統會結合：
+
+- 門市啟用狀態
+- 每週營業時段
+- 公休日/臨時休業
+- 目前系統時間
+
+這讓訂位、點餐、門市資訊可以共用同一套營運狀態判斷。
+
+### FAQ search is controlled, not generative
+
+FAQ 客服不是生成式 AI。餐飲規則涉及訂金、退款、付款與門市政策，回答必須可控、可追溯。搜尋邏輯以後台知識庫為資料源，依標題、關鍵字、內文做權重排序；後台同時保留查詢紀錄與未命中問題，讓營運人員補齊內容。
+
+### Demo fallback keeps frontend useful without cloud database
+
+遠端 RDS 已停用後，線上版若完全依賴 API 會變成空頁。前端在主要展示頁保留 demo fallback data：
+
+- API 回空陣列或連線失敗時使用 demo stores/menu/news/FAQ。
+- 線上版可展示首頁、菜單、點餐、門市、消息、FAQ。
+- 完整資料寫入與權限流程仍以本機後端為準。
+
+這是作品集展示取捨，不是正式資料架構。
+
+## Tech Stack
+
+| Layer | Stack |
 | --- | --- |
-| 前端 | Vue 3, Vite, Pinia, Vue Router, Axios |
-| 後端 | Java 17, Spring Boot 3.2, Spring Security, Spring Data JPA |
-| 資料庫 | MySQL 8 |
-| 文件 | Swagger / OpenAPI |
-| 部署 | Vercel frontend demo |
-| 測試/驗證 | Maven test, Vite build, npm audit, Playwright smoke test |
+| Frontend | Vue 3, Vite, Vue Router, Pinia, Axios |
+| Backend | Java 17, Spring Boot 3.2, Spring Security, Spring Data JPA |
+| Database | MySQL 8 |
+| API Docs | springdoc-openapi / Swagger UI |
+| Payment Integration | ECPay sandbox, LINE Pay sandbox |
+| Deployment | Vercel frontend demo |
+| Verification | Maven test, Vite build, npm audit, Playwright smoke test |
 
-## 專案結構
+## Repository Layout
 
 ```text
 .
-├── backend/                    # Spring Boot API
-│   └── src/main/java/com/restaurant/
-├── restaurant-admin-frontend/   # Vue 前台與後台
-│   └── src/
-│       ├── api/                # API 與 demo fallback data
-│       ├── components/         # 共用元件
-│       ├── layouts/            # 前台/後台 layout
-│       ├── router/             # 路由與登入導流
-│       └── views/              # customer/admin 頁面
-├── sql/                        # 建表、demo data、migration
-├── docs/                       # 補充文件
+├── backend/
+│   ├── src/main/java/com/restaurant/
+│   │   ├── config/              # Security, CORS, Swagger
+│   │   ├── common/              # Shared response/error types
+│   │   ├── member/              # Auth, member, staff, point
+│   │   ├── reservation/         # Reservation, time slot, capacity, deposit
+│   │   ├── order/               # Order, payment, admin dashboard
+│   │   ├── menu/                # Category, menu item, store menu
+│   │   ├── store/               # Store, hours, holidays, tables, features
+│   │   ├── homepage/            # Homepage setting
+│   │   ├── news/                # News article
+│   │   └── faq/                 # FAQ and search logs
+│   └── src/main/resources/
+├── restaurant-admin-frontend/
+│   ├── src/api/                 # Axios clients + demo fallback data
+│   ├── src/components/          # Shared UI, support chat widget
+│   ├── src/layouts/             # Customer/Admin layouts
+│   ├── src/router/              # Routes and auth redirect
+│   └── src/views/               # Customer/Admin pages
+├── sql/                         # Schema, seed data, migrations
+├── docs/                        # Supplementary docs
 └── README.md
 ```
 
-## 本機啟動
+## Main Routes
 
-### 1. 準備 MySQL
+### Customer
+
+| Route | Purpose |
+| --- | --- |
+| `/home` | 品牌首頁 |
+| `/reservation` | 顧客訂位 |
+| `/menu` | 菜單瀏覽 |
+| `/order` | 點餐流程 |
+| `/store` | 分店資訊 |
+| `/news` | 最新消息 |
+| `/faq` | FAQ 查詢 |
+| `/login`, `/register`, `/profile` | 會員流程 |
+
+### Admin
+
+| Route | Purpose |
+| --- | --- |
+| `/admin/home` | 後台首頁 |
+| `/admin/reservation*` | 訂位、桌位、時段設定 |
+| `/admin/menu-*` | 菜單建立、編輯、設定 |
+| `/admin/order-*` | 訂單管理與營收 dashboard |
+| `/admin/member` | 會員管理 |
+| `/admin/store` | 門市營運管理 |
+| `/admin/homepage` | 首頁內容管理 |
+| `/admin/news` | 最新消息管理 |
+| `/admin/faqs`, `/admin/faq-analytics` | FAQ 與搜尋分析 |
+
+## Local Setup
+
+### Requirements
+
+- Java 17
+- Maven
+- Node.js `^20.19.0 || >=22.12.0`
+- MySQL 8
+
+### 1. Create database
 
 ```bash
 mysql -u root -p
@@ -86,7 +173,7 @@ CREATE DATABASE restaurant_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 exit
 ```
 
-依序匯入 SQL：
+### 2. Import schema and demo data
 
 ```bash
 for f in sql/*.sql; do
@@ -95,35 +182,35 @@ for f in sql/*.sql; do
 done
 ```
 
-### 2. 設定後端
+### 3. Configure backend
 
 ```bash
 cp backend/src/main/resources/application-dev.properties.example \
   backend/src/main/resources/application-dev.properties
 ```
 
-修改：
+Update local credentials:
 
 ```properties
 spring.datasource.username=root
-spring.datasource.password=你的 MySQL 密碼
-spring.mail.username=你的 Gmail
-spring.mail.password=你的 Gmail App Password
+spring.datasource.password=your_mysql_password
+spring.mail.username=your_gmail
+spring.mail.password=your_gmail_app_password
 ```
 
-啟動後端：
+### 4. Run backend
 
 ```bash
 cd backend
 mvn spring-boot:run
 ```
 
-後端預設：
+Default endpoints:
 
-- API：http://localhost:8080
-- Swagger：http://localhost:8080/swagger-ui.html
+- API: `http://localhost:8080`
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
 
-### 3. 啟動前端
+### 5. Run frontend
 
 ```bash
 cd restaurant-admin-frontend
@@ -131,80 +218,85 @@ npm install
 npm run dev
 ```
 
-前端預設：http://localhost:5173
+Default frontend:
 
-若後端不是 `8080`：
+- `http://localhost:5173`
+
+If backend port changes:
 
 ```bash
 VITE_API_TARGET=http://localhost:8081 npm run dev
 ```
 
-## Demo 帳號
+## Demo Accounts
 
-測試資料預設密碼皆為：
+Seed password:
 
 ```text
 password123
 ```
 
-| 角色 | 帳號 |
+| Role | Account |
 | --- | --- |
-| 系統管理員 | `admin@xuri.com` |
-| 店長 | `manager@xuri.com` |
-| 門市展示店長 | `storemanager@store.local` |
-| 員工 | `staff@xuri.com` |
-| 會員 | `user1@example.com` |
-| 會員 | `user2@example.com` |
+| Admin | `admin@xuri.com` |
+| Manager | `manager@xuri.com` |
+| Store manager demo | `storemanager@store.local` |
+| Staff | `staff@xuri.com` |
+| Member | `user1@example.com` |
+| Member | `user2@example.com` |
 
-## 常用指令
+## Verification
 
-前端：
+Frontend:
 
 ```bash
 cd restaurant-admin-frontend
 npm run build
 npm audit --omit=dev
-npx vercel --prod --yes
 ```
 
-後端：
+Backend:
 
 ```bash
 cd backend
 mvn test
-mvn spring-boot:run
 ```
 
-Git：
+Smoke test checklist:
+
+- Customer `/menu` renders menu categories and items.
+- Customer `/order` can choose store/time and show menu items.
+- FAQ search for `訂金可以退嗎` returns a deposit-related answer.
+- Admin login can reach store/news/FAQ/homepage pages.
+- Manager role cannot modify another store.
+
+## Deployment Notes
+
+- Current hosted demo is frontend-only.
+- Remote RDS is intentionally disabled to avoid ongoing cost.
+- Production deployment would need managed MySQL, backend hosting, fixed CORS origin, secure secret management, and payment callback domains.
+- No public demo URL is stored in this README by design.
+
+Deploy frontend when needed:
 
 ```bash
-git checkout develop
-git pull --ff-only
-git checkout main
-git merge --no-ff develop
-git push origin main
+cd restaurant-admin-frontend
+npx vercel --prod --yes
 ```
 
-## 線上版限制
+## Known Production Gaps
 
-- Vercel 版目前只部署前端。
-- AWS RDS 已停用，線上版不連接遠端 MySQL。
-- 後台登入、資料寫入、付款回寫等完整流程需本機後端與 MySQL。
-- 前端 demo fallback data 用於面試展示，不等同正式資料來源。
+| Area | Current Demo State | Production Direction |
+| --- | --- | --- |
+| CORS | Local/demo allowlist | Restrict to production frontend origin |
+| Auth storage | Frontend token storage | Move toward httpOnly cookie or stronger XSS controls |
+| Public transactional APIs | Some demo paths remain permissive | Add member auth or scoped access token |
+| SQL migrations | Ordered SQL scripts | Consolidate into repeatable migration workflow |
+| Assets | Large images remain | Compress WebP/AVIF, add stricter lazy loading |
+| Observability | Local logs | Add structured logs and deployment health checks |
 
-## 已知正式化項目
+## Branch Policy
 
-若要從作品集 demo 推向正式環境，優先處理：
-
-- CORS 改成固定正式網域。
-- 訂位、訂單、付款 API 補完整權限或 access token 邊界。
-- JWT 儲存從 localStorage 改成更安全策略，例如 httpOnly cookie。
-- 圖片壓縮成 WebP/AVIF，補 lazy loading 與 code splitting。
-- SQL migration 整理成可重複重建的新環境流程。
-
-## 分支狀態
-
-- `main`：Kevin 個人展示穩定版，Vercel production 來源。
-- `develop`：整合開發版，目前與 main 保持同步。
-
-成果發表後，main 可視為作品集版本；後續修改先進 develop，驗證後再 merge 回 main。
+- `main`: stable portfolio/demo branch.
+- `develop`: integration branch, kept in sync with main after verified changes.
+- Feature work should land in `develop`, pass verification, then merge into `main`.
