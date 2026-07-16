@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import api from "@/api/axios";
+import { demoCities, demoStores, getDemoDistricts, getDemoStoreDetail } from "@/api/demoData";
 import logoUrl from "@/assets/images/logo.png";
 
 const router = useRouter();
@@ -281,16 +282,15 @@ const loadStores = async () => {
 
   try {
     const response = await api.get("/api/stores");
-    allStores.value = unwrap(response);
+    const storeList = unwrap(response);
+    allStores.value = Array.isArray(storeList) ? storeList : demoStores;
     resultMode.value = "all";
     filterStores();
   } catch (error) {
-    errorMessage.value = "門市資料暫時無法載入";
-    allStores.value = [];
-    stores.value = [];
-    selectedStore.value = null;
-    selectedImageIndex.value = 0;
-    showFullHours.value = false;
+    errorMessage.value = "";
+    allStores.value = demoStores;
+    resultMode.value = "all";
+    filterStores();
   } finally {
     loading.value = false;
   }
@@ -299,9 +299,10 @@ const loadStores = async () => {
 const loadCities = async () => {
   try {
     const response = await api.get("/api/stores/cities");
-    cities.value = unwrap(response);
+    const cityList = unwrap(response);
+    cities.value = Array.isArray(cityList) ? cityList : demoCities;
   } catch (error) {
-    cities.value = [];
+    cities.value = demoCities;
   }
 };
 
@@ -318,9 +319,10 @@ const loadDistricts = async () => {
     const response = await api.get(
       `/api/stores/cities/${encodeURIComponent(selectedCity.value)}/districts`,
     );
-    districts.value = unwrap(response);
+    const districtList = unwrap(response);
+    districts.value = Array.isArray(districtList) ? districtList : getDemoDistricts(selectedCity.value);
   } catch (error) {
-    districts.value = [];
+    districts.value = getDemoDistricts(selectedCity.value);
   } finally {
     activeRegion.value = "all";
     resultMode.value = "all";
@@ -389,10 +391,23 @@ const findNearby = () => {
         });
         resultMode.value = "nearby";
         sortMode.value = "distance";
-        nearbyStores.value = unwrap(response);
+        const storeList = unwrap(response);
+        nearbyStores.value = Array.isArray(storeList)
+          ? storeList
+          : demoStores.map((store, index) => ({
+              ...store,
+              distanceKm: Number((1.2 + index * 2.4).toFixed(1)),
+            }));
         filterStores();
       } catch (error) {
-        errorMessage.value = "附近門市查詢失敗";
+        errorMessage.value = "";
+        resultMode.value = "nearby";
+        sortMode.value = "distance";
+        nearbyStores.value = demoStores.map((store, index) => ({
+          ...store,
+          distanceKm: Number((1.2 + index * 2.4).toFixed(1)),
+        }));
+        filterStores();
       } finally {
         nearbyLoading.value = false;
       }
@@ -412,9 +427,14 @@ const loadStoreDetail = async (storeId) => {
 
   try {
     const response = await api.get(`/api/stores/${storeId}`);
-    selectedStore.value = unwrap(response);
+    const store = unwrap(response);
+    selectedStore.value = store && typeof store === "object" && !Array.isArray(store)
+      ? store
+      : getDemoStoreDetail(storeId);
   } catch (error) {
-    selectedStore.value = stores.value.find((store) => store.storeId === storeId) ?? null;
+    selectedStore.value =
+      stores.value.find((store) => String(store.storeId) === String(storeId)) ??
+      getDemoStoreDetail(storeId);
   } finally {
     detailLoading.value = false;
   }

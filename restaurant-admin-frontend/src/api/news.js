@@ -1,10 +1,16 @@
 import api from "@/api/axios";
+import { demoNews } from "@/api/demoData";
 
 const unwrap = (response) => response.data?.data ?? response.data ?? [];
 
 export const newsApi = {
   async getPublishedNews() {
-    return unwrap(await api.get("/api/news"));
+    try {
+      const articles = unwrap(await api.get("/api/news"));
+      return Array.isArray(articles) ? articles : demoNews;
+    } catch {
+      return demoNews;
+    }
   },
 
   async getAdminNews() {

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import api from "@/api/axios";
+import { demoStores } from "@/api/demoData";
 import { homepageApi } from "@/api/homepage";
 import { newsApi } from "@/api/news";
 
@@ -324,10 +325,11 @@ const loadFeaturedStores = async () => {
 
   try {
     const response = await api.get("/api/stores");
-    stores.value = unwrap(response);
+    const storeList = unwrap(response);
+    stores.value = Array.isArray(storeList) ? storeList : demoStores;
   } catch (error) {
-    storeError.value = "門市資料暫時無法載入";
-    stores.value = [];
+    storeError.value = "";
+    stores.value = demoStores;
   } finally {
     storeLoading.value = false;
   }

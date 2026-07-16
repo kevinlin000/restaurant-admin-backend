@@ -1,16 +1,27 @@
 import http from './http'
+import { demoSlotCapacity, getDemoReservationSlots } from './demoData'
 
 // ========== 顧客端訂位 API ==========
 export const reservationApi = {
   
   // 顯示可訂日期時段
-  getAvailableSlots(params) {
-    return http.get('/reservations/slots', { params })
+  async getAvailableSlots(params) {
+    try {
+      const response = await http.get('/reservations/slots', { params })
+      return Array.isArray(response?.data) ? response : { data: getDemoReservationSlots(params?.storeId) }
+    } catch {
+      return { data: getDemoReservationSlots(params?.storeId) }
+    }
   },
 
   // 剩餘可訂桌位數
-  getSlotCapacity(slotId) {
-    return http.get(`/reservations/slots/${slotId}/capacity`)
+  async getSlotCapacity(slotId) {
+    try {
+      const response = await http.get(`/reservations/slots/${slotId}/capacity`)
+      return Array.isArray(response?.data) ? response : { data: demoSlotCapacity }
+    } catch {
+      return { data: demoSlotCapacity }
+    }
   },
 
   // 送出訂位時，檢查容量扣 reserved_count。
