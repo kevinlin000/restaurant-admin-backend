@@ -247,7 +247,7 @@ const fetchStores = async () => {
   try {
     const response = await axios.get('/api/menu-component/stores')
     const stores = response.data.data || response.data
-    storeList.value = Array.isArray(stores) ? stores : demoMenuStores
+    storeList.value = Array.isArray(stores) && stores.length ? stores : demoMenuStores
     if (storeList.value.length > 0 && !currentStoreId.value) currentStoreId.value = storeList.value[0].id
   } catch (error) {
     storeList.value = demoMenuStores
@@ -259,7 +259,7 @@ const fetchCategories = async () => {
   try {
     const response = await axios.get('/api/menu-categories')
     const raw = response.data.data || response.data
-    categoryList.value = Array.isArray(raw)
+    categoryList.value = Array.isArray(raw) && raw.length
       ? raw.map(cat => ({ id: cat.id || cat.categoryId, name: cat.categoryName || cat.name }))
       : demoMenuCategories
     if (categoryList.value.length > 0) activeCategoryId.value = categoryList.value[0].id
@@ -274,7 +274,7 @@ const fetchMenuData = async (storeId) => {
   try {
     const response = await axios.get(`/api/menu-items/store/${storeId}`)
     const raw = response.data.data || response.data
-    menuItems.value = (Array.isArray(raw) ? raw : getDemoMenuItems(storeId)).map(item => {
+    menuItems.value = (Array.isArray(raw) && raw.length ? raw : getDemoMenuItems(storeId)).map(item => {
       if (item.categoryId === undefined) item.categoryId = item.category_id;
       return item;
     })
