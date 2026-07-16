@@ -7,6 +7,12 @@ import api from "@/api/axios";
 import { useRoute, useRouter } from "vue-router";
 import Swal from "sweetalert2";
 import { getProfile } from "@/api/member";
+import {
+    demoMenuCategories,
+    demoStores,
+    getDemoMenuItems,
+    getDemoStoreDetail,
+} from "@/api/demoData";
 //Router
 const router = useRouter();
 const route = useRoute();
@@ -91,10 +97,12 @@ const selectedStoreName = computed(() => {
 async function loadStoreInfo(storeId) {
     try {
         const response = await axios.get(`/api/stores/${storeId}`);
-        storeInfo.value = response.data?.data ?? response.data ?? null;
+        const store = response.data?.data ?? response.data ?? null;
+        storeInfo.value = store && typeof store === "object" && !Array.isArray(store)
+            ? store
+            : getDemoStoreDetail(storeId);
     } catch (error) {
-        console.error("取得門市資料失敗", error);
-        storeInfo.value = null;
+        storeInfo.value = getDemoStoreDetail(storeId);
     }
 }
 const selectedTableLabel = computed(() => {
@@ -335,13 +343,13 @@ const getMenuItemImage = (item) => {
 const unwrap = (response) => response.data?.data ?? [];
 
 const normalizeStoreMenuItem = (item) => ({
-    id: item.id,
+    id: item.id ?? item.menuItemId ?? item.itemId,
     categoryId: Number(item.categoryId),
     itemName: item.itemName,
     description: item.description || "",
-    price: Number(item.finalPrice),
+    price: Number(item.finalPrice ?? item.price ?? item.basePrice ?? 0),
     imageUrl: getMenuItemImage(item),
-    status: item.isSelectable ? "AVAILABLE" : "SOLD_OUT",
+    status: item.isSelectable === false ? "SOLD_OUT" : "AVAILABLE",
     allergenInfo: item.allergenInfo || "無",
     featureTags: item.featureTags || [],
 });
@@ -363,7 +371,7 @@ async function loadMenuCategories() {
         const response = await axios.get("/api/menu-categories");
         const data = response.data?.data ?? response.data ?? [];
 
-        categories.value = data.map((item) => ({
+        categories.value = (Array.isArray(data) && data.length ? data : demoMenuCategories).map((item) => ({
             id: item.categoryId ?? item.id,
             name: shortCategoryNameMap[item.categoryName ?? item.name] ?? item.categoryName ?? item.name,
         }));
@@ -394,17 +402,9 @@ async function loadStoreMenu(storeId) {
         const response = await axios.get(`/api/menu-items/store/${storeId}`);
         const items = unwrap(response);
 
-        if (Array.isArray(items) && items.length > 0) {
-            menuItems.value = items.map(normalizeStoreMenuItem);
-            console.log(menuItems.value);
-            return;
-        }
-
-        menuItems.value = [];
-        menuLoadError.value = "此門市目前沒有可供應菜單";
+        menuItems.value = (Array.isArray(items) && items.length ? items : getDemoMenuItems(storeId)).map(normalizeStoreMenuItem);
     } catch (error) {
-        menuItems.value = [];
-        menuLoadError.value = "門市菜單暫時無法載入，請稍後再試";
+        menuItems.value = getDemoMenuItems(storeId).map(normalizeStoreMenuItem);
     }
 }
 async function loadRecommendItems() {
@@ -415,11 +415,9 @@ async function loadRecommendItems() {
         const response = await api.get("/api/menu/recommend");
         const data = response.data?.data ?? response.data ?? [];
 
-        recommendItems.value = Array.isArray(data) ? data.slice(0, 5) : [];
+        recommendItems.value = Array.isArray(data) && data.length ? data.slice(0, 5) : getDemoMenuItems(orderForm.value.storeId).slice(0, 5);
     } catch (error) {
-        console.error("取得人氣推薦失敗", error);
-        recommendItems.value = [];
-        recommendErrorMsg.value = "人氣推薦暫時無法載入";
+        recommendItems.value = getDemoMenuItems(orderForm.value.storeId).slice(0, 5);
     } finally {
         isRecommendLoading.value = false;
     }
@@ -501,8 +499,13 @@ const selectedPickupTime = computed(() => {
 });
 
 async function loadStoreOptions() {
-    const response = await axios.get("/api/stores");
-    storeOptions.value = response.data?.data ?? response.data ?? [];
+    try {
+        const response = await axios.get("/api/stores");
+        const stores = response.data?.data ?? response.data ?? [];
+        storeOptions.value = Array.isArray(stores) && stores.length ? stores : demoStores;
+    } catch {
+        storeOptions.value = demoStores;
+    }
 
     if (storeOptions.value.length > 0) {
         selectedPickerStoreId.value = storeOptions.value[0].storeId;
