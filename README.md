@@ -1,160 +1,129 @@
-# 敘日 - 餐廳管理系統
+# 敘日餐廳管理系統
 
-> JAVA Project— 餐廳訂位與點餐管理系統
+餐廳訂位、點餐、付款與品牌營運後台整合專題。
 
-## 專案概述
-「敘日」—— 不只是旭日的延伸，更是重逢的起點。
-「敘」是敘舊，是放下手機後的深度對談；「日」是時光，是歲月淬鍊出的滋味。
-我們參考「敘日」對食材與職人精神的堅持，但在系統設計上，我們更想強調「餐桌上的連結」。
-專案目的是開發一套完整的餐廳管理系統，涵蓋會員、訂位、訂餐、菜單、門市、品牌首頁、最新消息、FAQ 客服知識庫與後台營運管理。系統不只處理單次交易，也支援餐廳總部日常營運：門市狀態控管、品牌內容發布、顧客問題沉澱與後台權限分工。
+> Main 分支目前作為 Kevin Lin 個人作品集展示版本使用。Vercel 線上版不連接雲端資料庫，採前端 demo fallback data 呈現可瀏覽內容；完整後台、登入、資料庫與付款流程請用本機環境展示。
+
+## 展示入口
+
+建議展示路徑：
+
+- `/home`：首頁、品牌內容、精選門市、最新消息
+- `/menu`：菜單瀏覽、分類、門市菜單 fallback
+- `/order`：點餐流程、購物車、門市與取餐時間
+- `/store`：分店資訊與營業狀態
+- `/news`：最新消息
+- `/faq`：FAQ 與客服查詢
+
+線上版適合給面試官快速瀏覽 UI 與使用流程。後端 API、資料庫權限、後台管理與付款回寫要用本機版本看。
+
+## 專案重點
+
+敘日不是單一功能頁，而是把餐廳真實營運流程串起來：
+
+- 顧客端：訂位、菜單、點餐、付款、門市資訊、消息、FAQ。
+- 後台端：會員、訂位、訂單、菜單、門市、首頁、消息、FAQ 管理。
+- 營運邏輯：門市營業狀態、店長權限、訂金/付款狀態、FAQ 搜尋與未命中分析。
+- Demo 策略：無免費後端資料庫時，前端保留展示資料，避免線上作品變成空頁。
+
+## Kevin Lin 負責範圍
+
+我主要負責品牌營運後台與前台對應展示：
+
+| 模組 | 內容 |
+| --- | --- |
+| 首頁管理 | Hero 輪播、品牌文案、精選門市、精選消息、後台設定 |
+| 門市管理 | 門市資料、營業時間、公休日、桌位、特色標籤、店長權限 |
+| 最新消息 | 品牌公告、門市公告、發布/下架、軟刪除、zero datetime cleanup |
+| FAQ 客服 | FAQ 知識庫、客服浮窗、搜尋命中、未命中分析 |
+| Demo fallback | Vercel 無資料庫時仍顯示菜單、門市、消息與 FAQ |
+
+### 我想讓面試官看到的深度
+
+- **權限邊界放後端**：店長只能管理自己門市，不靠前端隱藏按鈕防呆。
+- **營業狀態不是單一欄位**：門市是否營業會結合營業時間、公休日與目前時間。
+- **內容管理動態化**：首頁、消息、門市、FAQ 都由後台資料驅動，不寫死在頁面。
+- **FAQ 搜尋可控**：不是 AI 幻覺回答，而是基於後台知識庫、關鍵字與命中權重。
+- **資料保留與清理**：消息採軟刪除；遇到 MySQL zero date 問題時用 migration 清髒資料。
+- **展示可靠性**：AWS RDS 已停用，線上版用前端 fallback data，避免面試官看到空畫面。
 
 ## 技術棧
 
 | 層級 | 技術 |
-|------|------|
-| 後端 | Spring Boot 3.x + Spring Security + Spring Data JPA |
-| 前端 | Vue 3 + Vite + Pinia + Axios |
-| 資料庫 | MySQL 8.0 |
-| API 規範 | RESTful API + Swagger/OpenAPI |
-| 版本控制 | Git + GitHub |
-
-## 核心模組與分工
-
-| 模組 | 負責人 | 分支名稱 | 說明 |
-|------|--------|----------|------|
-| 會員管理 | (填入姓名) | `feature/member` | 註冊登入、權限控管、點數系統 |
-| 訂位功能 | (填入姓名) | `feature/reservation` | 時段預約、人數控管、庫存邏輯 |
-| 訂餐與付款 | (填入姓名) | `feature/order` | 線上點餐、購物車、訂單管理、付款流程、智慧推薦 |
-| 菜單與價格 | (填入姓名) | `feature/menu`, `feat-menu-final` | 菜單分類、餐點詳情、分店定價、上下架管理 |
-| 門市營運管理 | kevinlin | `feature/store` | 據點資訊、分店配置、桌位管理、營業狀態、店長門市權限 |
-| 品牌首頁管理 | kevinlin | `feature/homepage-management` | 首頁 Hero、品牌文案、精選門市、精選消息 |
-| 最新消息管理 | kevinlin | `feature/news` | 品牌公告、活動消息、門市公告、發布與下架流程 |
-| FAQ 客服知識庫 | kevinlin | `feature/faq-support`, `feature/faq-analytics` | 常見問題、客服浮窗、搜尋紀錄、未命中問題分析 |
-
-## kevinlin 負責模組亮點
-
-kevinlin 負責的是「品牌營運後台」相關模組，目標是讓敘日不只是可以訂位與點餐，也能像真實餐飲品牌一樣維護門市、公告、首頁內容與客服知識庫。這些模組共同支援總部與店長的日常營運流程。
-
-### 品牌首頁管理
-
-- 前台首頁呈現品牌主視覺、品牌故事、精選分店、最新消息與 FAQ 入口。
-- 後台「首頁管理」可維護 Hero 輪播、首頁文案、精選門市與精選消息。
-- 首頁內容由資料庫驅動，避免每次活動或門市主推調整都需要改前端程式碼。
-- 登入導流支援原頁回跳，後台管理者未登入時會先導向登入頁，登入成功後回到原本要管理的頁面。
-
-### 門市營運管理
-
-- 前台分店資訊支援多門市展示，包含城市區域、地址、交通、停車、營業狀態與特色標籤。
-- 後台分店管理支援門市資料維護、營業時間、公休日、桌位、圖片與特色標籤。
-- 權限區分 ADMIN 與 MANAGER：ADMIN 可管理全部門市，MANAGER 僅能管理自己所屬門市。
-- 提供單店與全域營業狀態 API，供菜單與點餐模組判斷門市是否開放服務。
-- 店長門市權限由後端檢查，避免 MANAGER 透過改 URL 操作其他門市。
-
-### 最新消息管理
-
-- 前台最新消息支援品牌公告、活動消息與門市異動資訊。
-- 後台可新增、編輯、發布、下架與排序消息。
-- 支援全品牌公告與門市公告，讓總部與分店營運資訊可以集中維護。
-- 補充 `sql/16_news_zero_datetime_cleanup.sql`，修復舊 seed 資料的 zero datetime，避免最新消息 API 在 JDBC 讀取時間欄位時發生 500。
-
-### FAQ 與客服查詢紀錄
-
-- 前台 FAQ 提供訂位、訂金、點餐、外帶、門市、會員與服務規則查詢。
-- 全站右下角提供 FAQ 客服浮窗，讓顧客可直接搜尋常見問題。
-- 後台 FAQ 管理可維護問題、答案、分類、關鍵字、狀態與排序。
-- 後台客服查詢紀錄會記錄熱門查詢與未命中問題，協助營運端補強 FAQ 內容。
-- FAQ 不是靜態說明頁，而是可被客服浮窗與後台分析共用的知識庫。
+| --- | --- |
+| 前端 | Vue 3, Vite, Pinia, Vue Router, Axios |
+| 後端 | Java 17, Spring Boot 3.2, Spring Security, Spring Data JPA |
+| 資料庫 | MySQL 8 |
+| 文件 | Swagger / OpenAPI |
+| 部署 | Vercel frontend demo |
+| 測試/驗證 | Maven test, Vite build, npm audit, Playwright smoke test |
 
 ## 專案結構
 
-```
-restaurant-project/
-├── backend/                          # Spring Boot 後端
-│   ├── src/main/java/com/restaurant/
-│   │   ├── config/                   # 設定檔（CORS、Security、Swagger）
-│   │   ├── controller/               # API Controller
-│   │   ├── dto/                      # 資料傳輸物件
-│   │   │   ├── request/              # 前端傳入的請求格式
-│   │   │   └── response/             # 後端回傳的回應格式
-│   │   ├── entity/                   # JPA Entity（對應資料表）
-│   │   ├── repository/               # Spring Data JPA Repository
-│   │   ├── service/                  # Service 介面
-│   │   │   └── impl/                 # Service 實作
-│   │   ├── exception/                # 自訂例外處理
-│   │   ├── security/                 # Spring Security 相關
-│   │   └── util/                     # 工具類
-│   └── src/main/resources/
-│       ├── application.properties    # 主設定檔（不要 commit 敏感資訊）
-│       ├── application-dev.properties   # 開發環境設定
-│       └── application-prod.properties  # 正式環境設定
-│
-├── restaurant-admin-frontend/         # Vue 3 前端
-│   ├── src/
-│   │   ├── api/                      # Axios API 封裝
-│   │   ├── assets/                   # 靜態資源（圖片、CSS）
-│   │   ├── components/               # 共用元件
-│   │   ├── router/                   # Vue Router 路由
-│   │   ├── store/                    # Pinia 狀態管理
-│   │   └── views/                    # 頁面（依模組分資料夾）
-│   │       ├── member/
-│   │       ├── reservation/
-│   │       ├── order/
-│   │       ├── menu/
-│   │       ├── store/
-│   │       ├── news/
-│   │       ├── faq/
-│   │       └── admin/
-│   └── package.json
-│
-├── sql/                              # SQL 腳本
-│   ├── 01_create_tables.sql          # 建表語法（按順序）
-│   ├── 02_insert_test_data.sql       # 測試資料
-│   └── 03_indexes.sql                # 索引優化
-│
-├── docs/                             # 文件
-│   ├── api/                          # API 文件
-│   ├── database/                     # ER Model、欄位說明
-│   └── meeting-notes/                # 會議記錄
-│
-├── .gitignore
-├── .env.example                      # 環境變數範本
+```text
+.
+├── backend/                    # Spring Boot API
+│   └── src/main/java/com/restaurant/
+├── restaurant-admin-frontend/   # Vue 前台與後台
+│   └── src/
+│       ├── api/                # API 與 demo fallback data
+│       ├── components/         # 共用元件
+│       ├── layouts/            # 前台/後台 layout
+│       ├── router/             # 路由與登入導流
+│       └── views/              # customer/admin 頁面
+├── sql/                        # 建表、demo data、migration
+├── docs/                       # 補充文件
 └── README.md
 ```
 
-## 快速開始
+## 本機啟動
 
-### 1. Clone 專案
-
-```bash
-git clone https://github.com/你的帳號/restaurant-project.git
-cd restaurant-project
-```
-
-### 2. 資料庫設定
+### 1. 準備 MySQL
 
 ```bash
-# 連線到 MySQL，建立資料庫
 mysql -u root -p
 CREATE DATABASE restaurant_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-# 執行建表腳本
-mysql -u root -p restaurant_db < sql/01_create_tables.sql
-mysql -u root -p restaurant_db < sql/02_insert_test_data.sql
+exit
 ```
 
-### 3. 後端啟動
+依序匯入 SQL：
+
+```bash
+for f in sql/*.sql; do
+  echo "== $f"
+  mysql --force -u root -p restaurant_db < "$f"
+done
+```
+
+### 2. 設定後端
+
+```bash
+cp backend/src/main/resources/application-dev.properties.example \
+  backend/src/main/resources/application-dev.properties
+```
+
+修改：
+
+```properties
+spring.datasource.username=root
+spring.datasource.password=你的 MySQL 密碼
+spring.mail.username=你的 Gmail
+spring.mail.password=你的 Gmail App Password
+```
+
+啟動後端：
 
 ```bash
 cd backend
-# 複製設定檔範本
-cp src/main/resources/application-dev.properties.example src/main/resources/application-dev.properties
-# 修改資料庫連線資訊與 Gmail 驗證信設定
-# spring.mail.password 請填 Gmail App Password，不是 Gmail 登入密碼
-# 啟動
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+mvn spring-boot:run
 ```
 
-### 4. 前端啟動
+後端預設：
+
+- API：http://localhost:8080
+- Swagger：http://localhost:8080/swagger-ui.html
+
+### 3. 啟動前端
 
 ```bash
 cd restaurant-admin-frontend
@@ -162,133 +131,80 @@ npm install
 npm run dev
 ```
 
-## Git 工作流程
+前端預設：http://localhost:5173
 
-### 分支策略
-
-```
-main                         ← 穩定版本，不直接 commit
-  └── develop                ← 開發主線，由 kevinlin 統一整合與驗證
-       ├── feature/member              ← 會員、登入、點數、會員中心
-       ├── feature/reservation         ← 訂位、時段、訂金、訂位後台
-       ├── feature/order               ← 點餐、付款、訂單管理、智慧推薦
-       ├── feature/menu / feat-menu-final
-       │                               ← 菜單、分店定價、餐點詳情
-       ├── feature/store               ← 門市、桌位、營業狀態、店長權限
-       ├── feature/homepage-management ← 首頁內容管理
-       ├── feature/news                ← 最新消息前後台
-       └── feature/faq-support / feature/faq-analytics
-                                       ← FAQ、客服浮窗、查詢紀錄
-```
-
-### 每日工作流程
+若後端不是 `8080`：
 
 ```bash
-# 1. 開始工作前，先拉最新的 develop
-git checkout develop
-git pull origin develop
-
-# 2. 切換到自己的功能分支，合併 develop 的最新內容
-git checkout feature/your-module
-git merge develop
-
-# 3. 寫 code、commit
-git add .
-git commit -m "feat(module): 新增功能說明"
-
-# 4. 推上去
-git push origin feature/your-module
-
-# 5. 功能完成後，通知組長協助整合到 develop
+VITE_API_TARGET=http://localhost:8081 npm run dev
 ```
 
-### 整合與衝突處理
+## Demo 帳號
 
-develop 由 kevinlin 統一整合各功能分支。合併時會先確認遠端分支更新狀態，再依模組相依性分批合併，避免後進分支覆蓋已完成的跨模組邏輯。
+測試資料預設密碼皆為：
 
-基本整合檢查：
+```text
+password123
+```
+
+| 角色 | 帳號 |
+| --- | --- |
+| 系統管理員 | `admin@xuri.com` |
+| 店長 | `manager@xuri.com` |
+| 門市展示店長 | `storemanager@store.local` |
+| 員工 | `staff@xuri.com` |
+| 會員 | `user1@example.com` |
+| 會員 | `user2@example.com` |
+
+## 常用指令
+
+前端：
 
 ```bash
-git fetch origin
-git checkout develop
-git merge origin/feature/member
-git merge origin/feature/reservation
-git merge origin/feature/order
-git merge origin/feat-menu-final
-git merge origin/feature/store
-git merge origin/feature/homepage-management
-git merge origin/feature/news
-git merge origin/feature/faq-support
-git merge origin/feature/faq-analytics
+cd restaurant-admin-frontend
+npm run build
+npm audit --omit=dev
+npx vercel --prod --yes
+```
 
+後端：
+
+```bash
 cd backend
 mvn test
-
-cd ../restaurant-admin-frontend
-npm run build
-
-cd ..
-git diff --check
+mvn spring-boot:run
 ```
 
-若發生衝突，優先保留已上線或已驗證的跨模組流程，例如：
+Git：
 
-- 登入與 JWT 權限不得被舊版覆蓋。
-- 後台路由需保留 member、reservation、order、menu、store、homepage、news、FAQ 等入口。
-- 店長門市權限、訂單付款、點數、訂位訂金等跨模組邏輯需一起檢查。
-- SQL migration 不直接刪除，若有重複或順序問題，需補新的修正 migration。
-
-### Commit 訊息規範
-
-```
-feat(module):     新功能        例: feat(store): 新增門市狀態 API
-fix(module):      修 Bug        例: fix(member): 修正登入驗證邏輯
-docs(module):     文件更新      例: docs(readme): 更新模組分工
-style(module):    格式調整      例: style(news): 調整後台排版
-refactor(module): 重構          例: refactor(order): 抽取共用付款邏輯
-test(module):     測試          例: test(store): 新增門市權限測試
+```bash
+git checkout develop
+git pull --ff-only
+git checkout main
+git merge --no-ff develop
+git push origin main
 ```
 
-## API 規範
+## 線上版限制
 
-### 統一回應格式
+- Vercel 版目前只部署前端。
+- AWS RDS 已停用，線上版不連接遠端 MySQL。
+- 後台登入、資料寫入、付款回寫等完整流程需本機後端與 MySQL。
+- 前端 demo fallback data 用於面試展示，不等同正式資料來源。
 
-```json
-{
-  "success": true,
-  "message": "操作成功",
-  "data": { ... }
-}
-```
+## 已知正式化項目
 
-### 錯誤回應格式
+若要從作品集 demo 推向正式環境，優先處理：
 
-```json
-{
-  "success": false,
-  "message": "找不到該門市",
-  "errorCode": "STORE_NOT_FOUND"
-}
-```
+- CORS 改成固定正式網域。
+- 訂位、訂單、付款 API 補完整權限或 access token 邊界。
+- JWT 儲存從 localStorage 改成更安全策略，例如 httpOnly cookie。
+- 圖片壓縮成 WebP/AVIF，補 lazy loading 與 code splitting。
+- SQL migration 整理成可重複重建的新環境流程。
 
-### API 路徑規範
+## 分支狀態
 
-| 模組 | 前綴 |
-|------|------|
-| 會員 | `/api/members` |
-| 訂位 | `/api/reservations` |
-| 訂餐 | `/api/orders` |
-| 菜單 | `/api/menu-items`, `/api/menu-categories` |
-| 門市 | `/api/stores`, `/api/admin/stores` |
-| 首頁 | `/api/homepage`, `/api/admin/homepage` |
-| 最新消息 | `/api/news`, `/api/admin/news` |
-| FAQ | `/api/faqs`, `/api/admin/faqs` |
+- `main`：Kevin 個人展示穩定版，Vercel production 來源。
+- `develop`：整合開發版，目前與 main 保持同步。
 
-## 團隊公約
-
-1. **不要直接 push 到 main**，穩定版本只從 develop 整理上去。
-2. **develop 由 kevinlin 統一整合**，合併後需通過 `mvn test`、`npm run build` 與 `git diff --check`。
-3. **每次開始開發前先同步 develop**，避免分支長期落後造成大量衝突。
-4. **跨模組欄位或 SQL 變更要先告知**，例如 storeId、point_level、訂金欄位、付款狀態、FAQ 欄位長度。
-5. **不要 commit 敏感資訊**（密碼、API Key），用 `.env` 或 `application-dev.properties`（已在 .gitignore）。
-6. **每天結束前至少 push 一次**，避免程式碼只在自己電腦。
+成果發表後，main 可視為作品集版本；後續修改先進 develop，驗證後再 merge 回 main。
