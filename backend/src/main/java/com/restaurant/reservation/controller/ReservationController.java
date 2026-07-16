@@ -63,29 +63,39 @@ public class ReservationController {
 
     // 訂位成功、編輯頁 -> 讀取單筆訂位
     @GetMapping("/{reservationId}")
-    public ApiResponse<ReservationResponse> getReservation(@PathVariable Long reservationId) {
-        return ApiResponse.success(reservationService.getReservation(reservationId));
+    public ApiResponse<ReservationResponse> getReservation(
+            @PathVariable Long reservationId,
+            @RequestParam String token
+    ) {
+        return ApiResponse.success(reservationService.getReservationByAccessToken(reservationId, token));
     }
 
     // 修改訂位資訊 -> 顧客在 PENDING 狀態下
     @PutMapping("/{reservationId}")
     public ApiResponse<ReservationResponse> updateReservation(
             @PathVariable Long reservationId,
+            @RequestParam String token,
             @Valid @RequestBody CreateReservationRequest request
     ) {
-        return ApiResponse.success("訂位已更新", reservationService.updateReservation(reservationId, request));
+        return ApiResponse.success("訂位已更新", reservationService.updateReservationByAccessToken(reservationId, token, request));
     }
 
     // 訂位成功頁 -> 確認保留訂位
     @PatchMapping("/{reservationId}/reserve")
-    public ApiResponse<ReservationResponse> reserveReservation(@PathVariable Long reservationId) {
-        return ApiResponse.success("訂位已保留", reservationService.reserveReservation(reservationId));
+    public ApiResponse<ReservationResponse> reserveReservation(
+            @PathVariable Long reservationId,
+            @RequestParam String token
+    ) {
+        return ApiResponse.success("訂位已保留", reservationService.reserveReservationByAccessToken(reservationId, token));
     }
 
     // 取消訂位 -> 釋放容量並將狀態改為 CANCELLED
     @DeleteMapping("/{reservationId}")
-    public ApiResponse<Void> cancelReservation(@PathVariable Long reservationId) {
-        reservationService.cancelReservation(reservationId);
+    public ApiResponse<Void> cancelReservation(
+            @PathVariable Long reservationId,
+            @RequestParam String token
+    ) {
+        reservationService.cancelReservationByAccessToken(reservationId, token);
         return ApiResponse.success("訂位已取消");
     }
 }

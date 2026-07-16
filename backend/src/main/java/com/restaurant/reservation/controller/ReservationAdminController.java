@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -112,5 +113,13 @@ public class ReservationAdminController {
     ) {
         reservationAdminAccessService.requireStoreAccess(authentication, reservationAdminService.getReservationStoreId(reservationId));
         return ApiResponse.success("訂位資料已更新", reservationAdminService.updateReservationInfo(reservationId, request));
+    }
+
+    // 後台取消訂位
+    @DeleteMapping("/{reservationId}")
+    public ApiResponse<Void> cancelReservation(@PathVariable Long reservationId, Authentication authentication) {
+        reservationAdminAccessService.requireStoreAccess(authentication, reservationAdminService.getReservationStoreId(reservationId));
+        reservationAdminService.cancelReservation(reservationId);
+        return ApiResponse.success("訂位已取消");
     }
 }

@@ -38,11 +38,10 @@ const getUserInfo = () => {
 };
 
 const goDetail = () => {
-  const token = localStorage.getItem("accessToken");
   const userInfo = getUserInfo();
   const roleName = userInfo.roleName;
 
-  if (!token) {
+  if (!userInfo.userId) {
     router.push({
       name: "GuestOrderDetail",
       query: { orderId: orderId.value },

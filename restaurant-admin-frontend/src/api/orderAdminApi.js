@@ -3,11 +3,12 @@ import axios from 'axios'
 const API_URL = 'http://localhost:8080/api/admin/orders'
 
 const getAuthConfig = () => {
-  const token = localStorage.getItem('accessToken')
+  const token = sessionStorage.getItem('accessToken')
 
   return {
+    withCredentials: true,
     headers: {
-      Authorization: `Bearer ${token}`
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
     }
   }
 }

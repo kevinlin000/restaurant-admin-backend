@@ -15,6 +15,7 @@ const errorMessage = ref('')
 const successMessage = ref('')
 const cachedReservation = ref({})
 const storeName = ref('')
+const reservationToken = computed(() => route.query.token || reservation.value?.accessToken || '')
 
 // 訂位成功顯示名字、分店
 const displayName = computed(() => reservation.value?.customerName || cachedReservation.value.customerName || '訂位顧客')
@@ -73,9 +74,7 @@ const loadReservation = async () => {
   }
   loading.value = true
   try {
-    const res = route.query.token
-      ? await reservationApi.getPublicReservation(route.query.id, route.query.token)
-      : await reservationApi.getReservation(route.query.id)
+    const res = await reservationApi.getReservation(route.query.id, route.query.token)
     const item = res.data
     reservation.value = item
     loadCachedReservation(res.data?.reservationId)
@@ -105,7 +104,7 @@ const cancelReservation = async () => {
   if (!result.isConfirmed) return
 
   try {
-    await reservationApi.cancelReservation(reservation.value.reservationId)
+    await reservationApi.cancelReservation(reservation.value.reservationId, reservationToken.value)
     reservation.value = {
       ...reservation.value,
       status: 'CANCELLED',
@@ -142,7 +141,7 @@ const reserveReservation = async () => {
   if (!result.isConfirmed) return
 
   try {
-    const res = await reservationApi.reserveReservation(reservation.value.reservationId)
+    const res = await reservationApi.reserveReservation(reservation.value.reservationId, reservationToken.value)
     reservation.value = res.data
     successMessage.value = '已保留訂位，店家會依現場安排桌位。如需更改訂位資訊，請致電'
     await Swal.fire({

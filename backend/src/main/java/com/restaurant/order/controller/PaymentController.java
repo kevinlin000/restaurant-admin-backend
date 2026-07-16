@@ -42,10 +42,10 @@ public class PaymentController {
 
     @PostMapping("/ecpay/result")
     public void ecpayResult(
-            @RequestParam Long orderId,
+            @RequestParam Map<String, String> params,
             HttpServletResponse response) throws IOException {
 
-        paymentService.simulatePaymentSuccess(orderId);
+        Long orderId = paymentService.completeEcpayResult(params);
 
         response.setContentType("text/html;charset=UTF-8");
         response.getWriter().write(
@@ -54,10 +54,10 @@ public class PaymentController {
 
     @GetMapping("/ecpay/result")
     public void ecpayResultGet(
-            @RequestParam Long orderId,
+            @RequestParam Map<String, String> params,
             HttpServletResponse response) throws IOException {
 
-        paymentService.simulatePaymentSuccess(orderId);
+        Long orderId = paymentService.completeEcpayResult(params);
 
         response.setContentType("text/html;charset=UTF-8");
         response.getWriter().write(

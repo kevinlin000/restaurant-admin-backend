@@ -493,7 +493,8 @@ const handleRegister = async () => {
 
     const data = res.data.data;
 
-    localStorage.setItem("accessToken", data.accessToken);
+    sessionStorage.setItem("accessToken", data.accessToken);
+    localStorage.removeItem("accessToken");
     localStorage.setItem(
       "userInfo",
       JSON.stringify({

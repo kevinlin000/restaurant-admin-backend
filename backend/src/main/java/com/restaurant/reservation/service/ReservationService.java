@@ -154,14 +154,25 @@ public class ReservationService {
 
     // 信件中的成功頁連結使用 reservation_id + access_token 查詢，不需要會員登入 JWT
     public ReservationResponse getReservationByAccessToken(Long reservationId, String accessToken) {
-        if (accessToken == null || accessToken.isBlank()) {
-            throw new BusinessException("訂位連結驗證失敗");
-        }
+        return toResponse(requireReservationAccess(reservationId, accessToken));
+    }
 
-        Reservation reservation = reservationRepository
-                .findByReservationIdAndAccessToken(reservationId, accessToken)
-                .orElseThrow(() -> new BusinessException("訂位連結驗證失敗"));
-        return toResponse(reservation);
+    @Transactional
+    public ReservationResponse updateReservationByAccessToken(Long reservationId, String accessToken, CreateReservationRequest request) {
+        requireReservationAccess(reservationId, accessToken);
+        return updateReservation(reservationId, request);
+    }
+
+    @Transactional
+    public ReservationResponse reserveReservationByAccessToken(Long reservationId, String accessToken) {
+        requireReservationAccess(reservationId, accessToken);
+        return reserveReservation(reservationId);
+    }
+
+    @Transactional
+    public void cancelReservationByAccessToken(Long reservationId, String accessToken) {
+        requireReservationAccess(reservationId, accessToken);
+        cancelReservation(reservationId);
     }
 
     // 顧客編輯訂位：只有 PENDING 能改
@@ -347,6 +358,16 @@ public class ReservationService {
             token = UUID.randomUUID().toString().replace("-", "");
         } while (reservationRepository.existsByAccessToken(token));
         return token;
+    }
+
+    private Reservation requireReservationAccess(Long reservationId, String accessToken) {
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new BusinessException("訂位連結驗證失敗");
+        }
+
+        return reservationRepository
+                .findByReservationIdAndAccessToken(reservationId, accessToken)
+                .orElseThrow(() -> new BusinessException("訂位連結驗證失敗"));
     }
 
     // Entity 轉 DTO 補上時段日期、開始結束時間、已配桌桌號 -> 前端不用再分別查多張表

@@ -258,16 +258,16 @@ const getRouteRoles = (to) => {
 };
 
 router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem("accessToken");
   const userInfo = getUserInfo();
   const roleName = userInfo.roleName;
+  const isLoggedIn = Boolean(userInfo.userId && roleName);
 
   const isAdminPage = to.path.startsWith("/admin");
   const isProfilePage = to.path === "/profile";
   const requiresAuth = to.matched.some((record) => record.meta?.requiresAuth);
   const allowedRoles = getRouteRoles(to);
 
-  if (!token && (requiresAuth || isAdminPage || isProfilePage)) {
+  if (!isLoggedIn && (requiresAuth || isAdminPage || isProfilePage)) {
     next({
       path: "/login",
       query: { redirect: to.fullPath },
@@ -275,7 +275,7 @@ router.beforeEach((to, from, next) => {
     return;
   }
 
-  if (token && (to.path === "/login" || to.path === "/register")) {
+  if (isLoggedIn && (to.path === "/login" || to.path === "/register")) {
     next(getDefaultPathByRole(roleName));
     return;
   }

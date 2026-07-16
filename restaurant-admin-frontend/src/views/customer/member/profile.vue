@@ -712,8 +712,8 @@ const loadPointHistory = async () => {
 onMounted(async () => {
   syncActiveTabFromRoute();
 
-  const token = localStorage.getItem("accessToken");
-  if (!token) {
+  const userInfo = JSON.parse(localStorage.getItem("userInfo") || "{}");
+  if (!userInfo.userId) {
     router.push("/login");
     return;
   }

@@ -46,6 +46,7 @@ public class SecurityConfig {
                         // ===== 公開路由（不需要登入）=====
                         .requestMatchers(HttpMethod.POST, "/api/members/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/members/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/members/logout").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/members/password/forgot").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/members/password/verify-code").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/members/password/reset").permitAll()
@@ -72,11 +73,21 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/api/reservations/*/reserve").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/api/reservations/*").permitAll()
 
-                        // ===== 前台訂單 / 付款（Demo 允許未登入操作）=====
+                        // ===== 前台訂單 / 付款 =====
                         .requestMatchers(HttpMethod.POST, "/api/orders").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/orders/**").permitAll()
-                        .requestMatchers("/api/payments/**").permitAll()
-                        .requestMatchers("/api/reservation-payments/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/payments/ecpay/checkout/*").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/payments/ecpay/result").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/payments/ecpay/result").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/payments/ecpay/callback").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/payments/linepay/payment-url/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/payments/linepay/request/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/payments/linepay/confirm").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/payments/*/success")
+                        .hasAnyAuthority("ROLE_STAFF", "ROLE_MANAGER", "ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/reservation-payments/ecpay/checkout/*").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/reservation-payments/ecpay/result").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/reservation-payments/ecpay/result").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/reservation-payments/ecpay/callback").permitAll()
                         .requestMatchers(HttpMethod.GET, "/favicon.ico").permitAll()
 
                         // ===== 個人資料路由（所有已登入角色都可以看 / 修改自己的資料）=====

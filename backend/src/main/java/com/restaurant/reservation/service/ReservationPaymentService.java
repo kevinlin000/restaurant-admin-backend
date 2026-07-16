@@ -5,7 +5,7 @@ import com.restaurant.common.ResourceNotFoundException;
 import com.restaurant.reservation.dto.ReservationResponse;
 import com.restaurant.reservation.entity.Reservation;
 import com.restaurant.reservation.repository.ReservationRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -22,12 +22,27 @@ import java.util.Map;
 import java.util.TreeMap;
 
 @Service
-@RequiredArgsConstructor
 public class ReservationPaymentService {
 
     private final ReservationRepository reservationRepository;
     private final ReservationService reservationService;
     private final ReservationEmailService reservationEmailService;
+    private final String ecpayHashKey;
+    private final String ecpayHashIv;
+
+    public ReservationPaymentService(
+            ReservationRepository reservationRepository,
+            ReservationService reservationService,
+            ReservationEmailService reservationEmailService,
+            @Value("${ecpay.hash-key}") String ecpayHashKey,
+            @Value("${ecpay.hash-iv}") String ecpayHashIv
+    ) {
+        this.reservationRepository = reservationRepository;
+        this.reservationService = reservationService;
+        this.reservationEmailService = reservationEmailService;
+        this.ecpayHashKey = ecpayHashKey;
+        this.ecpayHashIv = ecpayHashIv;
+    }
 
     // 依「已建立的訂位」產生綠界付款表單
     public String createEcpayCheckoutForm(Long reservationId) {
@@ -83,6 +98,7 @@ public class ReservationPaymentService {
     // ＊綠界 Server-to-server callback；RtnCode=1 才代表付款成功＊
     @Transactional
     public void handleEcpayCallback(Map<String, String> params) {
+        verifyEcpayCheckMacValue(params);
         String rtnCode = params.get("RtnCode");
         String merchantTradeNo = params.get("MerchantTradeNo");
         if (!"1".equals(rtnCode)) {
@@ -178,14 +194,12 @@ public class ReservationPaymentService {
     }
 
     private String generateCheckMacValue(Map<String, String> params) {
-        String hashKey = "pwFHCqoQZGmho4w6";
-        String hashIV = "EkRm7iFT261dpevs";
         Map<String, String> sortedMap = new TreeMap<>(params);
-        StringBuilder raw = new StringBuilder("HashKey=").append(hashKey);
+        StringBuilder raw = new StringBuilder("HashKey=").append(ecpayHashKey);
         for (Map.Entry<String, String> entry : sortedMap.entrySet()) {
             raw.append("&").append(entry.getKey()).append("=").append(entry.getValue());
         }
-        raw.append("&HashIV=").append(hashIV);
+        raw.append("&HashIV=").append(ecpayHashIv);
 
         try {
             String encoded = URLEncoder.encode(raw.toString(), StandardCharsets.UTF_8).toLowerCase();
@@ -198,6 +212,21 @@ public class ReservationPaymentService {
             return result.toString();
         } catch (Exception e) {
             throw new BusinessException("產生訂金付款驗證碼失敗");
+        }
+    }
+
+    private void verifyEcpayCheckMacValue(Map<String, String> params) {
+        String received = params.get("CheckMacValue");
+        if (received == null || received.isBlank()) {
+            throw new BusinessException("訂金付款驗證碼缺失");
+        }
+
+        Map<String, String> valuesToVerify = new HashMap<>(params);
+        valuesToVerify.remove("CheckMacValue");
+        valuesToVerify.remove("reservationId");
+        String expected = generateCheckMacValue(valuesToVerify);
+        if (!expected.equalsIgnoreCase(received)) {
+            throw new BusinessException("訂金付款驗證碼不符");
         }
     }
 }

@@ -128,7 +128,16 @@ onBeforeUnmount(() => {
 });
 
 const logout = async () => {
+  try {
+    await fetch("/api/members/logout", {
+      method: "POST",
+      credentials: "include",
+    });
+  } catch {
+    // 前端仍清除本地登入狀態。
+  }
   localStorage.removeItem("accessToken");
+  sessionStorage.removeItem("accessToken");
   localStorage.removeItem("userInfo");
 
   userInfo.value = null;

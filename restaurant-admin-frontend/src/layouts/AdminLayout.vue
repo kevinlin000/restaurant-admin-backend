@@ -303,8 +303,17 @@ const adminDropdownItems = computed(() => {
   return items.filter((item) => hasPermission(item.roles));
 });
 
-const logout = () => {
+const logout = async () => {
+  try {
+    await fetch("/api/members/logout", {
+      method: "POST",
+      credentials: "include",
+    });
+  } catch {
+    // 前端仍清除本地登入狀態。
+  }
   localStorage.removeItem("accessToken");
+  sessionStorage.removeItem("accessToken");
   localStorage.removeItem("userInfo");
   window.dispatchEvent(new Event("login-state-changed"));
   router.push("/login");
