@@ -1,15 +1,31 @@
 import api from "@/api/axios";
+import { demoFaqs } from "@/api/demoData";
 
 const unwrap = (response) => response.data?.data ?? response.data ?? [];
 
 export const faqApi = {
   async getPublishedFaqs(category) {
     const params = category ? { category } : {};
-    return unwrap(await api.get("/api/faqs", { params }));
+    try {
+      const faqs = unwrap(await api.get("/api/faqs", { params }));
+      if (Array.isArray(faqs)) return faqs;
+      return category ? demoFaqs.filter((faq) => faq.category === category) : demoFaqs;
+    } catch {
+      return category ? demoFaqs.filter((faq) => faq.category === category) : demoFaqs;
+    }
   },
 
   async searchFaqs(query) {
-    return unwrap(await api.get("/api/faqs/search", { params: { q: query } }));
+    try {
+      const faqs = unwrap(await api.get("/api/faqs/search", { params: { q: query } }));
+      if (Array.isArray(faqs)) return faqs;
+    } catch {
+    }
+    const keyword = `${query || ""}`.trim().toLowerCase();
+    if (!keyword) return demoFaqs;
+    return demoFaqs.filter((faq) =>
+      `${faq.question} ${faq.answer} ${faq.keywords || ""}`.toLowerCase().includes(keyword),
+    );
   },
 
   async getAdminFaqs() {

@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, watch, computed as vueComputed, nextTick } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
+import { demoMenuCategories, demoMenuStores, getDemoMenuItems } from '@/api/demoData'
 
 // 🤝 1. 引進餐點列表本機圖片
 import tofuImg from "@/assets/images/tofu.jpg";
@@ -245,29 +246,41 @@ const fetchHeroBanners = async () => {
 const fetchStores = async () => {
   try {
     const response = await axios.get('/api/menu-component/stores')
-    storeList.value = response.data.data || response.data
+    const stores = response.data.data || response.data
+    storeList.value = Array.isArray(stores) ? stores : demoMenuStores
     if (storeList.value.length > 0 && !currentStoreId.value) currentStoreId.value = storeList.value[0].id
-  } catch (error) { console.error('門市載入失敗', error) }
+  } catch (error) {
+    storeList.value = demoMenuStores
+    if (storeList.value.length > 0 && !currentStoreId.value) currentStoreId.value = storeList.value[0].id
+  }
 }
 
 const fetchCategories = async () => {
   try {
     const response = await axios.get('/api/menu-categories')
     const raw = response.data.data || response.data
-    categoryList.value = raw.map(cat => ({ id: cat.id || cat.categoryId, name: cat.categoryName || cat.name }))
+    categoryList.value = Array.isArray(raw)
+      ? raw.map(cat => ({ id: cat.id || cat.categoryId, name: cat.categoryName || cat.name }))
+      : demoMenuCategories
     if (categoryList.value.length > 0) activeCategoryId.value = categoryList.value[0].id
-  } catch (error) { console.error('分類載入失敗', error) }
+  } catch (error) {
+    categoryList.value = demoMenuCategories
+    if (categoryList.value.length > 0) activeCategoryId.value = categoryList.value[0].id
+  }
 }
 
 const fetchMenuData = async (storeId) => {
   if (!storeId) return
   try {
     const response = await axios.get(`/api/menu-items/store/${storeId}`)
-    menuItems.value = (response.data.data || response.data).map(item => {
+    const raw = response.data.data || response.data
+    menuItems.value = (Array.isArray(raw) ? raw : getDemoMenuItems(storeId)).map(item => {
       if (item.categoryId === undefined) item.categoryId = item.category_id;
       return item;
     })
-  } catch (error) { console.error('菜單載入失敗', error); menuItems.value = [] }
+  } catch (error) {
+    menuItems.value = getDemoMenuItems(storeId)
+  }
 }
 
 // ✅ 統一的 featureTags 解析函式
