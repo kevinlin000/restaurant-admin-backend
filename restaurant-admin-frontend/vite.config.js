@@ -4,6 +4,8 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 
+const apiTarget = process.env.VITE_API_TARGET || 'http://localhost:8080'
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -20,7 +22,7 @@ export default defineConfig({
     proxy: {
       // dev 時把 /api 轉發到後端 Spring Boot
       '/api': {
-        target: 'http://localhost:8080',
+        target: apiTarget,
         changeOrigin: true,
       },
     },

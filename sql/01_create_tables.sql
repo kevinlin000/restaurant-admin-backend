@@ -61,7 +61,7 @@ CREATE TABLE store (
 CREATE TABLE store_hour (
     hour_id         BIGINT AUTO_INCREMENT PRIMARY KEY,
     store_id        BIGINT NOT NULL,
-    day_of_week     TINYINT NOT NULL COMMENT '1=週一 ... 7=週日（ISO 8601）',
+    day_of_week     INT NOT NULL COMMENT '1=週一 ... 7=週日（ISO 8601）',
     open_time       TIME NOT NULL COMMENT '開店時間',
     close_time      TIME NOT NULL COMMENT '關店時間',
     meal_period     VARCHAR(20) COMMENT 'LUNCH / DINNER / AFTERNOON_TEA / ALL_DAY',
@@ -95,14 +95,27 @@ CREATE TABLE store_image (
 ) COMMENT = '門市照片（一家店多張）';
 
 -- ============================================================
--- 6. table_info（桌位）
+-- 6. store_feature（門市特色標籤）
+-- ============================================================
+CREATE TABLE store_feature (
+    feature_id      BIGINT AUTO_INCREMENT PRIMARY KEY,
+    store_id        BIGINT NOT NULL,
+    feature_key     VARCHAR(40) NOT NULL COMMENT '標籤代碼，如 BUSINESS / FAMILY / PARKING',
+    feature_label   VARCHAR(30) NOT NULL COMMENT '前台顯示名稱',
+    sort_order      INT DEFAULT 0 COMMENT '排序（小的在前）',
+    FOREIGN KEY (store_id) REFERENCES store(store_id),
+    UNIQUE KEY uk_store_feature (store_id, feature_key)
+) COMMENT = '門市特色標籤（用於情境篩選與推薦排序）';
+
+-- ============================================================
+-- 7. table_info（桌位）
 -- 註：capacity 已改名為 table_size（幾人座，避免與庫存的 count 欄位混淆）
 -- ============================================================
 CREATE TABLE table_info (
     table_id        BIGINT AUTO_INCREMENT PRIMARY KEY,
     store_id        BIGINT NOT NULL,
     table_number    VARCHAR(10) NOT NULL COMMENT '桌號，如 A01、VIP1',
-    table_size      TINYINT NOT NULL COMMENT '幾人座',
+    table_size      INT NOT NULL COMMENT '幾人座',
     table_type      VARCHAR(20) COMMENT 'REGULAR / BOOTH / VIP_ROOM / BAR',
     zone            VARCHAR(20) COMMENT '樓層或區域，如 1F、2F、露臺',
     status          VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE'
@@ -112,7 +125,7 @@ CREATE TABLE table_info (
 ) COMMENT = '桌位資訊（實體桌定義；用來產生 reservation_capacity 的列）';
 
 -- ============================================================
--- 7. role（角色權限）
+-- 8. role（角色權限）
 -- ============================================================
 CREATE TABLE role (
     role_id         BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -121,7 +134,7 @@ CREATE TABLE role (
 ) COMMENT = '角色權限表';
 
 -- ============================================================
--- 8. user（登入帳號；會員與員工共用）
+-- 9. user（登入帳號；會員與員工共用）
 -- ============================================================
 CREATE TABLE user (
     user_id         BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -210,9 +223,13 @@ CREATE TABLE time_slot (
     slot_id         BIGINT AUTO_INCREMENT PRIMARY KEY,
     store_id        BIGINT NOT NULL,
     reservation_date DATE NOT NULL COMMENT '可訂日期',
+    day_of_week     INT COMMENT '1=週一...7=週日',
     start_time      TIME NOT NULL COMMENT '時段開始',
     end_time        TIME NOT NULL COMMENT '時段結束',
     is_open         BOOLEAN NOT NULL DEFAULT TRUE COMMENT '是否開放訂位',
+    is_rule_generated BOOLEAN NOT NULL DEFAULT FALSE COMMENT '是否由星期規則批次產生',
+    requires_deposit BOOLEAN NOT NULL DEFAULT FALSE COMMENT '此時段是否需要支付訂金',
+    deposit_amount  DECIMAL(10, 2) NOT NULL DEFAULT 0.00 COMMENT '此時段訂金金額',
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (store_id) REFERENCES store(store_id),
     UNIQUE KEY uk_time_slot (store_id, reservation_date, start_time)
@@ -227,7 +244,7 @@ CREATE TABLE time_slot (
 CREATE TABLE reservation_capacity (
     capacity_id     BIGINT AUTO_INCREMENT PRIMARY KEY,
     slot_id         BIGINT NOT NULL,
-    table_size      TINYINT NOT NULL COMMENT '幾人座（對應 table_info.table_size）',
+    table_size      INT NOT NULL COMMENT '幾人座（對應 table_info.table_size）',
     total_count     INT NOT NULL COMMENT '該人數桌型總數',
     reserved_count  INT NOT NULL DEFAULT 0 COMMENT '已訂數量',
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -275,16 +292,17 @@ CREATE TABLE reservation_table (
 -- ============================================================
 CREATE TABLE orders (
     order_id        BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id         BIGINT NOT NULL,
+    user_id BIGINT NULL COMMENT '會員ID，訪客點餐可為 NULL',
     store_id        BIGINT NOT NULL,
     table_id        BIGINT COMMENT '用餐桌位（外帶可為 null）',
     reservation_id  BIGINT COMMENT '關聯訂位（可為 null，外帶不需訂位）',
     order_type      VARCHAR(20) NOT NULL DEFAULT 'DINE_IN' COMMENT 'DINE_IN / TAKEOUT',
     total_amount    DECIMAL(10, 2) NOT NULL DEFAULT 0.00 COMMENT '訂單總金額（鎖定當下價格）',
+    final_amount    DECIMAL(10, 2) NOT NULL DEFAULT 0.00 COMMENT '折抵後實付金額',
     points_used     INT NOT NULL DEFAULT 0 COMMENT '本次折抵點數',
     points_earned   INT NOT NULL DEFAULT 0 COMMENT '本次累積點數',
     status          VARCHAR(20) NOT NULL DEFAULT 'PENDING'
-                    COMMENT 'PENDING / PREPARING / SERVED / PAID / CANCELLED',
+                   COMMENT 'PENDING / CONFIRMED / PREPARING / READY / COMPLETED / CANCELLED',
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user(user_id),
@@ -317,8 +335,8 @@ CREATE TABLE payment (
     reservation_id  BIGINT COMMENT '關聯訂位（付訂金時填）',
     amount          DECIMAL(10, 2) NOT NULL COMMENT '付款金額',
     payment_method  VARCHAR(20) COMMENT 'CREDIT_CARD / LINE_PAY / CASH',
-    payment_status  VARCHAR(20) NOT NULL DEFAULT 'PENDING'
-                    COMMENT 'PENDING / SUCCESS / FAILED / REFUNDED',
+    payment_status  VARCHAR(20) NOT NULL DEFAULT 'UNPAID'
+                    COMMENT 'UNPAID / PAID / REFUNDED',
     transaction_no  VARCHAR(100) COMMENT '金流服務商交易序號',
     paid_at         DATETIME COMMENT '實際付款成功時間',
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,

@@ -1,0 +1,578 @@
+package com.restaurant.order.service;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import com.restaurant.common.BusinessException;
+import com.restaurant.menu.entity.StoreMenu;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.restaurant.member.entity.User;
+import com.restaurant.member.repository.UserRepository;
+import com.restaurant.menu.entity.MenuItem;
+import com.restaurant.menu.repository.MenuItemRepository;
+import com.restaurant.menu.repository.StoreMenuRepository;
+import com.restaurant.order.dto.CreateOrderRequest;
+import com.restaurant.order.dto.OrderItemRequest;
+import com.restaurant.order.dto.OrderItemResponse;
+import com.restaurant.order.dto.OrderResponse;
+import com.restaurant.order.dto.OrderSummaryResponse;
+import com.restaurant.order.entity.Order;
+import com.restaurant.order.entity.OrderItem;
+import com.restaurant.order.entity.Payment;
+import com.restaurant.order.repository.OrderItemRepository;
+import com.restaurant.order.repository.OrderRepository;
+import com.restaurant.order.repository.PaymentRepository;
+import com.restaurant.reservation.entity.Reservation;
+import com.restaurant.reservation.repository.ReservationRepository;
+import com.restaurant.store.entity.Store;
+import com.restaurant.store.entity.TableInfo;
+import com.restaurant.store.repository.StoreRepository;
+import com.restaurant.store.repository.TableInfoRepository;
+import com.restaurant.member.service.PointService;
+
+@Service
+public class OrderService {
+        private static final String ORDER_TYPE_DINE_IN = "DINE_IN";
+        private static final String ORDER_TYPE_TAKEOUT = "TAKEOUT";
+
+        private final OrderRepository orderRepository;
+
+        private final OrderItemRepository orderItemRepository;
+
+        private final PaymentRepository paymentRepository;
+
+        private final UserRepository userRepository;
+
+        private final StoreRepository storeRepository;
+
+        private final TableInfoRepository tableInfoRepository;
+
+        private final ReservationRepository reservationRepository;
+
+        private final MenuItemRepository menuItemRepository;
+
+        private final StoreMenuRepository storeMenuRepository;
+
+        private final PointService pointService;
+
+        OrderService(OrderRepository orderRepository,
+                        OrderItemRepository orderItemRepository,
+                        PaymentRepository paymentRepository,
+                        UserRepository userRepository,
+                        StoreRepository storeRepository,
+                        TableInfoRepository tableInfoRepository,
+                        MenuItemRepository menuItemRepository,
+                        StoreMenuRepository storeMenuRepository,
+                        ReservationRepository reservationRepository,
+                        PointService pointService) {
+                this.orderRepository = orderRepository;
+                this.orderItemRepository = orderItemRepository;
+                this.paymentRepository = paymentRepository;
+                this.userRepository = userRepository;
+                this.storeRepository = storeRepository;
+                this.tableInfoRepository = tableInfoRepository;
+                this.menuItemRepository = menuItemRepository;
+                this.storeMenuRepository = storeMenuRepository;
+                this.reservationRepository = reservationRepository;
+                this.pointService = pointService;
+        }
+
+        @Transactional
+        public OrderResponse createOrder(CreateOrderRequest request) {
+                String orderType = normalizeOrderType(request.getOrderType());
+
+                // 1. 查詢 User
+                User user = null;
+
+                if (request.getUserId() != null) {
+                        user = userRepository.findById(request.getUserId())
+                                        .orElseThrow(() -> new BusinessException("找不到會員"));
+                }
+
+                // 2. 查詢 Store
+                Store store = storeRepository.findByStoreIdAndIsDeletedFalse(request.getStoreId())
+                                .orElseThrow(() -> new BusinessException("找不到門市"));
+                if (!"OPEN".equals(store.getStatus())) {
+                        throw new BusinessException("門市目前未開放點餐");
+                }
+
+                // 3. 查詢 Table
+                TableInfo table = resolveTable(request, orderType);
+
+                // 4. 查詢 Reservation
+
+                Reservation reservation = resolveReservation(request, user, store, orderType);
+
+                // 若是從訂位進來點餐，訂單歸屬以訂位資料為主。
+                // 會員訂位：訂單歸訂位會員
+                // 非會員訂位：訂單 user 為 null
+                if (reservation != null) {
+                        if (reservation.getUserId() != null) {
+                                user = userRepository.findById(reservation.getUserId())
+                                                .orElseThrow(() -> new BusinessException("找不到訂位會員"));
+                        } else {
+                                user = null;
+                        }
+                }
+
+                if (reservation != null
+                                && reservation.getDepositAmount() != null
+                                && reservation.getDepositAmount().compareTo(BigDecimal.ZERO) > 0
+                                && !"PAID".equals(reservation.getPaymentStatus())) {
+
+                        throw new BusinessException("此訂位尚未完成訂金付款，無法建立訂單");
+                }
+
+                // 5. 查詢 MenuItem// 6. 計算 totalAmount
+                List<OrderLine> orderLines = buildOrderLines(request.getStoreId(), request.getItems());
+                BigDecimal totalAmount = orderLines.stream()
+                                .map(OrderLine::subtotal)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                // 7. 計算 finalAmount
+                Integer requestedPointsUsed = request.getPointsUsed() != null
+                                ? request.getPointsUsed()
+                                : 0;
+
+                int actualPointsUsed = 0;
+
+                if (user != null && requestedPointsUsed > 0) {
+                        actualPointsUsed = pointService.usePointsForOrder(
+                                        user.getUserId(),
+                                        store.getStoreId(),
+                                        null,
+                                        requestedPointsUsed);
+                }
+
+                BigDecimal depositDiscount = BigDecimal.ZERO;
+
+                if (reservation != null
+                                && "PAID".equals(reservation.getPaymentStatus())
+                                && reservation.getDepositAmount() != null) {
+                        depositDiscount = reservation.getDepositAmount();
+                }
+
+                // TODO Reservation 完成訂金流程後，改由 Reservation 帶入 depositAmount
+
+                BigDecimal pointsDiscount = BigDecimal.valueOf(actualPointsUsed);
+
+                BigDecimal finalAmount = totalAmount
+                                .subtract(depositDiscount)
+                                .subtract(pointsDiscount);
+
+                if (finalAmount.compareTo(BigDecimal.ZERO) < 0) {
+                        finalAmount = BigDecimal.ZERO;
+                }
+
+                // 8. pointsEarned 由會員模組計算，這邊先放 0
+
+                // 9. 建立 Order
+                Order order = Order.builder()
+                                .user(user)
+                                .store(store)
+                                .table(table)
+                                .reservation(reservation)
+
+                                .orderType(orderType)
+                                // 計算假資料
+                                .totalAmount(totalAmount)
+                                .finalAmount(finalAmount)
+                                .pointsEarned(0)
+                                .pointsUsed(actualPointsUsed)
+                                .invoiceType(request.getInvoiceType())
+                                .carrierNumber(request.getCarrierNumber())
+                                .status("PENDING")
+                                .build();
+
+                // 11. 儲存 Order
+                Order savedOrder = orderRepository.save(order);
+
+                // System.out.println("finalAmount=" + savedOrder.getFinalAmount());
+                for (OrderLine orderLine : orderLines) {
+                        // 10. 建立 OrderItem
+                        OrderItem orderItem = OrderItem.builder()
+                                        .order(savedOrder)
+                                        .menuItem(orderLine.menuItem())
+                                        .quantity(orderLine.quantity())
+                                        .unitPrice(orderLine.unitPrice())
+                                        .subtotal(orderLine.subtotal())
+                                        .build();
+
+                        orderItemRepository.save(orderItem);
+                }
+                // 2. 建立 Payment
+                Payment payment = Payment.builder()
+                                .order(savedOrder)
+                                .paymentMethod(request.getPaymentMethod())
+                                .paymentStatus("UNPAID")
+                                .amount(savedOrder.getFinalAmount())
+                                .build();
+
+                paymentRepository.save(payment);
+                // paymentService.createUnpaidPayment(savedOrder, request.getPaymentMethod());
+                // 3. 回傳
+                return convertToResponse(savedOrder);
+        }
+
+        public OrderResponse getOrderById(Long orderId) {
+
+                Order order = orderRepository.findById(orderId)
+                                .orElseThrow(() -> new BusinessException("找不到訂單"));
+
+                return convertToResponse(order);
+        }
+
+        public List<OrderResponse> getAllOrdersForAdmin() {
+                return orderRepository.findAllByOrderByCreatedAtDesc()
+                                .stream()
+                                .map(this::convertToResponse)
+                                .toList();
+        }
+
+        public OrderResponse updateOrderStatusForAdmin(Long orderId, String status) {
+                if (status == null || status.isBlank()) {
+                        throw new BusinessException("訂單狀態不可為空");
+                }
+
+                String newStatus = status.trim().toUpperCase();
+
+                if (!newStatus.equals("PENDING")
+                                && !newStatus.equals("CONFIRMED")
+                                && !newStatus.equals("PREPARING")
+                                && !newStatus.equals("READY")
+                                && !newStatus.equals("COMPLETED")
+                                && !newStatus.equals("CANCELLED")) {
+                        throw new BusinessException("不支援的訂單狀態");
+                }
+
+                Order order = orderRepository.findById(orderId)
+                                .orElseThrow(() -> new BusinessException("找不到訂單"));
+
+                Payment payment = paymentRepository.findByOrder(order);
+
+                String currentStatus = order.getStatus();
+
+                if ("COMPLETED".equals(currentStatus) || "CANCELLED".equals(currentStatus)) {
+                        throw new BusinessException("已完成或已取消的訂單不可再修改");
+                }
+
+                if ("COMPLETED".equals(newStatus)) {
+                        if (payment == null || !"PAID".equals(payment.getPaymentStatus())) {
+                                throw new BusinessException("訂單尚未付款，不能設為已完成");
+                        }
+                }
+                // 狀態流程防呆
+                if (!isValidStatusTransition(currentStatus, newStatus)) {
+                        throw new BusinessException("訂單狀態必須依流程更新");
+                }
+
+                if ("CANCELLED".equals(newStatus)) {
+                        handleCancelOrder(order, payment);
+                } else {
+                        order.setStatus(newStatus);
+
+                        if ("COMPLETED".equals(newStatus) && order.getUser() != null) {
+                                int earnedPoints = pointService.earnPointsFromOrder(
+                                                order.getUser().getUserId(),
+                                                order.getStore().getStoreId(),
+                                                order.getOrderId(),
+                                                order.getFinalAmount());
+
+                                order.setPointsEarned(earnedPoints);
+                        }
+                }
+
+                Order savedOrder = orderRepository.save(order);
+
+                return convertToResponse(savedOrder);
+        }
+
+        @Transactional
+        public OrderResponse markPaymentPaidForAdmin(Long orderId, String paymentMethod) {
+                if (paymentMethod == null || paymentMethod.isBlank()) {
+                        throw new BusinessException("付款方式不可為空");
+                }
+
+                String method = paymentMethod.trim().toUpperCase();
+
+                if (!method.equals("CASH")
+                                && !method.equals("CREDIT_CARD")
+                                && !method.equals("LINE_PAY")) {
+                        throw new BusinessException("不支援的付款方式");
+                }
+
+                Order order = orderRepository.findById(orderId)
+                                .orElseThrow(() -> new BusinessException("找不到訂單"));
+
+                if ("CANCELLED".equals(order.getStatus())) {
+                        throw new BusinessException("已取消的訂單不可完成付款");
+                }
+
+                Payment payment = paymentRepository.findByOrder(order);
+
+                if (payment == null) {
+                        throw new BusinessException("找不到付款資料");
+                }
+
+                payment.setPaymentMethod(method);
+                payment.setPaymentStatus("PAID");
+                payment.setPaidAt(LocalDateTime.now());
+                paymentRepository.save(payment);
+
+                order.setStatus("COMPLETED");
+
+                if (order.getUser() != null && (order.getPointsEarned() == null || order.getPointsEarned() == 0)) {
+                        int earnedPoints = pointService.earnPointsFromOrder(
+                                        order.getUser().getUserId(),
+                                        order.getStore().getStoreId(),
+                                        order.getOrderId(),
+                                        order.getFinalAmount());
+
+                        order.setPointsEarned(earnedPoints);
+                }
+
+                Order savedOrder = orderRepository.save(order);
+
+                return convertToResponse(savedOrder);
+        }
+
+        private OrderResponse convertToResponse(Order order) {
+
+                Payment payment = paymentRepository.findByOrder(order);
+                List<OrderItem> orderItems = orderItemRepository.findByOrder(order);
+
+                List<OrderItemResponse> itemResponses = orderItems.stream()
+                                .map(item -> OrderItemResponse.builder()
+                                                .menuItemId(item.getMenuItem().getId())
+                                                .itemName(item.getMenuItem().getItemName())
+                                                .quantity(item.getQuantity())
+                                                .unitPrice(item.getUnitPrice())
+                                                .subtotal(item.getSubtotal())
+                                                .build())
+                                .collect(Collectors.toList());
+                return OrderResponse.builder()
+                                .orderId(order.getOrderId())
+                                .userId(order.getUser() != null ? order.getUser().getUserId() : null)
+                                .storeId(order.getStore().getStoreId())
+                                .tableId(order.getTable() != null ? order.getTable().getTableId() : null)
+                                .tableNumber(order.getTable() != null ? order.getTable().getTableNumber() : null)
+                                .reservationId(order.getReservation() != null
+                                                ? order.getReservation().getReservationId()
+                                                : null)
+                                .depositAmount(order.getReservation() != null
+                                                ? order.getReservation().getDepositAmount()
+                                                : BigDecimal.ZERO)
+                                .depositStatus(order.getReservation() != null
+                                                ? order.getReservation().getPaymentStatus()
+                                                : null)
+                                .orderType(order.getOrderType())
+                                .totalAmount(order.getTotalAmount())
+                                .finalAmount(order.getFinalAmount())
+                                .pointsUsed(order.getPointsUsed())
+                                .pointsEarned(order.getPointsEarned())
+                                .paymentMethod(payment != null ? payment.getPaymentMethod() : null)
+                                .paymentStatus(payment != null ? payment.getPaymentStatus() : null)
+                                .invoiceType(order.getInvoiceType())
+                                .carrierNumber(order.getCarrierNumber())
+                                .status(order.getStatus())
+                                .createdAt(order.getCreatedAt())
+                                .items(itemResponses)
+                                .build();
+        }
+
+        public List<OrderSummaryResponse> getOrdersByUserId(Long userId) {
+
+                List<Order> orders = orderRepository.findByUserUserId(userId);
+
+                return orders.stream()
+                                .map(this::convertToSummaryResponse)
+                                .collect(Collectors.toList());
+        }
+
+        private OrderSummaryResponse convertToSummaryResponse(Order order) {
+
+                Payment payment = paymentRepository.findByOrder(order);
+
+                return OrderSummaryResponse.builder()
+                                .orderId(order.getOrderId())
+                                .userId(order.getUser() != null ? order.getUser().getUserId() : null)
+                                .storeId(order.getStore().getStoreId())
+                                .tableNumber(order.getTable() != null ? order.getTable().getTableNumber() : null)
+                                .orderType(order.getOrderType())
+                                .totalAmount(order.getTotalAmount())
+                                .finalAmount(order.getFinalAmount())
+                                .depositAmount(order.getReservation() != null
+                                                ? order.getReservation().getDepositAmount()
+                                                : BigDecimal.ZERO)
+                                .depositStatus(order.getReservation() != null
+                                                ? order.getReservation().getPaymentStatus()
+                                                : null)
+                                .paymentMethod(payment != null ? payment.getPaymentMethod() : null)
+                                .paymentStatus(payment != null ? payment.getPaymentStatus() : null)
+                                .invoiceType(order.getInvoiceType())
+                                .carrierNumber(order.getCarrierNumber())
+                                .status(order.getStatus())
+                                .createdAt(order.getCreatedAt())
+                                .build();
+        }
+
+        private TableInfo resolveTable(CreateOrderRequest request, String orderType) {
+                if (request.getTableId() == null) {
+                        if (ORDER_TYPE_DINE_IN.equals(orderType)) {
+                                throw new BusinessException("內用訂單必須指定桌位");
+                        }
+                        return null;
+                }
+
+                return tableInfoRepository.findByTableIdAndStoreId(request.getTableId(), request.getStoreId())
+                                .orElseThrow(() -> new BusinessException("桌位不屬於指定門市"));
+        }
+
+        private Reservation resolveReservation(CreateOrderRequest request, User user, Store store, String orderType) {
+                if (request.getReservationId() == null) {
+                        return null;
+                }
+
+                if (!ORDER_TYPE_DINE_IN.equals(orderType)) {
+                        throw new BusinessException("外帶訂單不可綁定訂位");
+                }
+
+                Reservation reservation = reservationRepository.findById(request.getReservationId())
+                                .orElseThrow(() -> new BusinessException("找不到訂位資料"));
+
+                if (!reservation.getStoreId().equals(store.getStoreId())) {
+                        throw new BusinessException("訂位門市與訂單門市不一致");
+                }
+
+                // if (reservation.getUserId() != null && user != null &&
+                // !reservation.getUserId().equals(user.getUserId())) {
+                // throw new BusinessException("訂位會員與訂單會員不一致");
+                // }
+
+                if ("CANCELLED".equals(reservation.getStatus())) {
+                        throw new BusinessException("已取消的訂位不可建立訂單");
+                }
+
+                return reservation;
+        }
+
+        private List<OrderLine> buildOrderLines(Long storeId, List<OrderItemRequest> items) {
+                if (items == null || items.isEmpty()) {
+                        throw new BusinessException("訂單至少需要一個餐點");
+                }
+
+                List<OrderLine> orderLines = new ArrayList<>();
+
+                for (OrderItemRequest itemRequest : items) {
+                        if (itemRequest.getMenuItemId() == null) {
+                                throw new BusinessException("餐點 ID 不可為空");
+                        }
+                        if (itemRequest.getQuantity() == null || itemRequest.getQuantity() < 1) {
+                                throw new BusinessException("餐點數量至少為 1");
+                        }
+
+                        StoreMenu storeMenu = storeMenuRepository
+                                        .findByStoreIdAndMenuItemIdAndIsAvailableTrue(storeId,
+                                                        itemRequest.getMenuItemId())
+                                        .orElseThrow(() -> new BusinessException("此門市未供應部分餐點"));
+                        MenuItem menuItem = menuItemRepository.findById(itemRequest.getMenuItemId())
+                                        .orElseThrow(() -> new BusinessException("找不到餐點"));
+                        if (!Boolean.TRUE.equals(menuItem.getIsActive())) {
+                                throw new BusinessException("餐點已下架");
+                        }
+
+                        BigDecimal unitPrice = storeMenu.getPrice() != null ? storeMenu.getPrice()
+                                        : menuItem.getPrice();
+                        if (unitPrice == null) {
+                                throw new BusinessException("餐點價格未設定");
+                        }
+
+                        Integer quantity = itemRequest.getQuantity();
+                        BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
+                        orderLines.add(new OrderLine(menuItem, quantity, unitPrice, subtotal));
+                }
+
+                return orderLines;
+        }
+
+        private String normalizeOrderType(String orderType) {
+                if (orderType == null || orderType.isBlank()) {
+                        return ORDER_TYPE_DINE_IN;
+                }
+
+                String normalized = orderType.trim().toUpperCase();
+                if ("TAKE_OUT".equals(normalized)) {
+                        return ORDER_TYPE_TAKEOUT;
+                }
+                if (ORDER_TYPE_DINE_IN.equals(normalized) || ORDER_TYPE_TAKEOUT.equals(normalized)) {
+                        return normalized;
+                }
+
+                throw new BusinessException("不支援的訂單類型");
+        }
+
+        private record OrderLine(MenuItem menuItem, Integer quantity, BigDecimal unitPrice, BigDecimal subtotal) {
+        }
+
+        private void handleCancelOrder(Order order, Payment payment) {
+                if (payment != null && "PAID".equals(payment.getPaymentStatus())) {
+                        LocalDateTime createdAt = order.getCreatedAt();
+
+                        if (createdAt != null &&
+                                        createdAt.isBefore(LocalDateTime.now().minusDays(30))) {
+                                throw new BusinessException("超過 30 天的訂單不可退款");
+                        }
+
+                        payment.setPaymentStatus("REFUNDED");
+                        paymentRepository.save(payment);
+                }
+
+                if (order.getUser() != null
+                                && order.getPointsUsed() != null
+                                && order.getPointsUsed() > 0) {
+
+                        pointService.refundPointsForOrder(
+                                        order.getUser().getUserId(),
+                                        order.getStore().getStoreId(),
+                                        order.getOrderId(),
+                                        order.getPointsUsed());
+                }
+
+                order.setStatus("CANCELLED");
+        }
+
+        private boolean isValidStatusTransition(String currentStatus, String newStatus) {
+
+                if (currentStatus.equals(newStatus)) {
+                        return true;
+                }
+
+                if ("CANCELLED".equals(newStatus)) {
+                        return true;
+                }
+
+                if ("PENDING".equals(currentStatus)) {
+                        return "CONFIRMED".equals(newStatus);
+                }
+
+                if ("CONFIRMED".equals(currentStatus)) {
+                        return "PREPARING".equals(newStatus);
+                }
+
+                if ("PREPARING".equals(currentStatus)) {
+                        return "READY".equals(newStatus);
+                }
+
+                if ("READY".equals(currentStatus)) {
+                        return "COMPLETED".equals(newStatus);
+                }
+
+                return false;
+        }
+
+}
