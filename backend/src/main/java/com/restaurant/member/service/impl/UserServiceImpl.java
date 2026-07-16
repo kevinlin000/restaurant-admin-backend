@@ -33,7 +33,7 @@ public class UserServiceImpl implements UserService {
      * 取得會員個人資料
      */
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public MemberProfileResponse getProfile(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("使用者不存在"));

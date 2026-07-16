@@ -1,4 +1,3 @@
-
 CREATE TABLE IF NOT EXISTS news_article (
     news_id BIGINT NOT NULL AUTO_INCREMENT,
     category VARCHAR(30) NOT NULL,

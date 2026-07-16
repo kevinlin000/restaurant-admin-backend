@@ -219,11 +219,12 @@ async function loadMemberPoints() {
     if (!isLogin.value) return;
 
     try {
-        const token = localStorage.getItem("accessToken");
+        const token = sessionStorage.getItem("accessToken");
 
         const response = await axios.get("/api/members/me/points", {
+            withCredentials: true,
             headers: {
-                Authorization: `Bearer ${token}`,
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
         });
 

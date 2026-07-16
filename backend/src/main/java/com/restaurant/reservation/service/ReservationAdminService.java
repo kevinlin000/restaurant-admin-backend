@@ -218,6 +218,14 @@ public class ReservationAdminService {
         return reservationService.toResponse(reservation);
     }
 
+    @Transactional
+    public void cancelReservation(Long reservationId) {
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ResourceNotFoundException("訂位", reservationId));
+        syncNoShowReservations(reservation.getStoreId());
+        reservationService.cancelReservation(reservationId);
+    }
+
     private void syncNoShowReservations(Long storeId) {
         reservationRepository.markNoShowReservations(storeId, LocalDate.now(), LocalTime.now());
     }

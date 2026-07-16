@@ -29,6 +29,7 @@ const successMessage = ref('')
 const successReservation = ref(null)
 const currentMember = ref(null)
 const editingReservationId = ref(null)
+const editingReservationToken = ref('')
 const editingOriginalSlotId = ref(null)
 const editingOriginalPartySize = ref(null)
 const showDateDropdown = ref(false)
@@ -296,8 +297,8 @@ const fillMemberInfo = (member) => {
 
 // 若會員已登入，進入訂位頁時自動帶入姓名、手機、Email
 const loadCurrentMember = async () => {
-  if (!localStorage.getItem('accessToken')) return
   const storedUser = getCurrentUserInfo()
+  if (!storedUser?.userId) return
   try {
     const res = await getProfile()
     const profile = res.data?.data || {}
@@ -334,7 +335,7 @@ const submitReservation = async () => {
   try {
     const isEditing = Boolean(editingReservationId.value)
     const res = editingReservationId.value
-      ? await reservationApi.updateReservation(editingReservationId.value, payload)
+      ? await reservationApi.updateReservation(editingReservationId.value, editingReservationToken.value, payload)
       : await reservationApi.createReservation(payload)
     cacheSuccessReservation(res.data?.reservationId)
     successReservation.value = res.data
@@ -361,9 +362,10 @@ const loadReservationForEdit = async () => {
   loading.value = true
   errorMessage.value = ''
   try {
-    const res = await reservationApi.getReservation(editId)
+    const res = await reservationApi.getReservation(editId, route.query.token)
     const item = res.data
     editingReservationId.value = item.reservationId
+    editingReservationToken.value = route.query.token || item.accessToken || ''
     editingOriginalSlotId.value = item.slotId
     editingOriginalPartySize.value = item.partySize
     form.customerName = item.customerName || ''

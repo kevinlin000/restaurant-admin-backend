@@ -1,6 +1,7 @@
 package com.restaurant.config;
 
 import com.restaurant.member.util.JwtUtil;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,7 +20,7 @@ import java.util.List;
  * JWT 驗證過濾器。
  *
  * 每一個 HTTP Request 進來時執行一次，負責：
- * 1. 從 Authorization Header 取出 Bearer Token
+ * 1. 優先從 Authorization Header 取 Bearer Token，否則讀 HttpOnly Cookie
  * 2. 用 JwtUtil 驗證 Token 是否合法
  * 3. 解析出 userId 和 roleName，寫入 SecurityContextHolder
  *
@@ -39,14 +40,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String authHeader = request.getHeader("Authorization");
+        String token = null;
 
-        // 沒有 Authorization Header，或格式不是 Bearer，直接放行（交給 SecurityConfig 決定是否拒絕）
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        } else if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("access_token".equals(cookie.getName())) {
+                    token = cookie.getValue();
+                    break;
+                }
+            }
+        }
+
+        // 沒有 Token，直接放行（交給 SecurityConfig 決定是否拒絕）
+        if (token == null || token.isBlank()) {
             filterChain.doFilter(request, response);
             return;
         }
-
-        String token = authHeader.substring(7); // 移除 "Bearer " 前綴
 
         // Token 驗證失敗（過期、被篡改等），直接放行，SecurityConfig 會擋下需要認證的路由
         if (!jwtUtil.validateToken(token)) {

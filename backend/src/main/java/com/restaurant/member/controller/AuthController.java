@@ -15,8 +15,13 @@ import com.restaurant.member.dto.VerifyPasswordResetCodeRequest;
 import com.restaurant.member.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.Duration;
 
 @RestController
 @RequestMapping("/api/members")
@@ -24,6 +29,32 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
         private final AuthService authService;
+
+        @Value("${jwt.expiration:86400000}")
+        private long jwtExpirationMs;
+
+        @Value("${app.auth.cookie-secure:false}")
+        private boolean cookieSecure;
+
+        private ResponseCookie accessTokenCookie(String token) {
+                return ResponseCookie.from("access_token", token)
+                                .httpOnly(true)
+                                .secure(cookieSecure)
+                                .sameSite("Lax")
+                                .path("/")
+                                .maxAge(Duration.ofMillis(jwtExpirationMs))
+                                .build();
+        }
+
+        private ResponseCookie clearAccessTokenCookie() {
+                return ResponseCookie.from("access_token", "")
+                                .httpOnly(true)
+                                .secure(cookieSecure)
+                                .sameSite("Lax")
+                                .path("/")
+                                .maxAge(0)
+                                .build();
+        }
 
         /**
          * 會員註冊
@@ -34,7 +65,9 @@ public class AuthController {
                         @Valid @RequestBody MemberRegisterRequest request) {
 
                 LoginResponse data = authService.registerMember(request);
-                return ResponseEntity.ok(ApiResponse.success("註冊成功", data));
+                return ResponseEntity.ok()
+                                .header(HttpHeaders.SET_COOKIE, accessTokenCookie(data.getAccessToken()).toString())
+                                .body(ApiResponse.success("註冊成功", data));
         }
 
         /**
@@ -46,7 +79,16 @@ public class AuthController {
                         @Valid @RequestBody LoginRequest request) {
 
                 LoginResponse data = authService.login(request);
-                return ResponseEntity.ok(ApiResponse.success("登入成功", data));
+                return ResponseEntity.ok()
+                                .header(HttpHeaders.SET_COOKIE, accessTokenCookie(data.getAccessToken()).toString())
+                                .body(ApiResponse.success("登入成功", data));
+        }
+
+        @PostMapping("/logout")
+        public ResponseEntity<ApiResponse<Void>> logout() {
+                return ResponseEntity.ok()
+                                .header(HttpHeaders.SET_COOKIE, clearAccessTokenCookie().toString())
+                                .body(ApiResponse.success("登出成功"));
         }
 
         /**

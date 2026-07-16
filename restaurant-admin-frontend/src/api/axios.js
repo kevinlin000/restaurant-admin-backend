@@ -4,11 +4,12 @@ import router from "@/router";
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "",
   timeout: 30000,
+  withCredentials: true,
 });
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("accessToken");
+    const token = sessionStorage.getItem("accessToken");
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -27,6 +28,7 @@ api.interceptors.response.use(
     // 401：沒有登入或 token 失效，才清除登入狀態。
     if (status === 401) {
       localStorage.removeItem("accessToken");
+      sessionStorage.removeItem("accessToken");
       localStorage.removeItem("userInfo");
 
       window.dispatchEvent(new Event("login-state-changed"));

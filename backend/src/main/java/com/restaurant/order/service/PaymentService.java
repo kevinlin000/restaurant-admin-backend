@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.restaurant.order.entity.Order;
 import com.restaurant.order.entity.Payment;
@@ -22,9 +23,19 @@ public class PaymentService {
 
     private final OrderRepository orderRepository;
 
-    PaymentService(PaymentRepository paymentRepository, OrderRepository orderRepository) {
+    private final String ecpayHashKey;
+
+    private final String ecpayHashIv;
+
+    PaymentService(
+            PaymentRepository paymentRepository,
+            OrderRepository orderRepository,
+            @Value("${ecpay.hash-key}") String ecpayHashKey,
+            @Value("${ecpay.hash-iv}") String ecpayHashIv) {
         this.paymentRepository = paymentRepository;
         this.orderRepository = orderRepository;
+        this.ecpayHashKey = ecpayHashKey;
+        this.ecpayHashIv = ecpayHashIv;
     }
 
     public Payment createUnpaidPayment(Order order, String paymentMethod) {
@@ -199,14 +210,11 @@ public class PaymentService {
 
     private String generateCheckMacValue(Map<String, String> params) {
 
-        String hashKey = "pwFHCqoQZGmho4w6";
-        String hashIV = "EkRm7iFT261dpevs";
-
         Map<String, String> sortedMap = new TreeMap<>(params);
 
         StringBuilder sb = new StringBuilder();
 
-        sb.append("HashKey=").append(hashKey);
+        sb.append("HashKey=").append(ecpayHashKey);
 
         for (Map.Entry<String, String> entry : sortedMap.entrySet()) {
             sb.append("&")
@@ -215,7 +223,7 @@ public class PaymentService {
                     .append(entry.getValue());
         }
 
-        sb.append("&HashIV=").append(hashIV);
+        sb.append("&HashIV=").append(ecpayHashIv);
 
         try {
             String encoded = URLEncoder.encode(
@@ -241,6 +249,7 @@ public class PaymentService {
     }
 
     public void handleEcpayCallback(Map<String, String> params) {
+        verifyEcpayCheckMacValue(params);
 
         String rtnCode = params.get("RtnCode");
         String merchantTradeNo = params.get("MerchantTradeNo");
@@ -249,12 +258,35 @@ public class PaymentService {
             throw new RuntimeException("付款失敗：" + params.get("RtnMsg"));
         }
 
-        String orderIdText = merchantTradeNo
-                .substring(2, merchantTradeNo.indexOf("T"));
+        simulatePaymentSuccess(parseOrderId(merchantTradeNo));
+    }
 
-        Long orderId = Long.valueOf(orderIdText);
+    public Long completeEcpayResult(Map<String, String> params) {
+        handleEcpayCallback(params);
+        return parseOrderId(params.get("MerchantTradeNo"));
+    }
 
-        simulatePaymentSuccess(orderId);
+    private void verifyEcpayCheckMacValue(Map<String, String> params) {
+        String received = params.get("CheckMacValue");
+        if (received == null || received.isBlank()) {
+            throw new RuntimeException("綠界付款驗證碼缺失");
+        }
+
+        Map<String, String> valuesToVerify = new HashMap<>(params);
+        valuesToVerify.remove("CheckMacValue");
+        valuesToVerify.remove("orderId");
+        String expected = generateCheckMacValue(valuesToVerify);
+        if (!expected.equalsIgnoreCase(received)) {
+            throw new RuntimeException("綠界付款驗證碼不符");
+        }
+    }
+
+    private Long parseOrderId(String merchantTradeNo) {
+        if (merchantTradeNo == null || !merchantTradeNo.startsWith("OD") || !merchantTradeNo.contains("T")) {
+            throw new RuntimeException("綠界交易編號格式錯誤");
+        }
+        String orderIdText = merchantTradeNo.substring(2, merchantTradeNo.indexOf("T"));
+        return Long.valueOf(orderIdText);
     }
 
     // public String createLinePayRequest(Long orderId) {

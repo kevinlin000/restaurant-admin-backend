@@ -19,18 +19,18 @@ export const reservationApi = {
   },
 
   // 編輯訂位，重新檢查時段、容量
-  updateReservation(reservationId, payload) {
-    return http.put(`/reservations/${reservationId}`, payload)
+  updateReservation(reservationId, token, payload) {
+    return http.put(`/reservations/${reservationId}`, payload, { params: { token } })
   },
 
   // 保留訂位，狀態從 PENDING 改為 RESERVED。
-  reserveReservation(reservationId) {
-    return http.patch(`/reservations/${reservationId}/reserve`)
+  reserveReservation(reservationId, token) {
+    return http.patch(`/reservations/${reservationId}/reserve`, null, { params: { token } })
   },
 
   // 訂位成功、編輯，用來讀取單筆訂位最新資料。
-  getReservation(reservationId) {
-    return http.get(`/reservations/${reservationId}`)
+  getReservation(reservationId, token) {
+    return http.get(`/reservations/${reservationId}`, { params: { token } })
   },
 
   // Gmail 訂位成功信連結用 id + token 查詢(可不用會員登入 JWT)
@@ -39,8 +39,8 @@ export const reservationApi = {
   },
 
   // 取消訂位，恢復容量、移除已配桌資料
-  cancelReservation(reservationId) {
-    return http.delete(`/reservations/${reservationId}`)
+  cancelReservation(reservationId, token) {
+    return http.delete(`/reservations/${reservationId}`, { params: { token } })
   },
 
   // 取得訂位訂金付款頁網址
@@ -100,6 +100,10 @@ export const reservationAdminApi = {
   // 訂位名單：編輯
   updateReservationInfo(reservationId, payload) {
     return http.put(`/admin/reservations/${reservationId}`, payload)
+  },
+
+  cancelReservation(reservationId) {
+    return http.delete(`/admin/reservations/${reservationId}`)
   },
 }
 

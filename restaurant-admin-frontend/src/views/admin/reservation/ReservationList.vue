@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { reservationAdminApi, reservationApi } from '@/api/reservation'
+import { reservationAdminApi } from '@/api/reservation'
 import {
   buildStoreNameLookup,
   canUseAllManagedStores,
@@ -221,7 +221,7 @@ const loadReservations = async () => {
 
 // 取消訂位後 -> 重新載入列表、狀態立即更新
 const cancelReservation = async (reservationId) => {
-  await reservationApi.cancelReservation(reservationId)
+  await reservationAdminApi.cancelReservation(reservationId)
   await loadReservations()
 }
 
